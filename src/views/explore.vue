@@ -64,7 +64,7 @@
 </template>
 
 <script>
-import { mapMutations, mapGetters } from 'vuex';
+import { mapActions, mapGetters } from 'vuex';
 import NProgress from 'nprogress';
 import { topPlaylist, highQualityPlaylist, toplists } from '@/api/playlist';
 import { playlistCategories } from '@/utils/staticData';
@@ -116,7 +116,7 @@ export default {
     this.$parent.$refs.scrollbar.restorePosition();
   },
   methods: {
-    ...mapMutations('preferences', ['togglePlaylistCategory']),
+    ...mapActions('preferences', ['togglePlaylistCategory']),
     loadData() {
       setTimeout(() => {
         if (!this.show) NProgress.start();
@@ -188,7 +188,9 @@ export default {
       return playlistCategories.filter(c => c.bigCat === name);
     },
     toggleCat(name) {
-      this.togglePlaylistCategory(name);
+      return this.togglePlaylistCategory(name).catch(error => {
+        this.$store.dispatch('showToast', error.message || '设置保存失败');
+      });
     },
   },
 };

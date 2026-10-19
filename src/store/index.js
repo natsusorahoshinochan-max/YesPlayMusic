@@ -19,13 +19,14 @@ export function createStore({
   credentials = noCredentials,
   session = {},
   library = {},
+  preferences = {},
   actions = {},
 } = {}) {
   initializePlayerStorage(storage);
   const persistence = createPersistence(storage, language);
   const plugins = [persistence.install];
   if (process.env.IS_ELECTRON === true) plugins.push(getSendSettingsPlugin());
-  store = new Vuex.Store({
+  const createdStore = new Vuex.Store({
     state: createState(storage),
     mutations,
     actions: { ...rootActions, ...actions },
@@ -36,9 +37,16 @@ export function createStore({
         credentials,
       }),
       library: createLibrary(persistence.snapshot.library, library),
-      preferences: createPreferences(persistence.snapshot.preferences),
+      preferences: createPreferences(persistence.snapshot.preferences, {
+        ...preferences,
+        persist: async () => {
+          await persistence.ready;
+          await persistence.save(createdStore.state);
+        },
+      }),
     },
   });
-  return store;
+  store = createdStore;
+  return createdStore;
 }
 export { store as default };
