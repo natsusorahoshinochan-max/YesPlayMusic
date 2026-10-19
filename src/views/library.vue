@@ -389,7 +389,11 @@ export default {
       this.$refs.playModeTabMenu.openMenu(e);
     },
     changePlaylistFilter(type) {
-      this.$store.commit('preferences/setLibraryPlaylistFilter', type);
+      this.$store
+        .dispatch('preferences/setLibraryPlaylistFilter', type)
+        .catch(error => {
+          this.$store.dispatch('showToast', error.message || '设置保存失败');
+        });
       window.scrollTo({ top: 375, behavior: 'smooth' });
     },
     selectUploadFiles() {

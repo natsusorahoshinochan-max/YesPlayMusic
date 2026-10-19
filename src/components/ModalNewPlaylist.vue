@@ -91,7 +91,9 @@ export default {
             }
             this.close();
             this.showToast('成功创建歌单');
-            this.$store.commit('preferences/setLibraryPlaylistFilter', 'mine');
+            this.$store
+              .dispatch('preferences/setLibraryPlaylistFilter', 'mine')
+              .catch(error => this.showToast(error.message || '设置保存失败'));
           }
         });
     },

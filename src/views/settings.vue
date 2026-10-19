@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page" @click="clickOutside">
+  <div class="settings-page" @click.self="clickOutside">
     <div class="container">
       <div v-if="showUserInfo" class="user">
         <div class="left">
@@ -702,7 +702,7 @@
         </div>
       </div>
 
-      <div v-if="isElectron">
+      <div v-if="isElectron" @click.stop>
         <h3>快捷键</h3>
         <div class="item">
           <div class="left">
@@ -725,6 +725,7 @@
           :class="{ 'global-disabled': !enableGlobalShortcut }"
           tabindex="0"
           @keydown="handleShortcutKeydown"
+          @keyup="handleShortcutKeyup"
         >
           <div class="row row-head">
             <div class="col">功能</div>
@@ -811,21 +812,22 @@
 import { mapState, mapActions, mapGetters } from 'vuex';
 import { auth as lastfmAuth } from '@/api/lastfm';
 import { bytesToSize } from '@/utils/common';
-import { changeAppearance, changeThemeColor } from '@/utils/appearance';
 import { countDBSize, clearDB } from '@/utils/db';
 import pkg from '../../package.json';
-
-const electron =
-  process.env.IS_ELECTRON === true ? window.require('electron') : null;
-const ipcRenderer =
-  process.env.IS_ELECTRON === true ? electron.ipcRenderer : null;
+import cloneDeep from 'lodash/cloneDeep';
 
 const validShortcutCodes = ['=', '-', '~', '[', ']', ';', "'", ',', '.', '/'];
 
 export default {
   name: 'Settings',
+  beforeRouteLeave(to, from, next) {
+    this.exitRecordShortcut().then(() => next());
+  },
   data() {
     return {
+      proxyDraft: cloneDeep(
+        this.$store.getters['preferences/settings'].proxyConfig
+      ),
       tracksCache: {
         size: '0KB',
         length: 0,
@@ -919,8 +921,7 @@ export default {
         return this.settings.lang;
       },
       set(lang) {
-        this.$i18n.locale = lang;
-        this.$store.commit('preferences/changeLang', lang);
+        this.submitPreference('setLanguage', lang);
       },
     },
     musicLanguage: {
@@ -928,7 +929,7 @@ export default {
         return this.settings.musicLanguage ?? 'all';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'musicLanguage',
           value,
         });
@@ -940,16 +941,7 @@ export default {
         return this.settings.appearance;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'appearance',
-          value,
-        });
-        changeAppearance(value);
-        const resolvedAppearance =
-          value === 'auto'
-            ? document.body?.getAttribute('data-theme') || 'light'
-            : value;
-        changeThemeColor(this.themeColor, resolvedAppearance);
+        this.submitPreference('setAppearance', value);
       },
     },
     themeColor: {
@@ -958,30 +950,15 @@ export default {
         return this.settings.themeColor;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'themeColor',
-          value,
-        });
-        const resolvedAppearance =
-          this.settings.appearance === 'auto'
-            ? document.body?.getAttribute('data-theme') || 'light'
-            : this.settings.appearance;
-        changeThemeColor(value, resolvedAppearance);
+        this.submitPreference('setThemeColor', value);
       },
     },
     trayIconTheme: {
       get() {
-        if (this.settings.trayIconTheme === undefined) return 'auto';
         return this.settings.trayIconTheme;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'trayIconTheme',
-          value,
-        });
-        if (this.isElectron) {
-          ipcRenderer.send('updateTrayIcon', value);
-        }
+        this.submitPreference('setTrayIconTheme', value);
       },
     },
     musicQuality: {
@@ -989,9 +966,9 @@ export default {
         return this.settings.musicQuality ?? 320000;
       },
       set(value) {
-        if (value === this.settings.musicQuality) return;
-        this.$store.commit('preferences/changeMusicQuality', value);
-        this.clearCache();
+        this.submitPreference('setMusicQuality', value).then(() =>
+          this.countDBSize()
+        );
       },
     },
     lyricFontSize: {
@@ -1000,7 +977,7 @@ export default {
         return this.settings.lyricFontSize;
       },
       set(value) {
-        this.$store.commit('preferences/changeLyricFontSize', value);
+        this.submitPreference('setPreference', { key: 'lyricFontSize', value });
       },
     },
     outputDevice: {
@@ -1016,10 +993,7 @@ export default {
         return this.settings.outputDevice;
       },
       set(deviceId) {
-        if (deviceId === this.settings.outputDevice || deviceId === undefined)
-          return;
-        this.$store.commit('preferences/changeOutputDevice', deviceId);
-        this.player.setOutputDevice();
+        this.submitPreference('setOutputDevice', deviceId);
       },
     },
     enableUnblockNeteaseMusic: {
@@ -1028,7 +1002,7 @@ export default {
         return value !== undefined ? value : true;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'enableUnblockNeteaseMusic',
           value,
         });
@@ -1040,7 +1014,7 @@ export default {
         return this.settings.showPlaylistsByAppleMusic;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'showPlaylistsByAppleMusic',
           value,
         });
@@ -1052,7 +1026,7 @@ export default {
         return this.settings.nyancatStyle;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'nyancatStyle',
           value,
         });
@@ -1064,13 +1038,9 @@ export default {
         return this.settings.automaticallyCacheSongs;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'automaticallyCacheSongs',
-          value,
-        });
-        if (value === false) {
-          this.clearCache();
-        }
+        this.submitPreference('setAutomaticCaching', value).then(() =>
+          this.countDBSize()
+        );
       },
     },
     showLyricsTranslation: {
@@ -1078,7 +1048,7 @@ export default {
         return this.settings.showLyricsTranslation;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'showLyricsTranslation',
           value,
         });
@@ -1089,7 +1059,7 @@ export default {
         return this.settings.lyricsBackground || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'lyricsBackground',
           value,
         });
@@ -1100,7 +1070,7 @@ export default {
         return this.settings.showLyricsTime;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'showLyricsTime',
           value,
         });
@@ -1111,7 +1081,7 @@ export default {
         return this.settings.enableOsdlyricsSupport;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'enableOsdlyricsSupport',
           value,
         });
@@ -1122,7 +1092,7 @@ export default {
         return this.settings.closeAppOption;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'closeAppOption',
           value,
         });
@@ -1133,7 +1103,7 @@ export default {
         return this.settings.enableDiscordRichPresence;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'enableDiscordRichPresence',
           value,
         });
@@ -1144,7 +1114,7 @@ export default {
         return this.settings.subTitleDefault;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'subTitleDefault',
           value,
         });
@@ -1156,13 +1126,7 @@ export default {
         return this.settings.enableReversedMode;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'enableReversedMode',
-          value,
-        });
-        if (value === false) {
-          this.$store.state.player.reversed = false;
-        }
+        this.submitPreference('setReversedModeEnabled', value);
       },
     },
     enableGlobalShortcut: {
@@ -1170,10 +1134,7 @@ export default {
         return this.settings.enableGlobalShortcut;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'enableGlobalShortcut',
-          value,
-        });
+        this.submitPreference('setGlobalShortcutsEnabled', value);
       },
     },
     showLibraryDefault: {
@@ -1181,7 +1142,7 @@ export default {
         return this.settings.showLibraryDefault || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'showLibraryDefault',
           value,
         });
@@ -1192,7 +1153,7 @@ export default {
         return this.settings.cacheLimit || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'cacheLimit',
           value,
         });
@@ -1200,32 +1161,18 @@ export default {
     },
     proxyProtocol: {
       get() {
-        return this.settings.proxyConfig?.protocol || 'noProxy';
+        return this.proxyDraft.protocol || 'noProxy';
       },
       set(value) {
-        let config = this.settings.proxyConfig || {};
-        config.protocol = value;
-        if (value === 'noProxy') {
-          ipcRenderer.send('removeProxy');
-          this.showToast('已关闭代理');
-        }
-        this.$store.commit('preferences/updateSettings', {
-          key: 'proxyConfig',
-          value: config,
-        });
+        this.$set(this.proxyDraft, 'protocol', value);
       },
     },
     proxyServer: {
       get() {
-        return this.settings.proxyConfig?.server || '';
+        return this.proxyDraft.server || '';
       },
       set(value) {
-        let config = this.settings.proxyConfig || {};
-        config.server = value;
-        this.$store.commit('preferences/updateSettings', {
-          key: 'proxyConfig',
-          value: config,
-        });
+        this.$set(this.proxyDraft, 'server', value);
       },
     },
     enableRealIP: {
@@ -1233,7 +1180,7 @@ export default {
         return this.settings.enableRealIP || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'enableRealIP',
           value: value,
         });
@@ -1244,7 +1191,7 @@ export default {
         return this.settings.realIP || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'realIP',
           value: value,
         });
@@ -1252,15 +1199,10 @@ export default {
     },
     proxyPort: {
       get() {
-        return this.settings.proxyConfig?.port || '';
+        return this.proxyDraft.port || '';
       },
       set(value) {
-        let config = this.settings.proxyConfig || {};
-        config.port = value;
-        this.$store.commit('preferences/updateSettings', {
-          key: 'proxyConfig',
-          value: config,
-        });
+        this.$set(this.proxyDraft, 'port', value);
       },
     },
     unmSource: {
@@ -1272,9 +1214,9 @@ export default {
       },
       /** @param {string?} value */
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmSource',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1283,7 +1225,7 @@ export default {
         return this.settings.unmSearchMode || 'fast-first';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmSearchMode',
           value: value,
         });
@@ -1294,9 +1236,9 @@ export default {
         return this.settings.unmEnableFlac || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmEnableFlac',
-          value: value || false,
+          value,
         });
       },
     },
@@ -1305,9 +1247,9 @@ export default {
         return this.settings.unmProxyUri || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmProxyUri',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1316,9 +1258,9 @@ export default {
         return this.settings.unmJooxCookie || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmJooxCookie',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1327,9 +1269,9 @@ export default {
         return this.settings.unmQQCookie || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmQQCookie',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1338,9 +1280,9 @@ export default {
         return this.settings.unmYtDlExe || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmYtDlExe',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1349,7 +1291,7 @@ export default {
         return this.settings.linuxEnableCustomTitlebar;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'linuxEnableCustomTitlebar',
           value,
         });
@@ -1367,8 +1309,21 @@ export default {
     this.countDBSize('tracks');
     if (process.env.IS_ELECTRON) this.getAllOutputDevices();
   },
+  deactivated() {
+    this.exitRecordShortcut();
+  },
+  beforeDestroy() {
+    this.exitRecordShortcut();
+  },
   methods: {
     ...mapActions(['showToast']),
+    submitPreference(action, payload) {
+      return this.$store
+        .dispatch(`preferences/${action}`, payload)
+        .catch(error => {
+          this.showToast(error.message || '设置保存失败');
+        });
+    },
     getAllOutputDevices() {
       navigator.mediaDevices.enumerateDevices().then(devices => {
         this.allOutputDevices = devices.filter(device => {
@@ -1393,7 +1348,7 @@ export default {
       return this.$store.dispatch('session/logout');
     },
     countDBSize() {
-      countDBSize().then(data => {
+      return countDBSize().then(data => {
         if (data === undefined) {
           this.tracksCache = {
             size: '0KB',
@@ -1425,18 +1380,10 @@ export default {
       this.$store.commit('updateLastfm', {});
     },
     sendProxyConfig() {
-      if (this.proxyProtocol === 'noProxy') return;
-      const config = this.settings.proxyConfig;
-      if (
-        config.server === '' ||
-        !config.port ||
-        config.protocol === 'noProxy'
-      ) {
-        ipcRenderer.send('removeProxy');
-      } else {
-        ipcRenderer.send('setProxy', config);
-      }
-      this.showToast('已更新代理设置');
+      return this.submitPreference(
+        this.proxyProtocol === 'noProxy' ? 'disableProxy' : 'submitProxy',
+        cloneDeep(this.proxyDraft)
+      );
     },
     clickOutside() {
       this.exitRecordShortcut();
@@ -1463,13 +1410,14 @@ export default {
       }
       return shortcut.replace('CommandOrControl', 'Ctrl');
     },
-    readyToRecordShortcut(id, type) {
-      if (type === 'globalShortcut' && this.enableGlobalShortcut === false) {
-        return;
-      }
+    async readyToRecordShortcut(id, type) {
+      const allowed = await this.submitPreference('beginShortcutRecording', {
+        id,
+        type,
+      });
+      if (!allowed) return;
       this.shortcutInput = { id, type, recording: true };
       this.recordedShortcut = [];
-      ipcRenderer.send('switchGlobalShortcutStatusTemporary', 'disable');
     },
     handleShortcutKeydown(e) {
       if (this.shortcutInput.recording === false) return;
@@ -1493,27 +1441,22 @@ export default {
         );
       }
     },
-    saveShortcut() {
+    async saveShortcut() {
       const { id, type } = this.shortcutInput;
-      const payload = {
+      await this.submitPreference('saveShortcut', {
         id,
         type,
         shortcut: this.recordedShortcutComputed,
-      };
-      this.$store.commit('preferences/updateShortcut', payload);
-      ipcRenderer.send('updateShortcut', payload);
-      this.showToast('快捷键已保存');
+      });
       this.recordedShortcut = [];
     },
     exitRecordShortcut() {
-      if (this.shortcutInput.recording === false) return;
       this.shortcutInput = { id: '', type: '', recording: false };
       this.recordedShortcut = [];
-      ipcRenderer.send('switchGlobalShortcutStatusTemporary', 'enable');
+      return this.submitPreference('endShortcutRecording');
     },
     restoreDefaultShortcuts() {
-      this.$store.commit('preferences/restoreDefaultShortcuts');
-      ipcRenderer.send('restoreDefaultShortcuts');
+      return this.submitPreference('restoreDefaultShortcuts');
     },
   },
 };

@@ -90,15 +90,15 @@ export function changeAppearance(appearance) {
     .setAttribute('content', appearance === 'dark' ? '#222' : '#fff');
 }
 
+export function applySettingsAppearance(settings) {
+  changeAppearance(settings.appearance);
+  changeThemeColor(settings.themeColor);
+}
+
 export function initializeAppearance(getSettings) {
-  const apply = () => {
-    const settings = getSettings();
-    changeAppearance(settings.appearance);
-    changeThemeColor(settings.themeColor);
-  };
-  apply();
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   media.addEventListener('change', () => {
-    if (getSettings().appearance === 'auto') apply();
+    if (getSettings().appearance === 'auto')
+      applySettingsAppearance(getSettings());
   });
 }

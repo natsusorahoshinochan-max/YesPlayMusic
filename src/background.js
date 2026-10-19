@@ -20,11 +20,14 @@ import {
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 import { startNeteaseMusicApi } from './electron/services';
 import { initIpcMain } from './electron/ipcMain.js';
-import { createMenu } from './electron/menu';
+import { restoreProxy } from './electron/proxy';
 import { createTray } from '@/electron/tray';
 import { createTouchBar } from './electron/touchBar';
 import { createDockMenu } from './electron/dockMenu';
-import { registerGlobalShortcut } from './electron/globalShortcut';
+import {
+  applyDesktopShortcuts,
+  applyTrayIconTheme,
+} from './electron/preferences';
 import { autoUpdater } from 'electron-updater';
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer';
 import { EventEmitter } from 'events';
@@ -398,19 +401,21 @@ class Background {
       // init ipcMain
       initIpcMain(this.window, this.store, this.trayEventEmitter);
 
-      // set proxy
-      const proxyRules = this.store.get('proxy');
-      if (proxyRules) {
-        this.window.webContents.session.setProxy({ proxyRules }, result => {
-          log('finished setProxy', result);
-        });
-      }
+      await restoreProxy(this.window.webContents.session, this.store);
 
       // check for updates
       this.checkForUpdates();
 
-      // create menu
-      createMenu(this.window, this.store);
+      applyTrayIconTheme(this.trayEventEmitter);
+      applyDesktopShortcuts(
+        this.window,
+        this.store,
+        {
+          enabled: this.store.get('settings.enableGlobalShortcut') !== false,
+          recording: false,
+        },
+        true
+      );
 
       // create dock menu for macOS
       const createdDockMenu = createDockMenu(this.window);
@@ -419,11 +424,6 @@ class Background {
       // create touch bar
       const createdTouchBar = createTouchBar(this.window);
       if (createdTouchBar) this.window.setTouchBar(createdTouchBar);
-
-      // register global shortcuts
-      if (this.store.get('settings.enableGlobalShortcut') !== false) {
-        registerGlobalShortcut(this.window, this.store);
-      }
 
       // try to start osdlyrics process on start
       if (this.store.get('settings.enableOsdlyricsSupport')) {
