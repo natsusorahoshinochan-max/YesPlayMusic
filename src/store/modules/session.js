@@ -17,6 +17,7 @@ export default function createSession(
   }
 ) {
   let qrRun;
+  let ownership = Object.freeze({});
   function stopQr() {
     if (!qrRun) return;
     qrRun.stopped = true;
@@ -93,12 +94,12 @@ export default function createSession(
     }, 1000);
   }
 
-  async function clearIdentity({ commit, dispatch }) {
+  function clearIdentity({ commit, dispatch }) {
     identityChanged();
     credentials.remove('MUSIC_U');
     credentials.remove('__csrf');
     commit('setIdentity', { loginMode: null, hasCredential: false });
-    await dispatch('library/clearIdentity', null, { root: true });
+    return dispatch('library/clearIdentity', null, { root: true });
   }
 
   async function enterAccount({ commit, dispatch }, cookie) {
@@ -121,6 +122,7 @@ export default function createSession(
       hasCredential: Boolean(credentials.get('MUSIC_U')),
     }),
     getters: {
+      ownership: () => () => ownership,
       qr: state => state.qr,
       processing: state => state.processing,
       hasAccount: state => state.loginMode === 'account' && state.hasCredential,
@@ -135,6 +137,7 @@ export default function createSession(
         state.processing = value;
       },
       setIdentity(state, { loginMode, hasCredential }) {
+        ownership = Object.freeze({});
         state.loginMode = loginMode;
         state.hasCredential = hasCredential;
       },
@@ -231,10 +234,26 @@ export default function createSession(
           return false;
         }
       },
-      async invalidate(context) {
-        await clearIdentity(context);
+      async invalidate(context, signal) {
+        if (
+          !signal?.ownership ||
+          signal.ownership !== context.getters.ownership() ||
+          !context.getters.hasAccount
+        )
+          return false;
+        const cleanup = clearIdentity(context);
+        const retiredOwnership = ownership;
+        await cleanup;
+        if (ownership !== retiredOwnership) return false;
         notify('登录状态已失效，请重新登录');
-        return navigate('invalidated');
+        try {
+          return await navigate('invalidated', {
+            isCurrent: () => ownership === retiredOwnership,
+          });
+        } catch (error) {
+          console.debug('[session] invalidation navigation failed', error);
+          return false;
+        }
       },
       async logout(context) {
         try {

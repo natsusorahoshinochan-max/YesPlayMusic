@@ -1,3 +1,5 @@
+import { RequestFailure } from '@/utils/request';
+
 export const accountRequired = { status: 'denied', reason: 'account-required' };
 
 export function changeResult(outcome, synchronization = 'not-required') {
@@ -9,29 +11,18 @@ export async function performLibraryWrite(request) {
   try {
     response = await request();
   } catch (error) {
-    if (
-      !error?.isAxiosError &&
-      ![
-        'ECONNABORTED',
-        'ETIMEDOUT',
-        'ECONNRESET',
-        'ENOTFOUND',
-        'ERR_NETWORK',
-      ].includes(error?.code)
-    )
-      throw error;
+    if (!(error instanceof RequestFailure)) throw error;
     return {
-      status: 'unconfirmed',
-      ...(error.message ? { message: error.message } : {}),
+      status: error.category === 'network' ? 'unconfirmed' : 'rejected',
+      ...(error.category !== 'network' && error.message
+        ? { message: error.message }
+        : {}),
     };
   }
   const body = response?.body?.code !== undefined ? response.body : response;
   if (body?.code === 200) return { status: 'succeeded' };
   const message = body?.message || body?.msg;
-  return {
-    status: body?.code === undefined ? 'unconfirmed' : 'rejected',
-    ...(message ? { message } : {}),
-  };
+  throw new TypeError(message || 'Invalid library write response');
 }
 
 export async function synchronize(attempts) {

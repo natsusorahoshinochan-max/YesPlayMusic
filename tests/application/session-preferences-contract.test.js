@@ -188,7 +188,9 @@ describe('session and preferences public contracts (#1 and #8)', () => {
         credential: 'valid',
       });
       const before = JSON.parse(JSON.stringify(settingsOf(store)));
-      await store.dispatch(`session/${action}`);
+      await store.dispatch(`session/${action}`, {
+        ownership: store.getters['session/ownership'](),
+      });
       expect(store.getters['session/hasLibraryIdentity']).toBe(false);
       expect(store.getters['session/hasAccount']).toBe(false);
       expect(store.getters['library/user']).toEqual({});
@@ -197,9 +199,13 @@ describe('session and preferences public contracts (#1 and #8)', () => {
       expect(storage.read('settings')).toEqual(before);
       expect(store.getters['lastfm/authorization']).toEqual(lastfm);
       expect(storage.read('lastfm')).toEqual(lastfm);
-      expect(navigate).toHaveBeenCalledWith(
-        action === 'logout' ? 'logout' : 'invalidated'
-      );
+      if (action === 'invalidate') {
+        expect(navigate).toHaveBeenCalledWith('invalidated', {
+          isCurrent: expect.any(Function),
+        });
+      } else {
+        expect(navigate).toHaveBeenCalledWith('logout');
+      }
       if (action === 'invalidate') expect(notify).toHaveBeenCalled();
     }
   });

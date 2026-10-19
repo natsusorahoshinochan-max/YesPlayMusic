@@ -8,7 +8,7 @@
 
 | 位置 | 职责与公开接口 |
 | --- | --- |
-| `src/store/modules/session.js` | 身份查询 `hasAccount`、`hasLibraryIdentity`；`restore`、`loginWithPassword`、`startQrLogin`、`stopQrLogin`、`selectPublicIdentity`、`logout`、`invalidate`、`refreshDaily`；展示查询 `processing`、`qr` |
+| `src/store/modules/session.js` | 身份查询 `hasAccount`、`hasLibraryIdentity`、`ownership()`；`restore`、`loginWithPassword`、`startQrLogin`、`stopQrLogin`、`selectPublicIdentity`、`logout`、`invalidate`、`refreshDaily`；展示查询 `processing`、`qr` |
 | `src/store/modules/library.js` | 资料、喜欢歌单标识、收藏、云盘与历史；查询 `user`、`likedSongPlaylistID`、`collections`、`previewReady`；加载 `loadApplication`、`loadPage`、`refreshPlaylists` |
 | `src/application/` | 装配认证凭据、请求环境、endpoint 集合、导航和提示效果，连接会话恢复与后续启动依赖 |
 
@@ -24,7 +24,7 @@ session 的工厂接收 credentials、auth、导航、提示、时钟与调度�
 
 `selectPublicIdentity` 写入选择的公开资料，加载公开歌单和预览后导航至音乐库，不调用账号专属加载端点。账号登录也在预览加载完成后导航到音乐库。
 
-`logout` 发起远端退出，但不等待远端完成才清理本地身份。`logout` 与 `invalidate` 共用私有清理逻辑，删除 `MUSIC_U`、`__csrf`，清除登录模式、用户资料和喜欢歌单标识。主动退出回首页；失效提示后，Web 前往 `login`，Electron 前往 `loginAccount`。失效不再调用远端退出。设置、内存收藏集合、播放队列、播放进度、缓存和 Last.fm 授权不随该清理重置。
+`logout` 发起远端退出，但不等待远端完成才清理本地身份。`logout` 与 `invalidate` 共用私有清理逻辑，删除 `MUSIC_U`、`__csrf`，清除登录模式、用户资料和喜欢歌单标识。主动退出回首页；失效保留公开页面，受保护页面按路由要求前往 `login` 或 `loginAccount`，Electron 前往 `loginAccount`。失效不再调用远端退出。设置、内存收藏集合、播放队列、播放进度、缓存和 Last.fm 授权不随该清理重置。
 
 ## 音乐库加载与展示
 
@@ -38,7 +38,9 @@ App 调用 `library/loadApplication`，音乐库页调用 `library/loadPage`，�
 
 `src/utils/request.js` 使用 Axios，返回成功响应的业务数据。应用必须调用 `configureRequest` 提供设置读取、凭据读取、失效处理和请求环境；缺少失效处理会拒绝配置，未配置时不允许发送请求。请求实现不导入 router 或 session。
 
-被拒绝的响应同时包含 `code === 301` 与 `msg === '需要登录'` 时，请求层调用失效处理；`/logout` 被排除，避免主动退出递归失效。普通网络故障、超时和其他拒绝维持 `undefined` 结果，不引入统一错误类型或失败 rejection 契约。
+请求成功返回业务数据；失败拒绝 Promise。唯一分类源 `RequestFailure` 提供 `category`（`network`、`business`、`session-invalid`）、原始 `data`、HTTP `status`、业务或传输 `code`、`url`、发出时 `ownership` 和 `cause`。准备与编程异常保留原始错误。认证端点声明正常 QR 协议码及认证拒绝的解释范围；登录协议拒绝不会使当前账号失效，退出请求也不产生失效信号。
+
+session 在私有闭包中为建立、恢复、清理及身份变化生成唯一不可变归属，通过 `ownership()` 查询公开。请求发出时捕获归属；明确失效（`code === 301` 与 `msg === '需要登录'`）携带该归属交给 `session/invalidate`。只有匹配当前账号的信号执行清理，清理同步退休归属以合并并发信号。失效导航由应用接合安装临时路由守卫，仅检查所属导航，在异步页面解析后确认归属仍有效才允许完成，并在导航结束时移除守卫。普通网络错误与超时保留身份。查询自身的 `isCurrent` 仍可退休旧查询信号。
 
 `src/application/requestEnvironment.js` 集中选择 Web/Electron API 地址，并配置 cookie、realIP 和 HTTP/HTTPS proxy。跨源 Web API 在参数中携带现有 `MUSIC_U`；相对 Web 地址与 Electron 继续使用浏览器凭据传输。`src/application/credentials.js` 统一浏览器 cookie 与 `cookie-*` 本地存储的读写和删除。
 

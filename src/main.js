@@ -89,7 +89,7 @@ startApplication({
   configureRequest,
   requestEnvironment: createRequestEnvironment(),
   getCookie: key => credentials.get(key),
-  onSessionInvalid: () => store.dispatch('session/invalidate'),
+  onSessionInvalid: signal => store.dispatch('session/invalidate', signal),
   createPlayer,
   mount({ store, i18n }) {
     store.dispatch('session/refreshDaily');
