@@ -24,7 +24,7 @@
 </template>
 
 <script>
-import { mapMutations, mapState } from 'vuex';
+import { mapMutations, mapState, mapGetters } from 'vuex';
 import NProgress from 'nprogress';
 import { dailyRecommendTracks } from '@/api/playlist';
 
@@ -43,7 +43,11 @@ export default {
     };
   },
   computed: {
-    ...mapState(['player', 'data', 'dailyTracks']),
+    ...mapGetters({
+      user: 'library/user',
+      likedSongPlaylistID: 'library/likedSongPlaylistID',
+    }),
+    ...mapState(['player', 'dailyTracks']),
   },
   created() {
     if (this.dailyTracks.length === 0) {

@@ -53,7 +53,7 @@
             {{ $t('common.play') }}
           </ButtonTwoTone>
           <ButtonTwoTone
-            v-if="playlist.creator.userId !== data.user.userId"
+            v-if="playlist.creator.userId !== user.userId"
             :icon-class="playlist.subscribed ? 'heart-solid' : 'heart'"
             :icon-button="true"
             :horizontal-padding="0"
@@ -114,7 +114,7 @@
           {{ $t('common.play') }}
         </ButtonTwoTone>
         <ButtonTwoTone
-          v-if="playlist.creator.userId !== data.user.userId"
+          v-if="playlist.creator.userId !== user.userId"
           :icon-class="playlist.subscribed ? 'heart-solid' : 'heart'"
           :icon-button="true"
           :horizontal-padding="0"
@@ -141,10 +141,10 @@
       <h1>
         <img
           class="avatar"
-          :src="data.user.avatarUrl | resizeImage"
+          :src="user.avatarUrl | resizeImage"
           loading="lazy"
         />
-        {{ data.user.nickname }}{{ $t('library.sLikedSongs') }}
+        {{ user.nickname }}{{ $t('library.sLikedSongs') }}
       </h1>
       <div class="search-box-likepage" @click="searchInPlaylist()">
         <div class="container" :class="{ active: inputFocus }">
@@ -203,13 +203,13 @@
         $t('contextMenu.searchInPlaylist')
       }}</div>
       <div
-        v-if="playlist.creator.userId === data.user.userId"
+        v-if="playlist.creator.userId === user.userId"
         class="item"
         @click="editPlaylist"
         >编辑歌单信息</div
       >
       <div
-        v-if="playlist.creator.userId === data.user.userId"
+        v-if="playlist.creator.userId === user.userId"
         class="item"
         @click="deletePlaylist"
         >删除歌单</div
@@ -219,7 +219,7 @@
 </template>
 
 <script>
-import { mapMutations, mapActions, mapState } from 'vuex';
+import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
 import NProgress from 'nprogress';
 import {
   getPlaylistDetail,
@@ -227,7 +227,6 @@ import {
   deletePlaylist,
 } from '@/api/playlist';
 import { getTrackDetail } from '@/api/track';
-import { isAccountLoggedIn } from '@/utils/auth';
 import nativeAlert from '@/utils/nativeAlert';
 import locale from '@/locale';
 
@@ -369,7 +368,11 @@ export default {
     };
   },
   computed: {
-    ...mapState(['player', 'data']),
+    ...mapGetters({
+      user: 'library/user',
+      likedSongPlaylistID: 'library/likedSongPlaylistID',
+    }),
+    ...mapState(['player']),
     isLikeSongsPage() {
       return this.$route.name === 'likedSongs';
     },
@@ -378,8 +381,8 @@ export default {
     },
     isUserOwnPlaylist() {
       return (
-        this.playlist.creator.userId === this.data.user.userId &&
-        this.playlist.id !== this.data.likedSongPlaylistID
+        this.playlist.creator.userId === this.user.userId &&
+        this.playlist.id !== this.likedSongPlaylistID
       );
     },
     filteredTracks() {
@@ -405,7 +408,7 @@ export default {
   },
   created() {
     if (this.$route.name === 'likedSongs') {
-      this.loadData(this.data.likedSongPlaylistID);
+      this.loadData(this.likedSongPlaylistID);
     } else {
       this.loadData(this.$route.params.id);
     }
@@ -426,7 +429,7 @@ export default {
       );
     },
     likePlaylist(toast = false) {
-      if (!isAccountLoggedIn()) {
+      if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
@@ -490,7 +493,7 @@ export default {
       this.$refs.playlistMenu.openMenu(e);
     },
     deletePlaylist() {
-      if (!isAccountLoggedIn()) {
+      if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
@@ -521,7 +524,7 @@ export default {
       }
     },
     removeTrack(trackID) {
-      if (!isAccountLoggedIn()) {
+      if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }

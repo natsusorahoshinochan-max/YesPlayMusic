@@ -1,6 +1,6 @@
+import store from '@/store';
 import Vue from 'vue';
 import VueRouter from 'vue-router';
-import { isLooseLoggedIn, isAccountLoggedIn } from '@/utils/auth';
 
 Vue.use(VueRouter);
 const routes = [
@@ -145,27 +145,15 @@ VueRouter.prototype.push = function push(location) {
 };
 
 router.beforeEach((to, from, next) => {
-  // 需要登录的逻辑
-  if (to.meta.requireAccountLogin) {
-    if (isAccountLoggedIn()) {
-      next();
-    } else {
-      next({ path: '/login/account' });
-    }
+  if (to.meta.requireAccountLogin && !store.getters['session/hasAccount']) {
+    return next({ path: '/login/account' });
   }
-  if (to.meta.requireLogin) {
-    if (isLooseLoggedIn()) {
-      next();
-    } else {
-      if (process.env.IS_ELECTRON === true) {
-        next({ path: '/login/account' });
-      } else {
-        next({ path: '/login' });
-      }
-    }
-  } else {
-    next();
+  if (to.meta.requireLogin && !store.getters['session/hasLibraryIdentity']) {
+    return next({
+      path: process.env.IS_ELECTRON ? '/login/account' : '/login',
+    });
   }
+  return next();
 });
 
 export default router;

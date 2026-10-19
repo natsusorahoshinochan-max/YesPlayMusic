@@ -3,9 +3,9 @@
     <h1>
       <img
         class="avatar"
-        :src="data.user.avatarUrl | resizeImage"
+        :src="user.avatarUrl | resizeImage"
         loading="lazy"
-      />{{ data.user.nickname }}{{ $t('library.sLibrary') }}
+      />{{ user.nickname }}{{ $t('library.sLibrary') }}
     </h1>
     <div class="section-one">
       <div class="liked-songs" @click="goToLikedSongsList">
@@ -214,9 +214,8 @@
 </template>
 
 <script>
-import { mapActions, mapMutations, mapState } from 'vuex';
-import { randomNum, dailyTask } from '@/utils/common';
-import { isAccountLoggedIn } from '@/utils/auth';
+import { mapActions, mapMutations, mapGetters } from 'vuex';
+import { randomNum } from '@/utils/common';
 import { uploadSong } from '@/api/user';
 import { getLyric } from '@/api/track';
 import NProgress from 'nprogress';
@@ -251,7 +250,13 @@ export default {
     };
   },
   computed: {
-    ...mapState(['data', 'liked']),
+    ...mapGetters({
+      user: 'library/user',
+      likedSongPlaylistID: 'library/likedSongPlaylistID',
+      liked: 'library/collections',
+      libraryPlaylistFilter: 'preferences/libraryPlaylistFilter',
+    }),
+
     /**
      * @returns {string[]}
      */
@@ -279,11 +284,11 @@ export default {
         .map(extractLyricPart);
     },
     playlistFilter() {
-      return this.data.libraryPlaylistFilter || 'all';
+      return this.libraryPlaylistFilter || 'all';
     },
     filterPlaylists() {
       const playlists = this.liked.playlists.slice(1);
-      const userId = this.data.user.userId;
+      const userId = this.user.userId;
       if (this.playlistFilter === 'mine') {
         return playlists.filter(p => p.creator.userId === userId);
       } else if (this.playlistFilter === 'liked') {
@@ -310,31 +315,31 @@ export default {
   activated() {
     this.$parent.$refs.scrollbar.restorePosition();
     this.loadData();
-    dailyTask();
+    this.$store.dispatch('session/refreshDaily');
   },
   methods: {
     ...mapActions(['showToast']),
-    ...mapMutations(['updateModal', 'updateData']),
+    ...mapMutations(['updateModal']),
     loadData() {
       if (this.liked.songsWithDetails.length > 0) {
         NProgress.done();
         this.show = true;
-        this.$store.dispatch('fetchLikedSongsWithDetails');
+        this.$store.dispatch('library/fetchLikedSongsWithDetails');
         this.getRandomLyric();
       } else {
-        this.$store.dispatch('fetchLikedSongsWithDetails').then(() => {
+        this.$store.dispatch('library/fetchLikedSongsWithDetails').then(() => {
           NProgress.done();
           this.show = true;
           this.getRandomLyric();
         });
       }
-      this.$store.dispatch('fetchLikedSongs');
-      this.$store.dispatch('fetchLikedPlaylist');
-      this.$store.dispatch('fetchLikedAlbums');
-      this.$store.dispatch('fetchLikedArtists');
-      this.$store.dispatch('fetchLikedMVs');
-      this.$store.dispatch('fetchCloudDisk');
-      this.$store.dispatch('fetchPlayHistory');
+      this.$store.dispatch('library/fetchLikedSongs');
+      this.$store.dispatch('library/fetchLikedPlaylist');
+      this.$store.dispatch('library/fetchLikedAlbums');
+      this.$store.dispatch('library/fetchLikedArtists');
+      this.$store.dispatch('library/fetchLikedMVs');
+      this.$store.dispatch('library/fetchCloudDisk');
+      this.$store.dispatch('library/fetchPlayHistory');
     },
     playLikedSongs() {
       this.$store.state.player.playPlaylistByID(
@@ -351,7 +356,7 @@ export default {
       );
     },
     updateCurrentTab(tab) {
-      if (!isAccountLoggedIn() && tab !== 'playlists') {
+      if (!this.$store.getters['session/hasAccount'] && tab !== 'playlists') {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
@@ -377,7 +382,7 @@ export default {
       });
     },
     openAddPlaylistModal() {
-      if (!isAccountLoggedIn()) {
+      if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
@@ -394,7 +399,7 @@ export default {
       this.$refs.playModeTabMenu.openMenu(e);
     },
     changePlaylistFilter(type) {
-      this.updateData({ key: 'libraryPlaylistFilter', value: type });
+      this.$store.commit('preferences/setLibraryPlaylistFilter', type);
       window.scrollTo({ top: 375, behavior: 'smooth' });
     },
     selectUploadFiles() {
@@ -406,7 +411,7 @@ export default {
         if (result.code === 200) {
           let newCloudDisk = this.liked.cloudDisk;
           newCloudDisk.unshift(result.privateCloud);
-          this.$store.commit('updateLikedXXX', {
+          this.$store.commit('library/setCollection', {
             name: 'cloudDisk',
             data: newCloudDisk,
           });

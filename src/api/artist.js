@@ -1,6 +1,6 @@
+import store from '@/store';
 import request from '@/utils/request';
 import { mapTrackPlayableStatus } from '@/utils/common';
-import { isAccountLoggedIn } from '@/utils/auth';
 import { getTrackDetail } from '@/api/track';
 
 /**
@@ -17,7 +17,7 @@ export function getArtist(id) {
       timestamp: new Date().getTime(),
     },
   }).then(async data => {
-    if (!isAccountLoggedIn()) {
+    if (!store.getters['session/hasAccount']) {
       const trackIDs = data.hotSongs.map(t => t.id);
       const tracks = await getTrackDetail(trackIDs.join(','));
       data.hotSongs = tracks.songs;

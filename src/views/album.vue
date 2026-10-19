@@ -145,14 +145,13 @@
 </template>
 
 <script>
-import { mapMutations, mapActions, mapState } from 'vuex';
+import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
 import { getArtistAlbum } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
 import { getAlbum, albumDynamicDetail, likeAAlbum } from '@/api/album';
 import locale from '@/locale';
 import { splitSoundtrackAlbumTitle, splitAlbumTitle } from '@/utils/common';
 import NProgress from 'nprogress';
-import { isAccountLoggedIn } from '@/utils/auth';
 import { groupBy, toPairs, sortBy } from 'lodash';
 
 import ExplicitSymbol from '@/components/ExplicitSymbol.vue';
@@ -198,7 +197,11 @@ export default {
     };
   },
   computed: {
-    ...mapState(['player', 'data']),
+    ...mapGetters({
+      user: 'library/user',
+      likedSongPlaylistID: 'library/likedSongPlaylistID',
+    }),
+    ...mapState(['player']),
     albumTime() {
       let time = 0;
       this.tracks.map(t => (time = time + t.dt));
@@ -240,7 +243,7 @@ export default {
       this.$store.state.player.playAlbumByID(id, trackID);
     },
     likeAlbum(toast = false) {
-      if (!isAccountLoggedIn()) {
+      if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }

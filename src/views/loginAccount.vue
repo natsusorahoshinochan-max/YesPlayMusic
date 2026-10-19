@@ -115,8 +115,6 @@
 import QRCode from 'qrcode';
 import md5 from 'crypto-js/md5';
 import NProgress from 'nprogress';
-import { mapMutations } from 'vuex';
-import { setCookies } from '@/utils/auth';
 import nativeAlert from '@/utils/nativeAlert';
 import {
   loginWithPhone,
@@ -158,7 +156,6 @@ export default {
     clearInterval(this.qrCodeCheckInterval);
   },
   methods: {
-    ...mapMutations(['updateData']),
     validatePhone() {
       if (
         this.countryCode === '' ||
@@ -220,10 +217,9 @@ export default {
         return;
       }
       if (data.code === 200) {
-        setCookies(data.cookie);
-        this.updateData({ key: 'loginMode', value: 'account' });
-        this.$store.dispatch('fetchUserProfile').then(() => {
-          this.$store.dispatch('fetchLikedPlaylist').then(() => {
+        this.$store.dispatch('session/acceptCredentials', data.cookie);
+        this.$store.dispatch('library/fetchUserProfile').then(() => {
+          this.$store.dispatch('library/fetchLikedPlaylist').then(() => {
             this.$router.push({ path: '/library' });
           });
         });

@@ -64,7 +64,7 @@
 </template>
 
 <script>
-import { mapState, mapMutations } from 'vuex';
+import { mapMutations, mapGetters } from 'vuex';
 import NProgress from 'nprogress';
 import { topPlaylist, highQualityPlaylist, toplists } from '@/api/playlist';
 import { playlistCategories } from '@/utils/staticData';
@@ -103,7 +103,8 @@ export default {
     };
   },
   computed: {
-    ...mapState(['settings']),
+    ...mapGetters({ settings: 'preferences/settings' }),
+
     subText() {
       if (this.activeCategory === '排行榜') return 'updateFrequency';
       if (this.activeCategory === '推荐歌单') return 'copywriter';
@@ -115,7 +116,7 @@ export default {
     this.$parent.$refs.scrollbar.restorePosition();
   },
   methods: {
-    ...mapMutations(['togglePlaylistCategory']),
+    ...mapMutations('preferences', ['togglePlaylistCategory']),
     loadData() {
       setTimeout(() => {
         if (!this.show) NProgress.start();

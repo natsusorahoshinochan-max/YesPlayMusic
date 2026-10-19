@@ -181,7 +181,7 @@
 </template>
 
 <script>
-import { mapState, mapMutations, mapActions } from 'vuex';
+import { mapState, mapMutations, mapActions, mapGetters } from 'vuex';
 import '@/assets/css/slider.css';
 
 import ButtonIcon from '@/components/ButtonIcon.vue';
@@ -201,7 +201,12 @@ export default {
     };
   },
   computed: {
-    ...mapState(['player', 'settings', 'data']),
+    ...mapGetters({
+      settings: 'preferences/settings',
+      user: 'library/user',
+      likedSongPlaylistID: 'library/likedSongPlaylistID',
+    }),
+    ...mapState(['player']),
     currentTrack() {
       return this.player.currentTrack;
     },
@@ -231,7 +236,8 @@ export default {
   },
   methods: {
     ...mapMutations(['toggleLyrics']),
-    ...mapActions(['showToast', 'likeATrack']),
+    ...mapActions(['showToast']),
+    ...mapActions('library', ['likeATrack']),
     handleClick(event) {
       if (event.target == this.mouseDownTarget) {
         this.toggleLyrics();

@@ -51,8 +51,9 @@ export async function initializeTrackCache() {
 
 async function deleteExcessCache() {
   if (
-    store.state.settings.cacheLimit === false ||
-    tracksCacheBytes < store.state.settings.cacheLimit * Math.pow(1024, 2)
+    store.getters['preferences/settings'].cacheLimit === false ||
+    tracksCacheBytes <
+      store.getters['preferences/settings'].cacheLimit * Math.pow(1024, 2)
   ) {
     return;
   }

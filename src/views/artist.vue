@@ -187,7 +187,6 @@ import {
 } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
 import locale from '@/locale';
-import { isAccountLoggedIn } from '@/utils/auth';
 import NProgress from 'nprogress';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
@@ -292,7 +291,7 @@ export default {
         this.mvs = data.mvs;
         this.hasMoreMV = data.hasMore;
       });
-      if (isAccountLoggedIn()) {
+      if (this.$store.getters['session/hasAccount']) {
         similarArtists(id).then(data => {
           this.similarArtists = data.artists;
         });
@@ -323,7 +322,7 @@ export default {
       );
     },
     followArtist() {
-      if (!isAccountLoggedIn()) {
+      if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }

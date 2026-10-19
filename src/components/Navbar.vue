@@ -57,11 +57,11 @@
         <svg-icon icon-class="settings" />
         {{ $t('library.userProfileMenu.settings') }}
       </div>
-      <div v-if="!isLooseLoggedIn" class="item" @click="toLogin">
+      <div v-if="!hasLibraryIdentity" class="item" @click="toLogin">
         <svg-icon icon-class="login" />
         {{ $t('login.login') }}
       </div>
-      <div v-if="isLooseLoggedIn" class="item" @click="logout">
+      <div v-if="hasLibraryIdentity" class="item" @click="logout">
         <svg-icon icon-class="logout" />
         {{ $t('library.userProfileMenu.logout') }}
       </div>
@@ -75,8 +75,7 @@
 </template>
 
 <script>
-import { mapState } from 'vuex';
-import { isLooseLoggedIn, doLogout } from '@/utils/auth';
+import { mapGetters } from 'vuex';
 
 // import icons for win32 title bar
 // icons by https://github.com/microsoft/vscode-codicons
@@ -105,13 +104,18 @@ export default {
     };
   },
   computed: {
-    ...mapState(['settings', 'data']),
-    isLooseLoggedIn() {
-      return isLooseLoggedIn();
+    ...mapGetters({
+      settings: 'preferences/settings',
+      user: 'library/user',
+      likedSongPlaylistID: 'library/likedSongPlaylistID',
+    }),
+
+    hasLibraryIdentity() {
+      return this.$store.getters['session/hasLibraryIdentity'];
     },
     avatarUrl() {
-      return this.data?.user?.avatarUrl && this.isLooseLoggedIn
-        ? `${this.data?.user?.avatarUrl}?param=512y512`
+      return this.user?.avatarUrl && this.hasLibraryIdentity
+        ? `${this.user?.avatarUrl}?param=512y512`
         : 'http://s4.music.126.net/style/web2/img/default/default_avatar.jpg?param=60y60';
     },
     hasCustomTitlebar() {
@@ -151,7 +155,7 @@ export default {
     },
     logout() {
       if (!confirm('确定要退出登录吗？')) return;
-      doLogout();
+      this.$store.dispatch('session/logout');
       this.$router.push({ name: 'home' });
     },
     toSettings() {
