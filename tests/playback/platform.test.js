@@ -24,7 +24,11 @@ function setup(options = {}, playbackOptions = {}) {
   const playback = createPlayback({
     getTrack: async () => track,
     resources: {
-      resolve: async () => ({ kind: 'url', url: '/audio' }),
+      resolve: async () => ({
+        kind: 'url',
+        url: '/audio',
+        sourceInfo: { from: 'netease' },
+      }),
       prefetch: async () => {},
     },
     audio: {
@@ -40,7 +44,7 @@ function setup(options = {}, playbackOptions = {}) {
       }),
     },
     onStateChange: state => platform?.publish(state),
-    onProgress: value => platform?.progress(value),
+    onProgress: (value, detail) => platform?.progress(value, detail),
     ...playbackOptions,
   });
   platform = createPlaybackPlatform({
@@ -126,7 +130,11 @@ test('metadata is published before audio resolution and final state includes fav
   expect(mediaSession.metadata.title).toBe('Seven');
   expect(window.yesplaymusic.player.currentTrack.id).toBe(7);
   expect(window.yesplaymusic.player.playing).toBe(false);
-  resolveSource({ kind: 'url', url: '/audio' });
+  resolveSource({
+    kind: 'url',
+    url: '/audio',
+    sourceInfo: { from: 'netease' },
+  });
   await pending;
   expect(window.yesplaymusic.player.playing).toBe(true);
   expect(document.title).toBe('Seven · Artist - YesPlayMusic');
@@ -237,7 +245,7 @@ test('new metadata publishes its own progress while the previous audio awaits re
   const source = new Promise(resolve => {
     finishSource = resolve;
   });
-  const { playback, platform, mediaSession } = setup(
+  const { playback, platform, mediaSession, ipc } = setup(
     {},
     {
       getTrack: async id => ({
@@ -248,7 +256,11 @@ test('new metadata publishes its own progress while the previous audio awaits re
       resources: {
         resolve: current =>
           current.id === 7
-            ? Promise.resolve({ kind: 'url', url: '/seven' })
+            ? Promise.resolve({
+                kind: 'url',
+                url: '/seven',
+                sourceInfo: { from: 'netease' },
+              })
             : source,
       },
       setInterval: callback => {
@@ -261,6 +273,7 @@ test('new metadata publishes its own progress while the previous audio awaits re
   await playback.playTracks([7]);
   playback.seek(37);
   expect(window.yesplaymusic.player.progress).toBe(37);
+  expect(document.title).toBe('Seven · Artist - YesPlayMusic');
   const selection = playback.playTracks([8]);
   await Promise.resolve();
   await Promise.resolve();
@@ -269,6 +282,11 @@ test('new metadata publishes its own progress while the previous audio awaits re
     progress: 0,
   });
   expect(mediaSession.metadata.title).toBe('Eight');
+  expect(document.title).toBe('Seven · Artist - YesPlayMusic');
+  expect(ipc.send).not.toHaveBeenCalledWith(
+    'playDiscordPresence',
+    expect.objectContaining({ id: 8 })
+  );
   expect(mediaSession.setPositionState).toHaveBeenLastCalledWith({
     duration: 90,
     playbackRate: 1,
@@ -283,8 +301,18 @@ test('new metadata publishes its own progress while the previous audio awaits re
     playbackRate: 1,
     position: 0,
   });
-  finishSource({ kind: 'url', url: '/eight' });
+  playback.seek(38);
+  expect(ipc.send).not.toHaveBeenCalledWith(
+    'playDiscordPresence',
+    expect.objectContaining({ id: 8 })
+  );
+  finishSource({ kind: 'url', url: '/eight', sourceInfo: { from: 'netease' } });
   await selection;
+  expect(document.title).toBe('Eight · Artist - YesPlayMusic');
+  expect(ipc.send).toHaveBeenCalledWith(
+    'playDiscordPresence',
+    expect.objectContaining({ id: 8 })
+  );
   platform.dispose();
   playback.dispose();
 });

@@ -181,7 +181,8 @@ export function createPlaybackPlatform({
         !previous ||
         previous.playing !== state.playing ||
         previous.currentTrackID !== state.currentTrackID;
-      if (changedPlayback) {
+      // A metadata-ready target can still be waiting on the old audio handle.
+      if (changedPlayback && (!state.playing || state.sourceInfo)) {
         const track = state.currentTrack;
         const title =
           state.playing && track?.id
@@ -223,7 +224,8 @@ export function createPlaybackPlatform({
       updatePosition(position);
       if (detail.seeked) {
         send('seeked', position);
-        if (lastState?.playing) discord(lastState, position);
+        if (lastState?.playing && lastState.sourceInfo)
+          discord(lastState, position);
       }
     },
     dispose() {
