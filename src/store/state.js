@@ -24,6 +24,6 @@ export default function createState(storage) {
     },
     dailyTracks: [],
     lastfm: JSON.parse(storage.getItem('lastfm')) || {},
-    player: JSON.parse(storage.getItem('player')) || {},
+    player: null,
   };
 }
