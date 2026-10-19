@@ -138,8 +138,7 @@ export default {
   methods: {
     ...mapActions(['showToast']),
     playTrackInSearchResult(id) {
-      let track = this.tracks.find(t => t.id === id);
-      this.$store.state.player.appendTrackToPlayerList(track, true);
+      return this.$store.state.player.enqueueNext(id, { playNow: true });
     },
     search(type = 'all') {
       let showToast = this.showToast;

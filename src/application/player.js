@@ -1,4 +1,5 @@
 import { Howl } from 'howler';
+import { personalFM, fmTrash } from '@/api/others';
 import { getMP3, getTrackDetail, scrobble } from '@/api/track';
 import { getPlaylistDetail, intelligencePlaylist } from '@/api/playlist';
 import { getAlbum } from '@/api/album';
@@ -17,6 +18,9 @@ export function createPlaybackFeedback({ notify }) {
       notify('无法播放: 不支持的音频格式');
     else if (event.reason === 'no-source')
       notify(`无法播放 ${event.track?.name || '当前歌曲'}`);
+    else if (event.reason === 'fm-empty')
+      notify('获取私人FM数据时重试次数过多，请手动切换下一首');
+    else if (event.reason === 'fm-timeout') notify('personal fm timeout');
     else if (event.status === 'failed') notify('播放失败，请稍后重试');
   };
 }
@@ -55,6 +59,15 @@ export function createPlayer({ store, onPlaybackEvent, ...overrides } = {}) {
     getTrack: async id => {
       const result = await getTrackDetail(id);
       return result?.songs?.find(track => String(track.id) === String(id));
+    },
+    personalFM: {
+      load: async () => {
+        const response = await personalFM();
+        if (!Array.isArray(response?.data))
+          throw new Error('invalid-fm-response');
+        return response.data;
+      },
+      trash: fmTrash,
     },
     resources: createAudioResources({
       cache: { getTrackSource, cacheTrackSource },

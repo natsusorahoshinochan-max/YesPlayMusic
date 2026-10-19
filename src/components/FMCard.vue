@@ -3,7 +3,7 @@
     <img :src="nextTrackCover" style="display: none" loading="lazy" />
     <img
       class="cover"
-      :src="track.album && track.album.picUrl | resizeImage(512)"
+      :src="(track.album || track.al || {}).picUrl | resizeImage(512)"
       loading="lazy"
       @click="goToAlbum"
     />
@@ -50,9 +50,15 @@ export default {
     };
   },
   computed: {
-    ...mapState(['player']),
+    ...mapState({ playback: 'player' }),
+    player() {
+      return this.playback.state;
+    },
     track() {
       return this.player.personalFMTrack;
+    },
+    trackID() {
+      return this.track.id;
     },
     isPlaying() {
       return this.player.playing && this.player.isPersonalFM;
@@ -61,34 +67,37 @@ export default {
       return this.track.artists || this.track.ar || [];
     },
     nextTrackCover() {
-      return `${this.player._personalFMNextTrack?.album?.picUrl.replace(
-        'http://',
-        'https://'
-      )}?param=512y512`;
+      const cover =
+        this.player.personalFMNextTrack?.album?.picUrl ||
+        this.player.personalFMNextTrack?.al?.picUrl;
+      return cover
+        ? `${cover.replace('http://', 'https://')}?param=512y512`
+        : '';
     },
   },
   watch: {
-    track() {
+    trackID() {
       this.getColor();
     },
   },
   created() {
     this.getColor();
-    window.ok = this.getColor;
   },
   methods: {
     play() {
-      this.player.playPersonalFM();
+      return this.playback.playPersonalFM();
     },
     next() {
-      this.player.playNextFMTrack();
+      return this.playback.next({ personalFM: true });
     },
     goToAlbum() {
-      if (this.track.album.id === 0) return;
-      this.$router.push({ path: '/album/' + this.track.album.id });
+      const album = this.track.album || this.track.al;
+      if (!album?.id) return;
+      this.$router.push({ path: '/album/' + album.id });
     },
     moveToFMTrash() {
-      this.player.moveToFMTrash();
+      if (this.$store.getters['session/hasAccount'])
+        return this.playback.discardFMTrack();
     },
     getColor() {
       if (!this.player.personalFMTrack?.album?.picUrl) return;

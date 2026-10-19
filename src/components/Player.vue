@@ -288,16 +288,16 @@ export default {
       this.$router.push({ path: '/artist/' + id });
     },
     moveToFMTrash() {
-      this.playback.moveToFMTrash();
+      return this.playback.discardFMTrack();
     },
     switchRepeatMode() {
-      this.playback.switchRepeatMode();
+      return this.playback.cycleRepeat();
     },
     switchShuffle() {
-      this.playback.switchShuffle();
+      return this.playback.toggleShuffle();
     },
     switchReversed() {
-      this.playback.switchReversed();
+      return this.playback.setReversed(!this.player.reversed);
     },
     mute() {
       return this.playback.toggleMute();
