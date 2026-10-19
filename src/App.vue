@@ -91,16 +91,9 @@ export default {
       }
     },
     fetchData() {
-      if (!this.$store.getters['session/hasLibraryIdentity']) return;
-      this.$store.dispatch('library/fetchLikedSongs');
-      this.$store.dispatch('library/fetchLikedSongsWithDetails');
-      this.$store.dispatch('library/fetchLikedPlaylist');
-      if (this.$store.getters['session/hasAccount']) {
-        this.$store.dispatch('library/fetchLikedAlbums');
-        this.$store.dispatch('library/fetchLikedArtists');
-        this.$store.dispatch('library/fetchLikedMVs');
-        this.$store.dispatch('library/fetchCloudDisk');
-      }
+      this.$store.dispatch('library/loadApplication').catch(() => {
+        this.$store.dispatch('showToast', '音乐库加载失败');
+      });
     },
     handleScroll() {
       this.$refs.scrollbar.handleScroll();

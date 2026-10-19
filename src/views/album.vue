@@ -148,7 +148,7 @@
 import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
 import { getArtistAlbum } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
-import { getAlbum, albumDynamicDetail, likeAAlbum } from '@/api/album';
+import { getAlbum, albumDynamicDetail } from '@/api/album';
 import locale from '@/locale';
 import { splitSoundtrackAlbumTitle, splitAlbumTitle } from '@/utils/common';
 import NProgress from 'nprogress';
@@ -247,10 +247,11 @@ export default {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
-      likeAAlbum({
-        id: this.album.id,
-        t: this.dynamicDetail.isSub ? 0 : 1,
-      })
+      this.$store
+        .dispatch('library/setAlbumFavorite', {
+          id: this.album.id,
+          favorite: !this.dynamicDetail.isSub,
+        })
         .then(data => {
           if (data.code === 200) {
             this.dynamicDetail.isSub = !this.dynamicDetail.isSub;

@@ -182,7 +182,6 @@ import {
   getArtist,
   getArtistAlbum,
   artistMv,
-  followAArtist,
   similarArtists,
 } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
@@ -326,12 +325,14 @@ export default {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
-      followAArtist({
-        id: this.artist.id,
-        t: this.artist.followed ? 0 : 1,
-      }).then(data => {
-        if (data.code === 200) this.artist.followed = !this.artist.followed;
-      });
+      this.$store
+        .dispatch('library/setArtistFavorite', {
+          id: this.artist.id,
+          favorite: !this.artist.followed,
+        })
+        .then(data => {
+          if (data.code === 200) this.artist.followed = !this.artist.followed;
+        });
     },
     scrollTo(div, block = 'center') {
       document.getElementById(div).scrollIntoView({

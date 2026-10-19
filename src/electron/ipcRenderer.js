@@ -61,7 +61,7 @@ export function ipcRenderer(vueInstance) {
   });
 
   ipcRenderer.on('like', () => {
-    store.dispatch('library/likeATrack', player.currentTrack.id);
+    store.dispatch('library/toggleTrackFavorite', player.currentTrack.id);
   });
 
   ipcRenderer.on('repeat', () => {

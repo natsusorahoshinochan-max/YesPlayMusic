@@ -2,23 +2,108 @@ export default function createLibrary(
   snapshot,
   { api = {}, notifyLikedSongsChanged = () => {} } = {}
 ) {
-  const {
-    likeATrack,
-    getPlaylistDetail,
-    getTrackDetail,
-    userPlaylist,
-    userPlayHistory,
-    userLikedSongsIDs,
-    likedAlbums,
-    likedArtists,
-    likedMVs,
-    cloudDisk,
-    userAccount,
-  } = api;
+  function setCollection({ commit }, name, data) {
+    commit('setCollection', { name, data });
+    if (name === 'songs') notifyLikedSongsChanged();
+  }
+
+  async function loadPlaylists(context) {
+    const result = await api.userPlaylist({
+      uid: context.state.user.userId,
+      limit: 2000,
+      timestamp: Date.now(),
+    });
+    if (result.playlist) {
+      setCollection(context, 'playlists', result.playlist);
+      context.commit('setLikedSongPlaylistID', result.playlist[0]?.id || 0);
+    }
+  }
+
+  async function loadPreview(context) {
+    const id = context.state.likedSongPlaylistID;
+    const result = id ? await api.getPlaylistDetail(id, true) : null;
+    const ids = result?.playlist?.trackIds?.map(track => track.id) || [];
+    if (!context.rootGetters['session/hasAccount']) {
+      setCollection(context, 'songs', ids);
+    }
+    const tracks = ids.length
+      ? (await api.getTrackDetail(ids.slice(0, 12).join(','))).songs
+      : [];
+    setCollection(context, 'songsWithDetails', tracks || []);
+    context.commit('setPreviewReady');
+  }
+
+  async function loadSongs(context) {
+    const result = await api.userLikedSongsIDs(context.state.user.userId);
+    if (result.ids) setCollection(context, 'songs', result.ids);
+  }
+
+  async function loadCollection(context, name, endpoint, limit) {
+    const result = await api[endpoint]({ limit });
+    if (result.data) setCollection(context, name, result.data);
+  }
+
+  async function loadHistory(context) {
+    const result = await Promise.all(
+      [0, 1].map(type =>
+        api.userPlayHistory({ uid: context.state.user.userId, type })
+      )
+    );
+    const data = {};
+    ['allData', 'weekData'].forEach((name, index) => {
+      data[name] = result[index][name].map(item => ({
+        ...item.song,
+        playCount: item.playCount,
+      }));
+    });
+    setCollection(context, 'playHistory', data);
+  }
+
+  function reportBackground(context, work) {
+    work.catch(() =>
+      context.dispatch('showToast', '音乐库部分内容加载失败', { root: true })
+    );
+  }
+
+  async function loadLibrary(context, includeHistory) {
+    if (!context.rootGetters['session/hasLibraryIdentity']) return;
+    if (context.rootGetters['session/hasAccount']) {
+      const result = await api.userAccount();
+      if (result.code === 200) context.commit('setUser', result.profile);
+      reportBackground(context, loadSongs(context));
+      reportBackground(
+        context,
+        loadCollection(context, 'albums', 'likedAlbums', 2000)
+      );
+      reportBackground(
+        context,
+        loadCollection(context, 'artists', 'likedArtists', 2000)
+      );
+      reportBackground(
+        context,
+        loadCollection(context, 'mvs', 'likedMVs', 1000)
+      );
+      reportBackground(
+        context,
+        loadCollection(context, 'cloudDisk', 'cloudDisk', 1000)
+      );
+      if (includeHistory) reportBackground(context, loadHistory(context));
+    }
+    await loadPlaylists(context);
+    await loadPreview(context);
+  }
+
+  function requireAccount(context) {
+    if (context.rootGetters['session/hasAccount']) return true;
+    context.dispatch('showToast', '此操作需要登录网易云账号', { root: true });
+    return false;
+  }
+
   return {
     namespaced: true,
     state: () => ({
       ...snapshot,
+      previewReady: false,
       collections: {
         songs: [],
         songsWithDetails: [],
@@ -34,6 +119,7 @@ export default function createLibrary(
       user: state => state.user,
       likedSongPlaylistID: state => state.likedSongPlaylistID,
       collections: state => state.collections,
+      previewReady: state => state.previewReady,
     },
     mutations: {
       setUser(state, user) {
@@ -44,7 +130,9 @@ export default function createLibrary(
       },
       setCollection(state, { name, data }) {
         state.collections[name] = data;
-        if (name === 'songs') notifyLikedSongsChanged();
+      },
+      setPreviewReady(state) {
+        state.previewReady = true;
       },
     },
     actions: {
@@ -52,170 +140,124 @@ export default function createLibrary(
         commit('setUser', {});
         commit('setLikedSongPlaylistID', 0);
       },
-      likeATrack({ state, commit, dispatch, rootGetters }, id) {
-        if (!rootGetters['session/hasAccount']) {
-          dispatch('showToast', '此操作需要登录网易云账号', { root: true });
-          return;
+      async deletePlaylist(context, id) {
+        if (!requireAccount(context)) return;
+        const result = await api.deletePlaylist(id);
+        if (result.code === 200) await loadPlaylists(context);
+        return result;
+      },
+      async uploadCloudTrack(context, file) {
+        if (!requireAccount(context) || !file) return;
+        const result = await api.uploadSong(file);
+        if (result?.code === 200) {
+          setCollection(context, 'cloudDisk', [
+            result.privateCloud,
+            ...context.state.collections.cloudDisk,
+          ]);
         }
-        let like = true;
-        if (state.collections.songs.includes(id)) like = false;
-        return likeATrack({ id, like })
-          .then(() => {
-            if (like === false) {
-              commit('setCollection', {
-                name: 'songs',
-                data: state.collections.songs.filter(d => d !== id),
-              });
-            } else {
-              let newLikeSongs = state.collections.songs;
-              newLikeSongs.push(id);
-              commit('setCollection', {
-                name: 'songs',
-                data: newLikeSongs,
-              });
-            }
-            dispatch('fetchLikedSongsWithDetails');
-          })
-          .catch(() => {
-            dispatch('showToast', '操作失败，专辑下架或版权锁定', {
-              root: true,
-            });
-          });
+        return result;
       },
-      fetchLikedSongs: ({ state, commit, rootGetters }) => {
-        if (!rootGetters['session/hasLibraryIdentity']) return;
-        if (rootGetters['session/hasAccount']) {
-          return userLikedSongsIDs(state.user.userId).then(result => {
-            if (result.ids) {
-              commit('setCollection', {
-                name: 'songs',
-                data: result.ids,
-              });
-            }
+      async deleteCloudTrack(context, id) {
+        if (!requireAccount(context)) return;
+        const result = await api.cloudDiskTrackDelete(id);
+        if (result.code === 200) {
+          setCollection(
+            context,
+            'cloudDisk',
+            context.state.collections.cloudDisk.filter(
+              track => track.songId !== id
+            )
+          );
+        }
+        return result;
+      },
+      async setPlaylistFavorite(context, { id, favorite }) {
+        if (!requireAccount(context)) return;
+        const result = await api.subscribePlaylist({ id, t: favorite ? 1 : 2 });
+        if (result.code === 200) await loadPlaylists(context);
+        return result;
+      },
+      async changePlaylistTracks(context, params) {
+        if (!requireAccount(context)) return;
+        const result = await api.addOrRemoveTrackFromPlaylist(params);
+        if (result.body?.code === 200) {
+          const affectsLikedSongs =
+            Number(params.pid) === Number(context.state.likedSongPlaylistID);
+          await loadPlaylists(context);
+          if (affectsLikedSongs) {
+            await loadSongs(context);
+            await loadPreview(context);
+          }
+        }
+        return result;
+      },
+      async createPlaylist(context, { name, privacy = false, trackID }) {
+        if (!requireAccount(context)) return;
+        const result = await api.createPlaylist({
+          name,
+          privacy: privacy ? 10 : 0,
+        });
+        if (result.code !== 200) return result;
+        let trackResult;
+        if (trackID) {
+          trackResult = await api.addOrRemoveTrackFromPlaylist({
+            op: 'add',
+            pid: result.id,
+            tracks: trackID,
           });
-        } else {
-          // TODO:搜索ID登录的用户
+        }
+        await loadPlaylists(context);
+        return { ...result, trackResult };
+      },
+      async setAlbumFavorite(context, { id, favorite }) {
+        if (!requireAccount(context)) return;
+        const result = await api.likeAAlbum({ id, t: favorite ? 1 : 0 });
+        if (result.code === 200)
+          await loadCollection(context, 'albums', 'likedAlbums', 2000);
+        return result;
+      },
+      async setArtistFavorite(context, { id, favorite }) {
+        if (!requireAccount(context)) return;
+        const result = await api.followAArtist({ id, t: favorite ? 1 : 0 });
+        if (result.code === 200)
+          await loadCollection(context, 'artists', 'likedArtists', 2000);
+        return result;
+      },
+      async setMVFavorite(context, { id, favorite }) {
+        if (!requireAccount(context)) return;
+        const result = await api.likeAMV({ mvid: id, t: favorite ? 1 : 0 });
+        if (result.code === 200)
+          await loadCollection(context, 'mvs', 'likedMVs', 1000);
+        return result;
+      },
+      async toggleTrackFavorite(context, id) {
+        if (!requireAccount(context)) return;
+        const like = !context.state.collections.songs.includes(id);
+        try {
+          const result = await api.likeATrack({ id, like });
+          if (result.code !== 200) return result;
+          setCollection(
+            context,
+            'songs',
+            like
+              ? [...context.state.collections.songs, id]
+              : context.state.collections.songs.filter(song => song !== id)
+          );
+          if (!context.state.likedSongPlaylistID) await loadPlaylists(context);
+          await loadPreview(context);
+          return result;
+        } catch (error) {
+          await context.dispatch('showToast', '操作失败，专辑下架或版权锁定', {
+            root: true,
+          });
         }
       },
-      fetchLikedSongsWithDetails: ({ state, commit }) => {
-        return getPlaylistDetail(state.likedSongPlaylistID, true).then(
-          result => {
-            if (result.playlist?.trackIds?.length === 0) {
-              return new Promise(resolve => {
-                resolve();
-              });
-            }
-            return getTrackDetail(
-              result.playlist.trackIds
-                .slice(0, 12)
-                .map(t => t.id)
-                .join(',')
-            ).then(result => {
-              commit('setCollection', {
-                name: 'songsWithDetails',
-                data: result.songs,
-              });
-            });
-          }
-        );
-      },
-      fetchLikedPlaylist: ({ state, commit, rootGetters }) => {
-        if (!rootGetters['session/hasLibraryIdentity']) return;
-        if (rootGetters['session/hasAccount']) {
-          return userPlaylist({
-            uid: state.user?.userId,
-            limit: 2000, // 最多只加载2000个歌单（等有用户反馈问题再修）
-            timestamp: new Date().getTime(),
-          }).then(result => {
-            if (result.playlist) {
-              commit('setCollection', {
-                name: 'playlists',
-                data: result.playlist,
-              });
-              // 更新用户”喜欢的歌曲“歌单ID
-              commit('setLikedSongPlaylistID', result.playlist[0]?.id || 0);
-            }
-          });
-        } else {
-          // TODO:搜索ID登录的用户
-        }
-      },
-      fetchLikedAlbums: ({ commit, rootGetters }) => {
-        if (!rootGetters['session/hasAccount']) return;
-        return likedAlbums({ limit: 2000 }).then(result => {
-          if (result.data) {
-            commit('setCollection', {
-              name: 'albums',
-              data: result.data,
-            });
-          }
-        });
-      },
-      fetchLikedArtists: ({ commit, rootGetters }) => {
-        if (!rootGetters['session/hasAccount']) return;
-        return likedArtists({ limit: 2000 }).then(result => {
-          if (result.data) {
-            commit('setCollection', {
-              name: 'artists',
-              data: result.data,
-            });
-          }
-        });
-      },
-      fetchLikedMVs: ({ commit, rootGetters }) => {
-        if (!rootGetters['session/hasAccount']) return;
-        return likedMVs({ limit: 1000 }).then(result => {
-          if (result.data) {
-            commit('setCollection', {
-              name: 'mvs',
-              data: result.data,
-            });
-          }
-        });
-      },
-      fetchCloudDisk: ({ commit, rootGetters }) => {
-        if (!rootGetters['session/hasAccount']) return;
-        // FIXME: #1242
-        return cloudDisk({ limit: 1000 }).then(result => {
-          if (result.data) {
-            commit('setCollection', {
-              name: 'cloudDisk',
-              data: result.data,
-            });
-          }
-        });
-      },
-      fetchPlayHistory: ({ state, commit, rootGetters }) => {
-        if (!rootGetters['session/hasAccount']) return;
-        return Promise.all([
-          userPlayHistory({ uid: state.user?.userId, type: 0 }),
-          userPlayHistory({ uid: state.user?.userId, type: 1 }),
-        ]).then(result => {
-          const data = {};
-          const dataType = { 0: 'allData', 1: 'weekData' };
-          if (result[0] && result[1]) {
-            for (let i = 0; i < result.length; i++) {
-              const songData = result[i][dataType[i]].map(item => {
-                const song = item.song;
-                song.playCount = item.playCount;
-                return song;
-              });
-              data[[dataType[i]]] = songData;
-            }
-            commit('setCollection', {
-              name: 'playHistory',
-              data: data,
-            });
-          }
-        });
-      },
-      fetchUserProfile: ({ commit, rootGetters }) => {
-        if (!rootGetters['session/hasAccount']) return;
-        return userAccount().then(result => {
-          if (result.code === 200) {
-            commit('setUser', result.profile);
-          }
-        });
+      loadApplication: context => loadLibrary(context, false),
+      loadPage: context => loadLibrary(context, true),
+      async refreshPlaylists(context) {
+        if (!context.rootGetters['session/hasLibraryIdentity']) return;
+        await loadPlaylists(context);
+        await loadPreview(context);
       },
     },
   };

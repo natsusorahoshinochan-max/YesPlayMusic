@@ -76,8 +76,6 @@
 
 <script>
 import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
-import { addOrRemoveTrackFromPlaylist } from '@/api/playlist';
-import { cloudDiskTrackDelete } from '@/api/user';
 
 import TrackListItem from '@/components/TrackListItem.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
@@ -182,7 +180,7 @@ export default {
   methods: {
     ...mapMutations(['updateModal']),
     ...mapActions(['nextTrack', 'showToast']),
-    ...mapActions('library', ['likeATrack']),
+    ...mapActions('library', ['toggleTrackFavorite']),
     openMenu(e, track, index = -1) {
       this.rightClickedTrack = track;
       this.rightClickedTrackIndex = index;
@@ -234,7 +232,7 @@ export default {
       this.player.addTrackToPlayNext(this.rightClickedTrack.id);
     },
     like() {
-      this.likeATrack(this.rightClickedTrack.id);
+      this.toggleTrackFavorite(this.rightClickedTrack.id);
     },
     addTrackToPlaylist() {
       if (!this.$store.getters['session/hasAccount']) {
@@ -259,18 +257,20 @@ export default {
       }
       if (confirm(`确定要从歌单删除 ${this.rightClickedTrack.name}？`)) {
         let trackID = this.rightClickedTrack.id;
-        addOrRemoveTrackFromPlaylist({
-          op: 'del',
-          pid: this.id,
-          tracks: trackID,
-        }).then(data => {
-          this.showToast(
-            data.body.code === 200
-              ? locale.t('toast.removedFromPlaylist')
-              : data.body.message
-          );
-          this.$parent.removeTrack(trackID);
-        });
+        this.$store
+          .dispatch('library/changePlaylistTracks', {
+            op: 'del',
+            pid: this.id,
+            tracks: trackID,
+          })
+          .then(data => {
+            this.showToast(
+              data.body.code === 200
+                ? locale.t('toast.removedFromPlaylist')
+                : data.body.message
+            );
+            if (data.body.code === 200) this.$parent.removeTrack(trackID);
+          });
       }
     },
     copyLink() {
@@ -292,17 +292,10 @@ export default {
     removeTrackFromCloudDisk() {
       if (confirm(`确定要从云盘删除 ${this.rightClickedTrack.songName}？`)) {
         let trackID = this.rightClickedTrack.songId;
-        cloudDiskTrackDelete(trackID).then(data => {
+        this.$store.dispatch('library/deleteCloudTrack', trackID).then(data => {
           this.showToast(
-            data.code === 200 ? '已将此歌曲从云盘删除' : data.message
+            data?.code === 200 ? '已将此歌曲从云盘删除' : data?.message
           );
-          let newCloudDisk = this.liked.cloudDisk.filter(
-            t => t.songId !== trackID
-          );
-          this.$store.commit('library/setCollection', {
-            name: 'cloudDisk',
-            data: newCloudDisk,
-          });
         });
       }
     },
