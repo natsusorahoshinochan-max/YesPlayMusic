@@ -1390,8 +1390,7 @@ export default {
       });
     },
     logout() {
-      this.$store.dispatch('session/logout');
-      this.$router.push({ name: 'home' });
+      return this.$store.dispatch('session/logout');
     },
     countDBSize() {
       countDBSize().then(data => {

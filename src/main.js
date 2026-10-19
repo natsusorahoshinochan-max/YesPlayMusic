@@ -5,6 +5,8 @@ import router from './router';
 import store, { createStore } from './store';
 import * as auth from '@/api/auth';
 import { createCredentials } from '@/application/credentials';
+import { createRequestEnvironment } from '@/application/requestEnvironment';
+import { createSessionEffects } from '@/application/sessionEffects';
 import { libraryApi } from '@/application/library';
 import { initializeTrackCache } from '@/utils/db';
 import { initializeLocale } from '@/locale';
@@ -50,7 +52,13 @@ startApplication({
   createStore() {
     const store = createStore({
       credentials,
-      session: { auth },
+      session: {
+        auth,
+        ...createSessionEffects({
+          router,
+          notify: message => store.dispatch('showToast', message),
+        }),
+      },
       library: {
         api: libraryApi,
         notifyLikedSongsChanged: () =>
@@ -64,13 +72,9 @@ startApplication({
   initializeLocale,
   initializeAppearance,
   configureRequest,
+  requestEnvironment: createRequestEnvironment(),
   getCookie: key => credentials.get(key),
-  onSessionInvalid() {
-    store.dispatch('session/logout');
-    return router.push({
-      name: process.env.IS_ELECTRON ? 'loginAccount' : 'login',
-    });
-  },
+  onSessionInvalid: () => store.dispatch('session/invalidate'),
   createPlayer,
   mount({ store, i18n }) {
     store.dispatch('session/refreshDaily');
