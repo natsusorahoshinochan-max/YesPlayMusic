@@ -49,6 +49,6 @@ preferences 已持有设置与音乐库筛选偏好，应用启动已有显式�
 - 受影响的 Web、Electron 设置功能及本地数据保持可用。
 - 新测试依据本文及后续确认的设计编写，从公开 interface 验证完整流程。
 
-## 设计待决事项
+## 对应设计
 
-完整设置操作的 interface 形态、设置应用逻辑的内部组织及 adapter 接线位置，在设计中比较并确定。
+已确认的[设置操作与持久化结构设计](../design/settings-and-persistence.md)定义完整 actions 与 getters 的 interface、共同配置应用函数、选择性持久化、adapter 接线和启动顺序。设计待实现。
