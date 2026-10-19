@@ -194,10 +194,5 @@ export function countDBSize() {
 }
 
 export function clearDB() {
-  return new Promise(resolve => {
-    db.tables.forEach(function (table) {
-      table.clear();
-    });
-    resolve();
-  });
+  return Promise.all(db.tables.map(table => table.clear()));
 }

@@ -11,6 +11,9 @@ export default function createPreferences(
     applyLanguage = () => {},
     applyProxy = () => {},
     applyAppearance = () => {},
+    clearCache = () => {},
+    applyOutputDevice = () => {},
+    resetReversedMode = () => {},
   } = {}
 ) {
   return {
@@ -66,6 +69,33 @@ export default function createPreferences(
         commit('setLibraryPlaylistFilter', value);
         await persist();
       },
+      async setMusicQuality({ commit, state }, value) {
+        value = value === 'flac' ? value : Number(value);
+        const previous = state.settings.musicQuality;
+        const changed =
+          value !== (previous === 'flac' ? previous : Number(previous));
+        commit('updateSettings', { key: 'musicQuality', value });
+        await persist();
+        if (changed) await clearCache();
+      },
+      async setOutputDevice({ commit }, value) {
+        if (value === undefined) return;
+        commit('updateSettings', { key: 'outputDevice', value });
+        await persist();
+        await applyOutputDevice();
+      },
+      async setAutomaticCaching({ commit }, value) {
+        value = Boolean(value);
+        commit('updateSettings', { key: 'automaticallyCacheSongs', value });
+        await persist();
+        if (!value) await clearCache();
+      },
+      async setReversedModeEnabled({ commit }, value) {
+        value = Boolean(value);
+        commit('updateSettings', { key: 'enableReversedMode', value });
+        await persist();
+        if (!value) await resetReversedMode();
+      },
       async setLanguage({ commit }, value) {
         commit('updateSettings', { key: 'lang', value });
         await persist();
@@ -101,17 +131,12 @@ export default function createPreferences(
       },
       async applyRestored({ state }) {
         await persist();
+        await applyOutputDevice();
         await applyLanguage(state.settings.lang);
         await applyAppearance(state.settings);
       },
     },
     mutations: {
-      changeMusicQuality(state, value) {
-        state.settings.musicQuality = value;
-      },
-      changeOutputDevice(state, deviceId) {
-        state.settings.outputDevice = deviceId;
-      },
       updateSettings(state, { key, value }) {
         Vue.set(state.settings, key, value);
       },
