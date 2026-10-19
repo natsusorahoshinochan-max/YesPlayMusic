@@ -1,16 +1,19 @@
+import 'fake-indexeddb/auto';
 import Vue from 'vue';
 import Vuex from 'vuex';
 import { shallowMount, createLocalVue } from '@vue/test-utils';
 import DailyTracksCard from '@/components/DailyTracksCard.vue';
 import { createPlayback } from '@/playback';
 import Player from '@/components/Player.vue';
+import Lyrics from '@/views/lyrics.vue';
+import MvRow from '@/components/MvRow.vue';
+import request from '@/utils/request';
 import TrackList from '@/components/TrackList.vue';
 import DailyTracks from '@/views/dailyTracks.vue';
 import { createStore } from '@/store';
 import router from '@/router';
 
 jest.mock('@/assets/css/slider.css', () => ({}));
-
 jest.mock('@/utils/request', () => ({ __esModule: true, default: jest.fn() }));
 
 const localVue = createLocalVue();
@@ -23,7 +26,7 @@ const tracks = [1, 2].map(id => ({
   dt: 180000,
 }));
 
-function fixture() {
+function fixture(overrides = {}) {
   const playback = createPlayback({
     getTrack: async id => tracks.find(track => track.id === id),
     resources: {
@@ -52,6 +55,7 @@ function fixture() {
         return handle;
       },
     },
+    ...overrides,
   });
   const store = new Vuex.Store({
     state: { player: playback, dailyTracks: tracks },
@@ -184,5 +188,96 @@ test('daily page plays loaded IDs without another source request', async () => {
   } finally {
     wrapper.destroy();
     playback.dispose();
+  }
+});
+
+test('lyrics reloads for a new song and retains loaded lyrics across progress and volume snapshots', async () => {
+  let tick;
+  const { playback } = fixture({
+    setInterval: callback => {
+      tick = callback;
+      return 1;
+    },
+    clearInterval() {},
+  });
+  const store = createStore();
+  store.state.player = playback;
+  request.mockResolvedValue({ lrc: { lyric: '[00:00.00] First lyric' } });
+  await playback.playTracks([1, 2]);
+  const wrapper = shallowMount(Lyrics, {
+    localVue,
+    store,
+    router,
+    mocks: { $t: key => key },
+    stubs: ['svg-icon', 'router-link'],
+  });
+  async function lyricIO() {
+    await new Promise(resolve => setTimeout(resolve, 30));
+    await Vue.nextTick();
+  }
+  try {
+    await lyricIO();
+    expect(
+      request.mock.calls
+        .filter(([call]) => call.url === '/lyric')
+        .map(([call]) => call.params.id)
+    ).toEqual([1]);
+    playback.seek(25);
+    await Vue.nextTick();
+    playback.setVolume(0.4);
+    await Vue.nextTick();
+    tick();
+    await lyricIO();
+    expect(
+      request.mock.calls
+        .filter(([call]) => call.url === '/lyric')
+        .map(([call]) => call.params.id)
+    ).toEqual([1]);
+    expect(wrapper.text()).toContain('First lyric');
+    await playback.next();
+    await lyricIO();
+    expect(
+      request.mock.calls
+        .filter(([call]) => call.url === '/lyric')
+        .map(([call]) => call.params.id)
+    ).toEqual([1, 2]);
+  } finally {
+    wrapper.destroy();
+    playback.dispose();
+  }
+});
+
+test('related MV navigation reads local video playing state at click time', async () => {
+  let videoPlaying = false;
+  const wrapper = shallowMount(MvRow, {
+    localVue,
+    router,
+    propsData: {
+      mvs: [{ id: 77, name: 'Related', cover: '' }],
+      getAutoplay: () => videoPlaying,
+    },
+    stubs: ['router-link'],
+  });
+  const navigate = jest.spyOn(router, 'push').mockResolvedValue();
+  try {
+    await wrapper.find('.cover').trigger('click');
+    expect(navigate).toHaveBeenLastCalledWith({
+      path: '/mv/77',
+      query: { autoplay: false },
+    });
+    videoPlaying = true;
+    await wrapper.find('.cover').trigger('click');
+    expect(navigate).toHaveBeenLastCalledWith({
+      path: '/mv/77',
+      query: { autoplay: true },
+    });
+    videoPlaying = false;
+    await wrapper.find('.cover').trigger('click');
+    expect(navigate).toHaveBeenLastCalledWith({
+      path: '/mv/77',
+      query: { autoplay: false },
+    });
+  } finally {
+    wrapper.destroy();
   }
 });
