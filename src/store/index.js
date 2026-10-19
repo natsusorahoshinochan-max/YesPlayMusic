@@ -50,6 +50,9 @@ export function createStore({
       session: createSession(persistence.snapshot.session, {
         ...session,
         credentials,
+        identityChanged() {
+          createdStore.state.player?.lyrics?.identityChanged();
+        },
       }),
       library: createLibrary(persistence.snapshot.library, library),
       playlistDetail: createPlaylistDetail({

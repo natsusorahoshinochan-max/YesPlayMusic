@@ -4,6 +4,7 @@ export default function createSession(
   snapshot,
   {
     credentials,
+    identityChanged = () => {},
     auth = {},
     navigate = () => {},
     notify = () => {},
@@ -65,6 +66,7 @@ export default function createSession(
   }
 
   async function clearIdentity({ commit, dispatch }) {
+    identityChanged();
     credentials.remove('MUSIC_U');
     credentials.remove('__csrf');
     commit('setIdentity', { loginMode: null, hasCredential: false });
@@ -72,6 +74,7 @@ export default function createSession(
   }
 
   async function enterAccount({ commit, dispatch }, cookie) {
+    identityChanged();
     credentials.set(cookie);
     commit('setIdentity', {
       loginMode: 'account',
@@ -165,6 +168,7 @@ export default function createSession(
         }
       },
       async selectPublicIdentity({ commit, dispatch }, user) {
+        identityChanged();
         commit('setIdentity', {
           loginMode: 'username',
           hasCredential: Boolean(credentials.get('MUSIC_U')),

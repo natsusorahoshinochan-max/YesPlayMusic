@@ -42,6 +42,7 @@ service.interceptors.response.use(
     const data = response?.data;
     const url = error?.config?.url || response?.config?.url || '';
     if (
+      (!error?.config?.isCurrent || error.config.isCurrent()) &&
       data &&
       data.code === 301 &&
       data.msg === '需要登录' &&
