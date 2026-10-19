@@ -80,7 +80,11 @@ import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
 import TrackListItem from '@/components/TrackListItem.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
 import locale from '@/locale';
-import { describeLibraryOutcome } from '@/utils/libraryOutcome';
+import {
+  describeLibraryOutcome,
+  toggleTrackFavoriteWithFeedback,
+  showLibraryChangeFeedback,
+} from '@/utils/libraryOutcome';
 
 export default {
   name: 'TrackList',
@@ -181,7 +185,6 @@ export default {
   methods: {
     ...mapMutations(['updateModal']),
     ...mapActions(['nextTrack', 'showToast']),
-    ...mapActions('library', ['toggleTrackFavorite']),
     openMenu(e, track, index = -1) {
       this.rightClickedTrack = track;
       this.rightClickedTrackIndex = index;
@@ -233,7 +236,10 @@ export default {
       this.player.addTrackToPlayNext(this.rightClickedTrack.id);
     },
     like() {
-      this.toggleTrackFavorite(this.rightClickedTrack.id);
+      return toggleTrackFavoriteWithFeedback(
+        this.$store,
+        this.rightClickedTrack.id
+      );
     },
     addTrackToPlaylist() {
       if (!this.$store.getters['session/hasAccount']) {
@@ -282,15 +288,14 @@ export default {
         this.rightClickedTrackIndex
       );
     },
-    removeTrackFromCloudDisk() {
-      if (confirm(`确定要从云盘删除 ${this.rightClickedTrack.songName}？`)) {
-        let trackID = this.rightClickedTrack.songId;
-        this.$store.dispatch('library/deleteCloudTrack', trackID).then(data => {
-          this.showToast(
-            data?.code === 200 ? '已将此歌曲从云盘删除' : data?.message
-          );
-        });
-      }
+    async removeTrackFromCloudDisk() {
+      if (!confirm(`确定要从云盘删除 ${this.rightClickedTrack.songName}？`))
+        return;
+      const result = await this.$store.dispatch(
+        'library/deleteCloudTrack',
+        this.rightClickedTrack.songId
+      );
+      showLibraryChangeFeedback(this.$store, result, '已将此歌曲从云盘删除');
     },
   },
 };

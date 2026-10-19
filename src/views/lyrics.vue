@@ -302,10 +302,11 @@
 </template>
 
 <script>
+import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 // The lyrics page of Apple Music is so gorgeous, so I copy the design.
 // Some of the codes are from https://github.com/sl1673495/vue-netease-music
 
-import { mapState, mapMutations, mapActions, mapGetters } from 'vuex';
+import { mapState, mapMutations, mapGetters } from 'vuex';
 import VueSlider from 'vue-slider-component';
 import ContextMenu from '@/components/ContextMenu.vue';
 import { formatTrackTime } from '@/utils/common';
@@ -507,7 +508,9 @@ export default {
   },
   methods: {
     ...mapMutations(['toggleLyrics', 'updateModal']),
-    ...mapActions('library', ['toggleTrackFavorite']),
+    toggleTrackFavorite(id) {
+      return toggleTrackFavoriteWithFeedback(this.$store, id);
+    },
     initDate() {
       var _this = this;
       clearInterval(this.timer);

@@ -1,4 +1,5 @@
 import store from '@/store';
+import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 
 export function ipcRenderer(vueInstance) {
   const player = store.state.player;
@@ -61,7 +62,7 @@ export function ipcRenderer(vueInstance) {
   });
 
   ipcRenderer.on('like', () => {
-    store.dispatch('library/toggleTrackFavorite', player.currentTrack.id);
+    return toggleTrackFavoriteWithFeedback(store, player.currentTrack.id);
   });
 
   ipcRenderer.on('repeat', () => {

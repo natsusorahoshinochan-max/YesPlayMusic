@@ -222,7 +222,7 @@
 import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
 import NProgress from 'nprogress';
 import nativeAlert from '@/utils/nativeAlert';
-import locale from '@/locale';
+import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
@@ -430,29 +430,21 @@ export default {
         trackID
       );
     },
-    likePlaylist(toast = false) {
-      if (!this.$store.getters['session/hasAccount']) {
-        this.showToast(locale.t('toast.needToLogin'));
-        return;
-      }
-      this.$store
-        .dispatch('library/setPlaylistFavorite', {
-          id: this.playlist.id,
-          favorite: !this.playlist.subscribed,
-        })
-        .then(data => {
-          if (data.code === 200) {
-            this.$store.dispatch('playlistDetail/applyLibraryChange', {
-              type: 'favorite',
-              playlistId: this.playlist.id,
-              favorite: !this.playlist.subscribed,
-            });
-            if (toast === true)
-              this.showToast(
-                this.playlist.subscribed ? '已保存到音乐库' : '已从音乐库删除'
-              );
-          }
-        });
+    async likePlaylist(toast = false) {
+      const favorite = !this.playlist.subscribed;
+      const result = await this.$store.dispatch('library/setPlaylistFavorite', {
+        id: this.playlist.id,
+        favorite,
+      });
+      showLibraryChangeFeedback(
+        this.$store,
+        result,
+        toast === true
+          ? favorite
+            ? '已保存到音乐库'
+            : '已从音乐库删除'
+          : undefined
+      );
     },
     async loadData(id) {
       this.searchKeyWords = '';
@@ -477,24 +469,12 @@ export default {
     openMenu(e) {
       this.$refs.playlistMenu.openMenu(e);
     },
-    deletePlaylist() {
-      if (!this.$store.getters['session/hasAccount']) {
-        this.showToast(locale.t('toast.needToLogin'));
-        return;
-      }
-      let confirmation = confirm(`确定要删除歌单 ${this.playlist.name}？`);
-      if (confirmation === true) {
-        this.$store
-          .dispatch('library/deletePlaylist', this.playlist.id)
-          .then(data => {
-            if (data.code === 200) {
-              nativeAlert(`已删除歌单 ${this.playlist.name}`);
-              this.$router.go(-1);
-            } else {
-              nativeAlert('发生错误');
-            }
-          });
-      }
+    async deletePlaylist() {
+      const { id, name } = this.playlist;
+      if (!confirm(`确定要删除歌单 ${name}？`)) return;
+      const result = await this.$store.dispatch('library/deletePlaylist', id);
+      showLibraryChangeFeedback(this.$store, result, `已删除歌单 ${name}`);
+      if (result.outcome.status === 'succeeded') this.$router.go(-1);
     },
     editPlaylist() {
       nativeAlert('此功能开发中');
