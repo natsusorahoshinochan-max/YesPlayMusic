@@ -72,11 +72,17 @@ curl --fail http://127.0.0.1:3000/login/status
 
 Browserslist 固定为 4.24.0、node-releases 固定为 2.0.18，满足测试工具的依赖范围并保持 Node 16 可安装。
 
-## 运行基线
+## Electron 播放运行验证
 
-- 常规依赖安装与 `--frozen-lockfile` 安装均通过；Electron 可执行文件保持可用。
-- Web 生产构建通过；Electron renderer 与主进程 bundle 构建通过（`--skipElectronBuild`），该命令不打安装包。构建保留 bundle 体积提示及 Electron 可选依赖 `abstract-socket`、`bufferutil`、`utf-8-validate` 缺失警告。
-- Web API 的登录状态接口正常返回访客结果。
-- Electron 主进程创建窗口并触发 ready-to-show，内置 API 对推荐内容请求返回成功。桌面完整交互尚未手动验证。
-- `yarn lint --no-fix` 通过，保留 7 个警告，涉及已有 `v-html` 使用与缺少 prop 默认值。
-- Electron 启动日志存在 Discord IPC 连接失败和 Vue Devtools 安装失败；应用窗口与内置 API 已继续启动。
+先激活工具环境并生成当前代码的 Electron bundle：
+
+```sh
+yarn vue-cli-service electron:build --skipElectronBuild
+YPM_RUNTIME_ROOT="$PWD" node scripts/verify-playback-runtime.cjs
+```
+
+入口为 `scripts/verify-playback-runtime.cjs`，音频与元数据 fixture 位于 `scripts/playback-runtime-fixture.cjs`。默认加载 `dist_electron/bundled/background.js`；使用 `YPM_ELECTRON_MAIN` 指向其他本次构建的主进程 bundle。Electron 可执行文件默认使用当前依赖，可用 `YPM_ELECTRON_BINARY` 指定。
+
+脚本创建独立的临时访客 profile，退出后清理。验证使用真实缓存音频、Howler、Blob URL、默认输出设备、原生播放控制、桌面状态和 `/player`；fixture 歌曲的元数据刷新指向本地 HTTP 服务。结果默认写入 `/tmp/yesplaymusic-spec17-context/runtime25-result.json`，可用 `YPM_RUNTIME_RESULT` 指定；读取结果中的检查项与错误确认实际通过范围。
+
+Web 使用正常页面交互验证播放；Linux MPRIS 和其他目标平台的原生能力在对应系统验证。听歌记录与 Last.fm 生产请求参数通过[受控 API 接合套件](../tests/README.md)验证。
