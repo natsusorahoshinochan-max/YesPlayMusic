@@ -1,7 +1,7 @@
 import dbus from 'dbus-next';
-import { ipcMain, app } from 'electron';
+import { ipcMain } from 'electron';
 
-export function createMpris(window) {
+export function createMpris(window, windowOperations) {
   const Player = require('mpris-service');
   const renderer = window.webContents;
 
@@ -12,15 +12,22 @@ export function createMpris(window) {
 
   player.on('next', () => renderer.send('next'));
   player.on('previous', () => renderer.send('previous'));
-  player.on('playpause', () => renderer.send('play'));
+  player.on('playpause', () => renderer.send('toggle'));
   player.on('play', () => renderer.send('play'));
-  player.on('pause', () => renderer.send('play'));
-  player.on('quit', () => app.exit());
+  player.on('pause', () => renderer.send('pause'));
+  player.on('quit', () => windowOperations.quit());
   player.on('position', args =>
     renderer.send('setPosition', args.position / 1000 / 1000)
   );
-  player.on('loopStatus', () => renderer.send('repeat'));
-  player.on('shuffle', () => renderer.send('shuffle'));
+  player.on('loopStatus', status => {
+    const mode = {
+      [Player.LOOP_STATUS_NONE]: 'off',
+      [Player.LOOP_STATUS_TRACK]: 'one',
+      [Player.LOOP_STATUS_PLAYLIST]: 'on',
+    }[status];
+    if (mode) renderer.send('setRepeatMode', mode);
+  });
+  player.on('shuffle', enabled => renderer.send('setShuffle', enabled));
 
   ipcMain.on('player', (e, { playing }) => {
     try {

@@ -4,14 +4,14 @@ export function createPlaybackReporting({
   neteaseScrobble,
   lastfmScrobble,
   lastfmNowPlaying,
-  getLastfmKey,
+  getLastfmAuthorization,
   now = Date.now,
   onError = error =>
     console.debug('[playback reporting] request failed', error),
 }) {
-  const submit = (request, params) => {
+  const submit = (request, params, authorization) => {
     try {
-      Promise.resolve(request(params)).catch(onError);
+      Promise.resolve(request(params, authorization)).catch(onError);
     } catch (error) {
       onError(error);
     }
@@ -26,21 +26,28 @@ export function createPlaybackReporting({
       duration: durationSeconds,
     });
     if (event.type === 'played') {
-      if (getLastfmKey() !== undefined) submit(lastfmNowPlaying, params());
+      const authorization = getLastfmAuthorization();
+      if (authorization.key !== undefined)
+        submit(lastfmNowPlaying, params(), authorization);
       return;
     }
     if (event.type !== 'before-replace' && event.type !== 'ended') return;
     const time = Math.floor(event.completed ? durationSeconds : event.position);
     if (time < 1 || !event.recordOnce()) return;
     submit(neteaseScrobble, { id: track.id, sourceid: event.source.id, time });
+    const authorization = getLastfmAuthorization();
     if (
-      getLastfmKey() !== undefined &&
+      authorization.key !== undefined &&
       (time >= durationSeconds / 2 || time >= 240)
     ) {
-      submit(lastfmScrobble, {
-        ...params(),
-        timestamp: Math.floor(now() / 1000) - time,
-      });
+      submit(
+        lastfmScrobble,
+        {
+          ...params(),
+          timestamp: Math.floor(now() / 1000) - time,
+        },
+        authorization
+      );
     }
   };
 }

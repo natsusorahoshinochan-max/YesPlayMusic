@@ -33,11 +33,10 @@
       </div>
       <div class="songs">
         <TrackList
-          :id="liked.playlists.length > 0 ? liked.playlists[0].id : 0"
           :tracks="liked.songsWithDetails"
           :column-number="3"
           type="tracklist"
-          dbclick-track-func="playPlaylist"
+          @activate="playLikedSongs($event.track.id)"
         />
       </div>
     </div>
@@ -145,12 +144,11 @@
 
       <div v-show="currentTab === 'cloudDisk'">
         <TrackList
-          :id="-8"
           :tracks="liked.cloudDisk"
           :column-number="3"
           type="cloudDisk"
-          dbclick-track-func="playCloudDisk"
           :extra-context-menu-item="['removeTrackFromCloudDisk']"
+          @activate="playCloudTrack"
         />
       </div>
 
@@ -177,6 +175,7 @@
           :tracks="playHistoryList"
           :column-number="1"
           type="tracklist"
+          @activate="playHistoryTrack"
         />
       </div>
     </div>
@@ -331,9 +330,28 @@ export default {
         .catch(() => this.showToast('音乐库加载失败'))
         .finally(() => NProgress.done());
     },
-    playLikedSongs() {
+    playCloudTrack({ track }) {
+      return this.$store.state.player.playTracks(
+        this.liked.cloudDisk.map(t => t.songId),
+        {
+          source: { type: 'cloudDisk', id: -8 },
+          startTrackId: track.songId,
+        }
+      );
+    },
+    playHistoryTrack({ track }) {
+      return this.$store.state.player.playTracks(
+        this.playHistoryList.map(t => t.id),
+        {
+          source: { type: 'url', id: '/library' },
+          startTrackId: track.id,
+        }
+      );
+    },
+    playLikedSongs(startTrackId) {
       return this.$store.state.player.playPlaylist(this.liked.playlists[0].id, {
         fresh: true,
+        startTrackId,
       });
     },
     playIntelligenceList() {

@@ -74,19 +74,19 @@
       <div v-for="item in tracksByDisc" :key="item.disc">
         <h2 class="disc">Disc {{ item.disc }}</h2>
         <TrackList
-          :id="album.id"
           :tracks="item.tracks"
           :type="'album'"
           :album-object="album"
+          @activate="playAlbum(album.id, $event.track.id)"
         />
       </div>
     </div>
     <div v-else>
       <TrackList
-        :id="album.id"
         :tracks="tracks"
         :type="'album'"
         :album-object="album"
+        @activate="playAlbum(album.id, $event.track.id)"
       />
     </div>
     <div class="extra-info">

@@ -19,7 +19,8 @@ import {
 } from '@/utils/platform';
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 import { startNeteaseMusicApi } from './electron/services';
-import { initIpcMain } from './electron/ipcMain.js';
+import { initIpcMain, rememberCloseOption } from './electron/ipcMain.js';
+import { createWindowOperations } from './electron/windowOperations';
 import { restoreProxy } from './electron/proxy';
 import { createTray } from '@/electron/tray';
 import { createTouchBar } from './electron/touchBar';
@@ -41,49 +42,6 @@ const log = text => {
   console.log(`${clc.blueBright('[background.js]')} ${text}`);
 };
 
-const closeOnLinux = (e, win, store) => {
-  let closeOpt = store.get('settings.closeAppOption');
-  if (closeOpt !== 'exit') {
-    e.preventDefault();
-  }
-
-  if (closeOpt === 'ask') {
-    dialog
-      .showMessageBox({
-        type: 'info',
-        title: 'Information',
-        cancelId: 2,
-        defaultId: 0,
-        message: '确定要关闭吗？',
-        buttons: ['最小化到托盘', '直接退出'],
-        checkboxLabel: '记住我的选择',
-      })
-      .then(result => {
-        if (result.checkboxChecked && result.response !== 2) {
-          win.webContents.send(
-            'rememberCloseAppOption',
-            result.response === 0 ? 'minimizeToTray' : 'exit'
-          );
-        }
-
-        if (result.response === 0) {
-          win.hide(); //调用 最小化实例方法
-        } else if (result.response === 1) {
-          win = null;
-          app.exit(); //exit()直接关闭客户端，不会执行quit();
-        }
-      })
-      .catch(err => {
-        log(err);
-      });
-  } else if (closeOpt === 'exit') {
-    win = null;
-    app.quit();
-  } else {
-    win.hide();
-  }
-};
-
 class Background {
   constructor() {
     this.window = null;
@@ -96,7 +54,15 @@ class Background {
     });
     this.neteaseMusicAPI = null;
     this.expressApp = null;
-    this.willQuitApp = !isMac;
+    this.windowOperations = createWindowOperations({
+      app,
+      dialog,
+      platform: process.platform,
+      getWindow: () => this.window,
+      getCloseOption: () => this.store.get('settings.closeAppOption'),
+      rememberCloseOption: value => rememberCloseOption(this.window, value),
+      onError: error => log(error),
+    });
 
     this.init();
   }
@@ -105,7 +71,7 @@ class Background {
     log('initializing');
 
     // Make sure the app is singleton.
-    if (!app.requestSingleInstanceLock()) return app.quit();
+    if (!app.requestSingleInstanceLock()) return this.windowOperations.quit();
 
     // start netease music api
     this.neteaseMusicAPI = startNeteaseMusicApi();
@@ -142,12 +108,12 @@ class Background {
     if (isWindows) {
       process.on('message', data => {
         if (data === 'graceful-exit') {
-          app.quit();
+          this.windowOperations.quit();
         }
       });
     } else {
       process.on('SIGTERM', () => {
-        app.quit();
+        this.windowOperations.quit();
       });
     }
   }
@@ -302,30 +268,7 @@ class Background {
       this.store.set('window', this.window.getBounds());
     });
 
-    this.window.on('close', e => {
-      log('window close event');
-
-      if (isLinux) {
-        closeOnLinux(e, this.window, this.store);
-      } else if (isMac) {
-        if (this.willQuitApp) {
-          this.window = null;
-          app.quit();
-        } else {
-          e.preventDefault();
-          this.window.hide();
-        }
-      } else {
-        let closeOpt = this.store.get('settings.closeAppOption');
-        if (this.willQuitApp && (closeOpt === 'exit' || closeOpt === 'ask')) {
-          this.window = null;
-          app.quit();
-        } else {
-          e.preventDefault();
-          this.window.hide();
-        }
-      }
-    });
+    this.window.on('close', this.windowOperations.close);
 
     this.window.on('resized', () => {
       this.store.set('window', this.window.getBounds());
@@ -393,12 +336,18 @@ class Background {
         this.ypmTrayImpl = createTray(
           this.window,
           this.trayEventEmitter,
-          this.store
+          this.store,
+          this.windowOperations
         );
       }
 
       // init ipcMain
-      initIpcMain(this.window, this.store, this.trayEventEmitter);
+      initIpcMain(
+        this.window,
+        this.store,
+        this.trayEventEmitter,
+        this.windowOperations
+      );
 
       await restoreProxy(this.window.webContents.session, this.store);
 
@@ -441,7 +390,7 @@ class Background {
 
       // create mpris
       if (isCreateMpris) {
-        createMpris(this.window);
+        createMpris(this.window, this.windowOperations);
       }
     });
 
@@ -458,12 +407,8 @@ class Background {
 
     app.on('window-all-closed', () => {
       if (!isMac) {
-        app.quit();
+        this.windowOperations.quit();
       }
-    });
-
-    app.on('before-quit', () => {
-      this.willQuitApp = true;
     });
 
     app.on('quit', () => {

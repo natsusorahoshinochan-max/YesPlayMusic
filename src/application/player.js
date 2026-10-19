@@ -74,7 +74,7 @@ export function createPlayer({
     neteaseScrobble: scrobble,
     lastfmScrobble: trackScrobble,
     lastfmNowPlaying: trackUpdateNowPlaying,
-    getLastfmKey: () => store.state.lastfm?.key,
+    getLastfmAuthorization: () => store.getters['lastfm/authorization'],
   });
   playback = createPlayback({
     sourceLists: {

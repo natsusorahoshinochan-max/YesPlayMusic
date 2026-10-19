@@ -1,6 +1,6 @@
 /* global __static */
 import path from 'path';
-import { app, nativeImage, Tray, Menu, nativeTheme } from 'electron';
+import { nativeImage, Tray, Menu, nativeTheme } from 'electron';
 import { isLinux } from '@/utils/platform';
 
 function getTrayIconTheme(store) {
@@ -32,7 +32,7 @@ function createMenuIcon(filename, iconTheme) {
   return nativeImage.createFromBitmap(bitmap, image.getSize());
 }
 
-function createMenuTemplate(win, store) {
+function createMenuTemplate(win, store, windowOperations) {
   const iconTheme = getTrayIconTheme(store);
 
   return [
@@ -48,7 +48,7 @@ function createMenuTemplate(win, store) {
       label: '暂停',
       icon: createMenuIcon('pause', iconTheme),
       click: () => {
-        win.webContents.send('play');
+        win.webContents.send('pause');
       },
       id: 'pause',
       visible: false,
@@ -101,7 +101,7 @@ function createMenuTemplate(win, store) {
       icon: createMenuIcon('exit', iconTheme),
       accelerator: 'CmdOrCtrl+W',
       click: () => {
-        app.exit();
+        windowOperations.quit();
       },
     },
   ];
@@ -117,11 +117,12 @@ function createMenuTemplate(win, store) {
 // 添加左键支持
 // 2022.05.17
 class YPMTrayLinuxImpl {
-  constructor(tray, win, emitter, store) {
+  constructor(tray, win, emitter, store, windowOperations) {
     this.tray = tray;
     this.win = win;
     this.emitter = emitter;
     this.store = store;
+    this.windowOperations = windowOperations;
     this.template = undefined;
     this.initTemplate();
     this.contextMenu = Menu.buildFromTemplate(this.template);
@@ -143,7 +144,7 @@ class YPMTrayLinuxImpl {
       {
         type: 'separator',
       },
-    ].concat(createMenuTemplate(this.win, this.store));
+    ].concat(createMenuTemplate(this.win, this.store, this.windowOperations));
   }
 
   handleEvents() {
@@ -188,12 +189,13 @@ class YPMTrayLinuxImpl {
 }
 
 class YPMTrayWindowsImpl {
-  constructor(tray, win, emitter, store) {
+  constructor(tray, win, emitter, store, windowOperations) {
     this.tray = tray;
     this.win = win;
     this.emitter = emitter;
     this.store = store;
-    this.template = createMenuTemplate(win, store);
+    this.windowOperations = windowOperations;
+    this.template = createMenuTemplate(win, store, windowOperations);
     this.contextMenu = Menu.buildFromTemplate(this.template);
 
     this.isPlaying = false;
@@ -257,7 +259,7 @@ class YPMTrayWindowsImpl {
   }
 }
 
-export function createTray(win, eventEmitter, store) {
+export function createTray(win, eventEmitter, store, windowOperations) {
   let trayIconSetting = store.get('settings.trayIconTheme') || 'auto';
   let iconTheme;
   if (trayIconSetting === 'auto') {
@@ -277,6 +279,6 @@ export function createTray(win, eventEmitter, store) {
   tray.setToolTip('YesPlayMusic');
 
   return isLinux
-    ? new YPMTrayLinuxImpl(tray, win, eventEmitter, store)
-    : new YPMTrayWindowsImpl(tray, win, eventEmitter, store);
+    ? new YPMTrayLinuxImpl(tray, win, eventEmitter, store, windowOperations)
+    : new YPMTrayWindowsImpl(tray, win, eventEmitter, store, windowOperations);
 }
