@@ -811,11 +811,8 @@
 import { mapState, mapActions } from 'vuex';
 import { isLooseLoggedIn, doLogout } from '@/utils/auth';
 import { auth as lastfmAuth } from '@/api/lastfm';
-import {
-  changeAppearance,
-  changeThemeColor,
-  bytesToSize,
-} from '@/utils/common';
+import { bytesToSize } from '@/utils/common';
+import { changeAppearance, changeThemeColor } from '@/utils/appearance';
 import { countDBSize, clearDB } from '@/utils/db';
 import pkg from '../../package.json';
 
