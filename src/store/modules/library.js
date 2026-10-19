@@ -121,6 +121,9 @@ export default function createLibrary(
         ),
     ];
     if (Number(playlistId) === Number(context.state.likedSongPlaylistID)) {
+      setCollection(context, 'songs', [
+        ...new Set([...context.state.collections.songs, ...trackIds]),
+      ]);
       attempts.push(
         () => loadSongs(context),
         () => loadPreview(context)
@@ -305,7 +308,9 @@ export default function createLibrary(
           };
         }
         creation = { ...creation, playlistId };
-        if (requested) {
+        if (requested && !context.rootGetters['session/hasAccount']) {
+          addition = accountRequired;
+        } else if (requested) {
           addition = await performLibraryWrite(() =>
             api.addOrRemoveTrackFromPlaylist({
               op: 'add',

@@ -26,7 +26,7 @@ function setup(mode = 'account') {
   };
   const store = createStore({
     storage,
-    credentials: { get: () => 'credential' },
+    credentials: { get: () => 'credential', remove() {} },
     library: { api },
   });
   return { store, api, storage };
@@ -276,4 +276,26 @@ test('confirmed addition to liked music retains known added IDs when refreshes f
     synchronization: 'incomplete',
   });
   expect(store.getters['library/collections'].songs).toEqual([7, 8]);
+});
+
+test('losing account permission during creation preserves its ID but denies the optional write', async () => {
+  const { store, api } = setup();
+  let finishCreation;
+  api.createPlaylist.mockReturnValue(
+    new Promise(resolve => {
+      finishCreation = resolve;
+    })
+  );
+  const creating = store.dispatch('library/createPlaylist', {
+    name: 'List',
+    trackIds: [7],
+  });
+  await store.dispatch('session/logout');
+  finishCreation({ code: 200, id: 20 });
+  await expect(creating).resolves.toEqual({
+    creation: { status: 'succeeded', playlistId: 20 },
+    addition: { status: 'denied', reason: 'account-required' },
+    synchronization: 'completed',
+  });
+  expect(api.addOrRemoveTrackFromPlaylist).not.toHaveBeenCalled();
 });

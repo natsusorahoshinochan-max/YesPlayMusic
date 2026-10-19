@@ -2,6 +2,12 @@
 import Vue from 'vue';
 import { mount } from '@vue/test-utils';
 import { createStore } from '@/store';
+import rootActions from '@/store/actions';
+beforeEach(() => jest.useFakeTimers());
+afterEach(() => {
+  jest.clearAllTimers();
+  jest.useRealTimers();
+});
 import { initializeLocale } from '@/locale';
 import NewPlaylist from '@/components/ModalNewPlaylist.vue';
 import AddTracks from '@/components/ModalAddTrackToPlaylist.vue';
@@ -57,7 +63,12 @@ function setup(
     storage,
     credentials: { get: () => 'credential' },
     library: { api },
-    actions: { showToast: (_, message) => messages.push(message) },
+    actions: {
+      showToast: (context, message) => {
+        messages.push(message);
+        return rootActions.showToast(context, message);
+      },
+    },
   });
   store.commit('updateModal', {
     modalName: 'newPlaylistModal',
@@ -108,8 +119,7 @@ test('creation remains successful when optional addition fails and persists the 
     tracks: '7',
   });
   expect(store.state.modals.newPlaylistModal.show).toBe(false);
-  expect(messages).toContain('成功创建歌单');
-  expect(messages).toContain('无法添加歌曲');
+  expect(messages).toEqual(['成功创建歌单；无法添加歌曲']);
   expect(store.getters['preferences/libraryPlaylistFilter']).toBe('mine');
   expect(JSON.parse(storage.getItem('data')).libraryPlaylistFilter).toBe(
     'mine'
@@ -142,8 +152,7 @@ test('global addition updates matching detail without a playlist page and closes
     [7]
   );
   expect(store.state.modals.addTrackToPlaylistModal.show).toBe(false);
-  expect(messages).toContain('已添加到歌单');
-  expect(messages).toContain('歌曲已添加，部分内容更新失败，请稍后刷新');
+  expect(messages).toEqual(['已添加到歌单；部分内容更新失败，请稍后刷新']);
   wrapper.destroy();
 });
 
@@ -177,10 +186,7 @@ test('creating without optional songs closes and reports successful creation des
   await flush();
   expect(store.state.modals.newPlaylistModal.show).toBe(false);
   expect(api.addOrRemoveTrackFromPlaylist).not.toHaveBeenCalled();
-  expect(messages).toEqual([
-    '成功创建歌单',
-    '歌单已创建，部分内容更新失败，请稍后刷新',
-  ]);
+  expect(messages).toEqual(['成功创建歌单；部分内容更新失败，请稍后刷新']);
   expect(store.getters['preferences/libraryPlaylistFilter']).toBe('mine');
   wrapper.destroy();
 });
@@ -202,3 +208,13 @@ test.each([
     wrapper.destroy();
   }
 );
+
+test('the visible toast keeps creation success and optional addition failure together', async () => {
+  const { wrapper, store } = setup(NewPlaylist, {
+    addition: { body: { code: 502, message: '无法添加歌曲' } },
+  });
+  await wrapper.find('button').trigger('click');
+  await flush();
+  expect(store.state.toast.text).toBe('成功创建歌单；无法添加歌曲');
+  wrapper.destroy();
+});

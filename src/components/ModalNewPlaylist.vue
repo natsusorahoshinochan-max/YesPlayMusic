@@ -87,15 +87,16 @@ export default {
           return;
         }
         this.close();
-        this.showToast('成功创建歌单');
+        const feedback = ['成功创建歌单'];
         if (result.addition.status === 'succeeded') {
-          this.showToast(locale.t('toast.savedToPlaylist'));
+          feedback.push(locale.t('toast.savedToPlaylist'));
         } else if (result.addition.status !== 'not-requested') {
-          this.showToast(describeLibraryOutcome(result.addition));
+          feedback.push(describeLibraryOutcome(result.addition));
         }
         if (result.synchronization === 'incomplete') {
-          this.showToast('歌单已创建，部分内容更新失败，请稍后刷新');
+          feedback.push('部分内容更新失败，请稍后刷新');
         }
+        this.showToast(feedback.join('；'));
         await this.$store
           .dispatch('preferences/setLibraryPlaylistFilter', 'mine')
           .catch(error => this.showToast(error.message || '设置保存失败'));

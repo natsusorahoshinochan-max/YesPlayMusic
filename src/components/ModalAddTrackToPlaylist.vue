@@ -87,10 +87,12 @@ export default {
           return;
         }
         this.close();
-        this.showToast(locale.t('toast.savedToPlaylist'));
-        if (result.synchronization === 'incomplete') {
-          this.showToast('歌曲已添加，部分内容更新失败，请稍后刷新');
-        }
+        const feedback = locale.t('toast.savedToPlaylist');
+        this.showToast(
+          result.synchronization === 'incomplete'
+            ? `${feedback}；部分内容更新失败，请稍后刷新`
+            : feedback
+        );
       } catch (error) {
         this.showToast(error.message || '添加歌曲失败');
       }
