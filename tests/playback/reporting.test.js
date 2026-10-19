@@ -35,6 +35,8 @@ function setup({ key, duration = 200900, onPlaybackEvent } = {}) {
         privileges: [{ id: Number(config.params.ids), pl: 320000 }],
       };
     }
+    if (config.url === '/personal_fm')
+      return { data: [{ id: 80 }, { id: 81 }] };
     return { code: 200 };
   });
   axios.mockResolvedValue({ data: {} });
@@ -253,4 +255,113 @@ test('application observers receive events while the production reporting receiv
     'played',
   ]);
   player.dispose();
+});
+
+test('single repeat creates distinct reporting instances and retains the original source across natural end and replacement', async () => {
+  jest.spyOn(Date, 'now').mockReturnValue(1000000);
+  const events = [];
+  let repeated;
+  const repeatedPlay = new Promise(resolve => {
+    repeated = resolve;
+  });
+  const { player, select, handles, records, lastfm } = setup({
+    key: 'authorized',
+    onPlaybackEvent: event => {
+      events.push(event);
+      if (
+        event.type === 'played' &&
+        events.filter(item => item.type === 'played').length === 2
+      )
+        repeated();
+    },
+  });
+  try {
+    await select(1, 17);
+    player.cycleRepeat();
+    player.cycleRepeat();
+    handles[0].events.onEnd();
+    await repeatedPlay;
+    expect(player.state).toMatchObject({
+      currentTrackID: 1,
+      repeatMode: 'one',
+      playing: true,
+    });
+    const played = events.filter(event => event.type === 'played');
+    expect(played[0].operationId).toBe(played[1].operationId);
+    expect(played[0].instanceId).not.toBe(played[1].instanceId);
+    expect(records().map(record => record.params)).toEqual([
+      { id: 1, sourceid: 17, time: 200, timestamp: expect.any(Number) },
+    ]);
+    player.seek(100.9);
+    await select(2, 22);
+    expect(records().map(record => record.params)).toEqual([
+      { id: 1, sourceid: 17, time: 200, timestamp: expect.any(Number) },
+      { id: 1, sourceid: 17, time: 100, timestamp: expect.any(Number) },
+    ]);
+    expect(
+      lastfm('track.scrobble').map(record => record.params.timestamp)
+    ).toEqual([800, 900]);
+    expect(lastfm('track.updateNowPlaying')).toHaveLength(3);
+    handles[0].events.onEnd();
+    handles[1].events.onEnd();
+    expect(records()).toHaveLength(2);
+    expect(
+      events
+        .filter(event => event.type === 'before-replace')
+        .map(event => event.instanceId)
+    ).toEqual(played.map(event => event.instanceId));
+  } finally {
+    player.dispose();
+  }
+});
+
+test('personal FM natural end and later ordinary selection report only their owning instances and source', async () => {
+  jest.spyOn(Date, 'now').mockReturnValue(1000000);
+  const events = [];
+  let advanced;
+  const nextPlay = new Promise(resolve => {
+    advanced = resolve;
+  });
+  const { player, select, handles, records, lastfm } = setup({
+    key: 'authorized',
+    onPlaybackEvent: event => {
+      events.push(event);
+      if (event.type === 'played' && event.track.id === 81) advanced();
+    },
+  });
+  try {
+    await select(1, 17);
+    player.seek(5.9);
+    await player.playPersonalFM();
+    expect(player.state).toMatchObject({
+      currentTrackID: 80,
+      isPersonalFM: true,
+    });
+    handles[1].events.onEnd();
+    await nextPlay;
+    player.seek(101.9);
+    await select(2, 22);
+    expect(records().map(record => record.params)).toEqual([
+      { id: 1, sourceid: 17, time: 5, timestamp: expect.any(Number) },
+      { id: 80, sourceid: 0, time: 200, timestamp: expect.any(Number) },
+      { id: 81, sourceid: 0, time: 101, timestamp: expect.any(Number) },
+    ]);
+    const played = events.filter(event => event.type === 'played');
+    expect(played.map(event => event.track.id)).toEqual([1, 80, 81, 2]);
+    expect(new Set(played.map(event => event.instanceId)).size).toBe(4);
+    expect(played[1].operationId).toBe(played[2].operationId);
+    expect(played[2].operationId).not.toBe(played[3].operationId);
+    expect(
+      lastfm('track.scrobble').map(record => record.params.timestamp)
+    ).toEqual([800, 899]);
+    expect(lastfm('track.updateNowPlaying')).toHaveLength(4);
+    handles.slice(0, 3).forEach(handle => {
+      handle.events.onEnd();
+      handle.events.onPlay();
+    });
+    expect(records()).toHaveLength(3);
+    expect(lastfm('track.updateNowPlaying')).toHaveLength(4);
+  } finally {
+    player.dispose();
+  }
 });

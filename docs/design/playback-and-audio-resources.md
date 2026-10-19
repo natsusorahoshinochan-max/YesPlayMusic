@@ -2,7 +2,7 @@
 
 ## 设计目标
 
-本文定义已确认、待实现的结构设计，对应[播放与音频资源需求](../requirements/playback-and-audio-resources-refactoring.md)。行为范围与验收要求由需求文档统一维护。
+本文定义播放系统的结构与交接，对应[播放与音频资源需求](../requirements/playback-and-audio-resources-refactoring.md)。行为范围与验收要求由需求文档统一维护。
 
 采用面向常见调用者的直接操作 interface。页面、快捷键与桌面控制表达用户动作，Playback module 完成选曲、资源取得、音频切换与状态交接。取源、音频缓存和元数据缓存读取各自形成完整 module。
 
@@ -33,7 +33,7 @@ flowchart TD
 
 ### 操作
 
-以下为 JavaScript interface 的设计名称。可选参数使用对象，已有播放来源保留在 `source` 中。
+以下为 JavaScript interface 的方法。可选参数使用对象，已有播放来源保留在 `source` 中。
 
 | 方法 | 参数与用途 |
 | --- | --- |
@@ -120,7 +120,7 @@ const details = await getTrackDetail(rows.map(row => row.trackId).join(','));
 Audio resources 的 interface 为：
 
 ```js
-resolve(track);  // Promise<Descriptor | null>
+resolve(track); // Promise<Descriptor | null>
 prefetch(track); // Promise<void>
 ```
 
@@ -181,11 +181,11 @@ Playback 在明确的状态转换处调用注入的输出函数。输出投影�
 | 桌面状态 | 歌曲资料、实际播放状态、模式、进度和当前歌曲收藏状态发生相应变化时交付 |
 | 应用反馈 | 操作中确定的失败及后续有效音频错误，使用共同的原因表达交付 |
 
-存储 adapter 显式映射已有 `player` 与 `playerCurrentTrackTime` 数据。恢复数据清单包含普通与随机队列各自的索引、私人 FM 当前及下一首资料等已有恢复内容；音频实例、Blob URL 和任务由运行过程建立。
+`player` 恢复投影由 `playerStorage.js` 的 allowlist 维护：`_enabled`、`_repeatMode`、`_shuffle`、`_reversed`、`_volume`、`_volumeBeforeMuted`、`_list`、`_current`、`_shuffledList`、`_shuffledCurrent`、`_playlistSource`、`_currentTrack`、`_playNextList`、`_isPersonalFM`、`_personalFMTrack`、`_personalFMNextTrack`。`restoreSaved()` 读取该投影及独立的 `playerCurrentTrackTime`，通过带操作归属的 `restore` 准备暂停音频；冷启动 FM 推荐加载沿用同一归属。音频实例、Blob URL 和任务由运行过程建立。
 
 桌面输出覆盖歌曲资料就绪等有用中间状态和音频事件。临时字段更新只影响必要的公开展示。保存与同步在具体状态转换处选择，不挂在所有方法的统一结束回调上。
 
-收藏属于 library。应用装配在收藏集合变化时，根据当前播放状态和 library 数据重新生成桌面收藏投影，替换调用旧播放器 `sendSelfToIpcMain` 的接线。
+收藏属于 library。应用装配订阅收藏集合变化，根据当前 Playback 状态和 library 数据重新生成桌面收藏投影。
 
 ## 依赖与启动装配
 
@@ -200,7 +200,20 @@ Playback 在明确的状态转换处调用注入的输出函数。输出投影�
 
 这些 seam 位于实际 I/O 或平台差异处。页面使用 Playback 的同一 interface。访客、公开音乐库浏览身份与网易云账号会话的取源分支继续由已有身份含义决定。
 
-`src/application/player.js` 负责构建依赖、连接输出和交付 Playback，移除原有 Proxy。启动装配的关系为：
+生产模块位置与交接如下：
+
+| 位置 | 职责 |
+| --- | --- |
+| `src/playback/index.js`、`sourceOperations.js` | Playback、来源操作与私有队列；操作编号覆盖完整选择流程 |
+| `src/playback/audioResources.js`、`audioAdapter.js` | 来源与预取、Howler 与临时地址的独立持有和释放 |
+| `src/audioCache/index.js`、`src/utils/db.js` | 串行缓存提交、真实数据库及下载接线 |
+| `src/api/metadataCache.js` 与各元数据 API | 缓存读取编排与各类型转换 |
+| `src/application/player.js` | 构建唯一 Playback，组合存储、上报、平台输出和外部观察者 |
+| `src/application/playerStorage.js` | 读取旧字段并投影持久化数据；比较持久化投影、单独保存采样进度 |
+| `src/application/playbackReporting.js` | 消费有效实例事件并连接网易云和 Last.fm 请求 |
+| `src/application/playbackPlatform.js` | 注册及释放媒体、IPC 和键盘控制，生成桌面及浏览器投影 |
+
+启动装配的关系为：
 
 1. 恢复 store 与配置，配置请求环境。
 2. 创建缓存及元数据读取依赖；缓存初始化进入其提交顺序。
@@ -222,7 +235,13 @@ Playback 的 `dispose()` 供装配使用，释放自身创建的计时器、音�
 | library 桌面收藏同步 | 由应用装配读取 library 与 Playback，交付桌面投影 |
 | application/player 与 startup | 创建实例、连接 adapters、恢复与释放 |
 
-接口切换覆盖全部受影响调用者，移除旧 Player 的字段修改和内部实例访问。已有媒体协议、听歌记录及平台输出在应用接合处承接；其产品规则依据需求范围保留。
+所有播放入口持有 `store.state.player` 的同一公开 facade。`window.yesplaymusic.player` 仅输出可序列化的桌面读取投影，原生 `/player` 从该投影读取；输入控制交由平台接合调用 facade。
+
+### 上报事件交接
+
+Playback 输出 `played`、`before-replace`、`ended` 事件，包含 `operationId`、`instanceId`、歌曲、该实例的来源、即时位置、完整秒数、自然结束标识及 `recordOnce()`。旧实例在正式交接时输出自己的最终快照；后续过时音频回调由操作与实例双重检查收束。
+
+`recordOnce()` 只能在同步事件交付期间取得该实例的一次记录权。应用装配先交付生产上报接合，再调用可选观察者。上报接合在发请求前取得记录权，请求独立完成；网易云和 Last.fm 共用该记录权。实际产品条件集中在[需求中的听歌记录与正在播放](../requirements/playback-and-audio-resources-refactoring.md#听歌记录与正在播放)。
 
 ## 验证设计
 
@@ -240,7 +259,7 @@ Playback 的 `dispose()` 供装配使用，释放自身创建的计时器、音�
 | 应用反馈 | 页面、快捷键、桌面入口及后续音频错误共用反馈，过时操作无提示 |
 | Web 与 Electron 接合 | 实际播放、设备应用和桌面调用与 adapters 的接线 |
 
-实现时补充本地 IndexedDB 替代测试依赖，并建立受控音频 adapter。旧内部字段断言由新 interface 测试替换。真实音频与 Electron 能力通过运行验证检查，缓存与异步归属通过可控测试覆盖。
+自动测试使用 `fake-indexeddb` 执行真实 Dexie，音频生命周期测试运行生产 adapter 并控制 Howler、URL 与设备边界。组合测试运行实际来源 API、元数据缓存、音频缓存、资源和应用装配。真实音频与 Electron 能力通过[运行验证入口](../development-environment.md#electron-播放运行验证)检查；有效套件位置见[测试组织](../../tests/README.md)。
 
 ## 方案选择与取舍
 
