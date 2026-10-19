@@ -1,72 +1,12 @@
-import { app, dialog, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import UNM from '@unblockneteasemusic/rust-napi';
 import { applyDesktopShortcuts, applyTrayIconTheme } from './preferences';
 import { registerProxy } from './proxy';
-import { isCreateTray, isMac } from '@/utils/platform';
+import { isCreateTray } from '@/utils/platform';
 
 const clc = require('cli-color');
 const log = text => {
   console.log(`${clc.blueBright('[ipcMain.js]')} ${text}`);
-};
-
-const exitAsk = (e, win) => {
-  e.preventDefault(); //阻止默认行为
-  dialog
-    .showMessageBox({
-      type: 'info',
-      title: 'Information',
-      cancelId: 2,
-      defaultId: 0,
-      message: '确定要关闭吗？',
-      buttons: ['最小化', '直接退出'],
-    })
-    .then(result => {
-      if (result.response == 0) {
-        e.preventDefault(); //阻止默认行为
-        win.minimize(); //调用 最小化实例方法
-      } else if (result.response == 1) {
-        win = null;
-        //app.quit();
-        app.exit(); //exit()直接关闭客户端，不会执行quit();
-      }
-    })
-    .catch(err => {
-      log(err);
-    });
-};
-
-const exitAskWithoutMac = (e, win) => {
-  e.preventDefault(); //阻止默认行为
-  dialog
-    .showMessageBox({
-      type: 'info',
-      title: 'Information',
-      cancelId: 2,
-      defaultId: 0,
-      message: '确定要关闭吗？',
-      buttons: ['最小化到托盘', '直接退出'],
-      checkboxLabel: '记住我的选择',
-    })
-    .then(result => {
-      if (result.checkboxChecked && result.response !== 2) {
-        win.webContents.send(
-          'rememberCloseAppOption',
-          result.response === 0 ? 'minimizeToTray' : 'exit'
-        );
-      }
-
-      if (result.response === 0) {
-        e.preventDefault(); //阻止默认行为
-        win.hide(); //调用 最小化实例方法
-      } else if (result.response === 1) {
-        win = null;
-        //app.quit();
-        app.exit(); //exit()直接关闭客户端，不会执行quit();
-      }
-    })
-    .catch(err => {
-      log(err);
-    });
 };
 
 const client = require('discord-rich-presence')('818936529484906596');
@@ -131,7 +71,37 @@ function parseSourceStringToList(executor, sourceString) {
     });
 }
 
-export function initIpcMain(win, store, trayEventEmitter) {
+// The renderer acknowledges the existing complete preferences operation before
+// the main process continues with an exit selected in the close dialog.
+export function rememberCloseOption(win, value) {
+  return new Promise((resolve, reject) => {
+    const contents = win.webContents;
+    const cleanup = () => {
+      ipcMain.removeListener('rememberCloseAppOptionFinished', finished);
+      contents.removeListener('destroyed', destroyed);
+    };
+    const destroyed = () => {
+      cleanup();
+      reject(new Error('Window closed before saving close preference'));
+    };
+    const finished = (event, error) => {
+      if (event.sender !== contents) return;
+      cleanup();
+      if (error) reject(new Error(error));
+      else resolve();
+    };
+    ipcMain.on('rememberCloseAppOptionFinished', finished);
+    contents.once('destroyed', destroyed);
+    try {
+      contents.send('rememberCloseAppOption', value);
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
+export function initIpcMain(win, store, trayEventEmitter, windowOperations) {
   // WIP: Do not enable logging as it has some issues in non-blocking I/O environment.
   // UNM.enableLogging(UNM.LoggingType.ConsoleEnv);
   const unmExecutor = new UNM.Executor();
@@ -196,24 +166,7 @@ export function initIpcMain(win, store, trayEventEmitter) {
     }
   );
 
-  ipcMain.on('close', e => {
-    if (isMac) {
-      win.hide();
-      exitAsk(e, win);
-    } else {
-      let closeOpt = store.get('settings.closeAppOption');
-      if (closeOpt === 'exit') {
-        win = null;
-        //app.quit();
-        app.exit(); //exit()直接关闭客户端，不会执行quit();
-      } else if (closeOpt === 'minimizeToTray') {
-        e.preventDefault();
-        win.hide();
-      } else {
-        exitAskWithoutMac(e, win);
-      }
-    }
-  });
+  ipcMain.on('close', () => windowOperations.close());
 
   ipcMain.on('minimize', () => {
     win.minimize();
