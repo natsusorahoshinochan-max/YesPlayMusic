@@ -3,6 +3,7 @@ import { startApplication } from '@/application/startup';
 import { initializeLocale } from '@/locale';
 import { initializeAppearance } from '@/utils/appearance';
 import request, { configureRequest } from '@/utils/request';
+import { createRequestEnvironment } from '@/application/requestEnvironment';
 
 let store;
 let createStore;
@@ -50,6 +51,7 @@ test('stored language and request effects are available before the first player 
     createStore,
     initializeLocale,
     configureRequest,
+    requestEnvironment: createRequestEnvironment({ webBaseURL: '/api' }),
     getCookie: () => null,
     onSessionInvalid: () => {
       invalidSession = true;
@@ -94,6 +96,7 @@ test('the real player starts its first request using the restored settings', asy
     initializeLocale,
     initializeAppearance,
     configureRequest,
+    requestEnvironment: createRequestEnvironment({ webBaseURL: '/api' }),
     getCookie: () => null,
     onSessionInvalid() {},
     createPlayer,

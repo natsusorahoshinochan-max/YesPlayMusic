@@ -3,6 +3,7 @@ export function startApplication({
   initializeLocale,
   initializeAppearance,
   configureRequest,
+  requestEnvironment,
   getCookie,
   onSessionInvalid,
   createPlayer,
@@ -12,7 +13,12 @@ export function startApplication({
   const getSettings = () => store.getters['preferences/settings'];
   const i18n = initializeLocale(getSettings().lang);
   initializeAppearance(getSettings);
-  configureRequest({ getSettings, getCookie, onSessionInvalid });
+  configureRequest({
+    getSettings,
+    getCookie,
+    onSessionInvalid,
+    environment: requestEnvironment,
+  });
   store.state.player = createPlayer();
   return mount({ store, i18n });
 }

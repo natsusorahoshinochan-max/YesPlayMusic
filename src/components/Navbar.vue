@@ -155,8 +155,7 @@ export default {
     },
     logout() {
       if (!confirm('确定要退出登录吗？')) return;
-      this.$store.dispatch('session/logout');
-      this.$router.push({ name: 'home' });
+      return this.$store.dispatch('session/logout');
     },
     toSettings() {
       this.$router.push({ name: 'settings' });
