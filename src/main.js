@@ -2,7 +2,9 @@ import Vue from 'vue';
 import VueGtag from 'vue-gtag';
 import App from './App.vue';
 import router from './router';
-import store from './store';
+import { createStore } from './store';
+import actions from './store/actions';
+import { initializeTrackCache } from '@/utils/db';
 import { initializeLocale } from '@/locale';
 import { initializeAppearance } from '@/utils/appearance';
 import { configureRequest } from '@/utils/request';
@@ -44,7 +46,11 @@ Vue.config.productionTip = false;
 
 NProgress.configure({ showSpinner: false, trickleSpeed: 100 });
 startApplication({
-  store,
+  createStore() {
+    const store = createStore({ actions });
+    initializeTrackCache();
+    return store;
+  },
   initializeLocale,
   initializeAppearance,
   configureRequest,

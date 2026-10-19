@@ -1,9 +1,11 @@
+/* eslint-env jest */
 import { startApplication } from '@/application/startup';
 import { initializeLocale } from '@/locale';
 import { initializeAppearance } from '@/utils/appearance';
 import request, { configureRequest } from '@/utils/request';
 
 let store;
+let createStore;
 let registrationRequests;
 
 beforeAll(() => {
@@ -24,7 +26,8 @@ beforeAll(() => {
   request.defaults.baseURL = '/api';
   registrationRequests = jest.fn();
   request.defaults.adapter = registrationRequests;
-  store = require('@/store').default;
+  createStore = require('@/store').createStore;
+  store = createStore();
 });
 
 test('registering the base store leaves network and player initialization to application startup', async () => {
@@ -44,7 +47,7 @@ test('stored language and request effects are available before the first player 
   };
   let firstRequest;
   const app = startApplication({
-    store,
+    createStore,
     initializeLocale,
     configureRequest,
     getCookie: () => null,
@@ -87,7 +90,7 @@ test('the real player starts its first request using the restored settings', asy
     });
   };
   const player = startApplication({
-    store,
+    createStore,
     initializeLocale,
     initializeAppearance,
     configureRequest,

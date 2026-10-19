@@ -1,8 +1,7 @@
 import store from '@/store';
 
-const player = store.state.player;
-
 export function ipcRenderer(vueInstance) {
+  const player = store.state.player;
   const self = vueInstance;
   // 添加专有的类名
   document.body.setAttribute('data-electron', 'yes');

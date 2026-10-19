@@ -1,5 +1,5 @@
 export function startApplication({
-  store,
+  createStore,
   initializeLocale,
   initializeAppearance,
   configureRequest,
@@ -8,6 +8,7 @@ export function startApplication({
   createPlayer,
   mount,
 }) {
+  const store = createStore();
   const getSettings = () => store.state.settings;
   const i18n = initializeLocale(getSettings().lang);
   initializeAppearance(getSettings);
