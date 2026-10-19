@@ -1,8 +1,23 @@
+import { shallowMount } from '@vue/test-utils';
+import Settings from '@/views/settings.vue';
 import { EventEmitter } from 'events';
 import { createStore } from '@/store';
 import { createPreferenceEffects } from '@/application/preferenceEffects';
 import { initIpcMain } from '@/electron/ipcMain';
 import { globalShortcut, Menu, ipcMain } from 'electron';
+
+jest.mock(
+  'dexie',
+  () =>
+    class {
+      constructor() {
+        this.trackSources = { each: () => Promise.resolve() };
+      }
+      version() {
+        return { stores: () => ({ upgrade() {} }) };
+      }
+    }
+);
 
 jest.mock(
   'electron',
@@ -87,6 +102,37 @@ test('桌面IPC镜像不注册快捷键；保存与默认恢复更新菜单但�
     await store.dispatch('preferences/endShortcutRecording');
     expect(globalShortcut.register).toHaveBeenCalled();
   } finally {
+    restore();
+  }
+});
+
+test('真实设置页面在桌面录制期间修改语言和恢复默认仍暂停，离开后恢复当前配置', async () => {
+  navigator.mediaDevices = { enumerateDevices: async () => [] };
+  const { store, restore } = desktop();
+  const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+  let wrapper;
+  try {
+    wrapper = shallowMount(Settings, {
+      store,
+      mocks: { $t: key => key },
+      stubs: ['router-link', 'svg-icon'],
+    });
+    await store.dispatch('preferences/setGlobalShortcutsEnabled', true);
+    await wrapper.find('.keyboard-input').trigger('click');
+    await flush();
+    globalShortcut.register.mockClear();
+    await wrapper.findAll('select').at(0).setValue('tr');
+    await flush();
+    expect(store.getters['preferences/settings'].lang).toBe('tr');
+    await wrapper.find('.restore-default-shortcut').trigger('click');
+    await flush();
+    expect(globalShortcut.register).not.toHaveBeenCalled();
+    wrapper.destroy();
+    wrapper = null;
+    await flush();
+    expect(globalShortcut.register).toHaveBeenCalled();
+  } finally {
+    wrapper?.destroy();
     restore();
   }
 });

@@ -68,17 +68,17 @@ curl --fail http://127.0.0.1:3000/login/status
 
 自动测试工具保留 Jest 29、jsdom、Vue 2 SFC 转换与 Vue Test Utils。Jest、babel-jest 与 jsdom 测试环境的 Node 范围为 `^14.15.0 || ^16.10.0 || >=18`；本项目使用 Node 16.20.2。
 
-过时测试位于 `tests/obsolete/`，Jest 与 ESLint 均排除此目录。当前没有有效测试套件，`yarn test --listTests` 返回空列表，`yarn test` 以非零状态报告没有测试。新测试依据[设置结构重构需求](requirements/settings-refactoring.md)、[音乐库变更结构重构需求](requirements/library-mutations-refactoring.md)及对应设计编写，从公开 interface 验证目标行为。
+过时测试位于 `tests/obsolete/`，Jest 与 ESLint 均排除此目录。有效测试通过真实 Vuex actions/getters、启动与页面集成验证 spec #8 的设置、持久化、音乐库写入与详情行为。当前有效验收为 19 个套件、160 项测试通过，具体组织见 [测试说明](../tests/README.md)。
 
 Browserslist 固定为 4.24.0、node-releases 固定为 2.0.18，满足测试工具的依赖范围并保持 Node 16 可安装。
 
 ## 运行基线
 
 - 常规依赖安装与 `--frozen-lockfile` 安装均通过；Electron 可执行文件保持可用。
-- Web 生产构建通过；Electron renderer 与主进程 bundle 构建通过（`--skipElectronBuild`）；开发首页可显示推荐内容。
+- Web 生产构建通过；Electron renderer 与主进程 bundle 构建通过（`--skipElectronBuild`），该命令不打安装包。构建保留 bundle 体积提示及 Electron 可选依赖 `abstract-socket`、`bufferutil`、`utf-8-validate` 缺失警告。
 - Web API 的登录状态接口正常返回访客结果。
 - Electron 主进程创建窗口并触发 ready-to-show，内置 API 对推荐内容请求返回成功。桌面完整交互尚未手动验证。
-- lint 存在 6 个错误、7 个警告。错误为桌面主进程和 IPC 中的未使用参数，以及 API 服务中未使用的 import。
+- `yarn lint --no-fix` 通过，保留 7 个警告，涉及已有 `v-html` 使用与缺少 prop 默认值。
 - Electron 启动日志存在 Discord IPC 连接失败和 Vue Devtools 安装失败；应用窗口与内置 API 已继续启动。
 
-本地验证日志位于被 Git 忽略的 `.direnv/`，仅用于定位运行问题。
+自动化验收覆盖设置恢复后的依赖接线、页面与普通 JavaScript 共用完整操作、录制期间的桌面平台控制，以及集合、详情和二维码变化的持久化隔离。真实账号操作、安装包与完整桌面手动交互不在该自动化结果的证明范围内。

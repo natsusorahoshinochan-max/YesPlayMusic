@@ -1,16 +1,14 @@
 # 设置操作与持久化：结构设计
 
-## 状态与目标
+## 当前实现与契约
 
-本文定义已确认、待实现的结构设计，对应[设置操作与持久化需求](../requirements/settings-refactoring.md)。
+本文描述当前实现的结构与公开契约，对应[设置操作与持久化需求](../requirements/settings-refactoring.md)。
 
 以 Vuex `preferences` 的 getters 和完整 actions 作为 module 的 interface。调用者提交设置意图，module 协调状态更新、选择性持久化和实际应用。纯数据偏好共用修改入口；具有执行流程的设置提供明确命名的操作。
 
-## 当前结构与目标结构
+## 当前结构
 
-当前 `preferences` 提供设置状态与 mutations，设置页另外组织语言、外观、Player、缓存和 Electron 调用。持久化订阅按 mutation 所属 module 同时写回 `settings` 和 `data`；Electron 设置同步还会触发全局快捷键注册。
-
-目标结构将这些知识收进完整操作。页面保留输入、未提交草稿、按键捕获、展示和提示；启动装配与运行时操作复用配置应用函数。
+`preferences` 提供响应式设置读取和完整 actions，协调配置更新、选择性保存及实际效果。设置页保留输入、代理草稿、按键捕获、展示和提示；启动装配与运行时操作共用配置应用函数。Electron 设置镜像与快捷键注册分别处理。
 
 ```mermaid
 flowchart TD
@@ -90,7 +88,7 @@ Vue 页面的 computed setter 只提交对应 action。缓存数量等展示查�
 
 默认值、已有版本迁移、缺失快捷键补齐、语言推导及现有取值转换集中管理。配置读取保留动态设置和未知字段；嵌套配置更新同样保留已有扩展字段，避免提交表单时覆盖掉未展示的数据。
 
-迁移后的有效配置用于建立 Vuex 状态、启动应用以及后续读取。页面中重复的静态默认值和转换规则移入这份 implementation。
+迁移后的有效配置用于建立 Vuex 状态、启动应用以及后续读取。静态默认值集中在 `initLocalStorage`，提交值的转换规则位于 preferences actions。
 
 ### 配置应用与变更动作
 
@@ -132,13 +130,11 @@ Electron adapter 分开协调设置镜像与具体平台效果：
 - 代理、托盘、菜单和快捷键效果通过完整操作调用。
 - 普通设置变化不触发快捷键重新注册。
 
-原 `sendSettings` 订阅与页面 IPC 的职责并入这一流程，设置变更的效果只有一个协调位置。
+`sendSettings` 订阅只同步设置镜像；preferences actions 通过效果 adapter 协调具体平台效果。
 
 ## 代理提交与已有存储
 
-当前页面逐字段修改 `settings.proxyConfig`，请求配置立即读取这些值；Electron session 代理则等待“更新代理”按钮。这是当前保存与应用时机的分裂。
-
-目标交互由页面持有代理草稿。编辑协议、地址和端口只修改草稿；点击更新调用 `submitProxy`，选择关闭调用 `disableProxy`。提交后，由完整操作更新保存值并应用代理。已有空配置处理由操作内部负责。
+页面持有完整代理草稿。编辑协议、地址和端口只修改草稿；点击更新调用 `submitProxy`，关闭提交调用 `disableProxy`。完整操作保存已提交配置并应用代理，空配置处理位于操作内部。
 
 保留已有存储表示：renderer 的 `settings.proxyConfig` 为结构化请求配置，主进程的 `proxy` 为已有桌面启动路径使用的代理规则字符串。
 
@@ -180,10 +176,10 @@ Electron adapter 分开协调设置镜像与具体平台效果：
 
 ## 代码职责与调用面
 
-| 位置 | 目标职责 |
+| 位置 | 当前职责 |
 | --- | --- |
 | `src/store/modules/preferences.js` | 设置读取、完整 actions、内部状态修改与录制平台状态 |
-| `src/store/initLocalStorage.js` 及配置数据处理函数 | 默认值、已有迁移与取值转换的集中实现 |
+| `src/store/initLocalStorage.js` | 默认值、已有迁移与配置补齐 |
 | `src/store/persistence.js` | 恢复持久化状态、比较持久化投影并写回对应存储 |
 | `src/application/` | 设置效果的依赖接线、实际 adapter 和启动装配 |
 | `src/utils/appearance.js` | 共同外观应用函数与系统主题响应 |

@@ -88,3 +88,62 @@ test.each(['settings', 'appVersion'])(
     if (failureKey === 'settings') expect(values.appVersion).toBe('"0.3.9"');
   }
 );
+
+test('生产设置 adapter 在真实启动接线后恢复，普通 JavaScript 与页面共用设置效果', async () => {
+  const {
+    createPreferenceEffects,
+  } = require('@/application/preferenceEffects');
+  const { initializeLocale } = require('@/locale');
+  const { initializeAppearance } = require('@/utils/appearance');
+  document.head.innerHTML = '<meta name="theme-color" content="#fff">';
+  window.matchMedia = () => ({ matches: false, addEventListener: jest.fn() });
+  const values = {
+    settings: JSON.stringify({
+      lang: 'tr',
+      appearance: 'dark',
+      themeColor: 'ocean',
+      outputDevice: 'saved',
+    }),
+  };
+  let store, locale;
+  const devices = [];
+  const player = {
+    setOutputDevice() {
+      devices.push(store.getters['preferences/settings'].outputDevice);
+    },
+  };
+  await startApplication({
+    createStore: () =>
+      (store = createStore({
+        storage: {
+          getItem: key => values[key] ?? null,
+          setItem: (key, value) => {
+            values[key] = value;
+          },
+        },
+        preferences: createPreferenceEffects({
+          getLocale: () => locale,
+          getPlayer: () => store.state.player,
+        }),
+      })),
+    initializeLocale: lang => (locale = initializeLocale(lang)),
+    configureRequest: ({ getSettings }) => {
+      expect(getSettings().outputDevice).toBe('saved');
+      expect(devices).toEqual([]);
+    },
+    createPlayer: () => player,
+    initializeAppearance,
+    mount: () => {
+      expect(devices).toEqual(['saved']);
+      expect(locale.locale).toBe('tr');
+      expect(document.body.getAttribute('data-theme')).toBe('dark');
+    },
+  });
+  await store.dispatch('preferences/setOutputDevice', 'changed');
+  await store.dispatch('preferences/setLanguage', 'zh-CN');
+  await store.dispatch('preferences/setAppearance', 'light');
+  expect(devices).toEqual(['saved', 'changed']);
+  expect(locale.locale).toBe('zh-CN');
+  expect(document.body.getAttribute('data-theme')).toBe('light');
+  expect(JSON.parse(values.settings).outputDevice).toBe('changed');
+});
