@@ -970,9 +970,9 @@ export default {
         return this.settings.musicQuality ?? 320000;
       },
       set(value) {
-        if (value === this.settings.musicQuality) return;
-        this.$store.commit('preferences/changeMusicQuality', value);
-        this.clearCache();
+        this.submitPreference('setMusicQuality', value).then(() =>
+          this.countDBSize()
+        );
       },
     },
     lyricFontSize: {
@@ -997,10 +997,7 @@ export default {
         return this.settings.outputDevice;
       },
       set(deviceId) {
-        if (deviceId === this.settings.outputDevice || deviceId === undefined)
-          return;
-        this.$store.commit('preferences/changeOutputDevice', deviceId);
-        this.player.setOutputDevice();
+        this.submitPreference('setOutputDevice', deviceId);
       },
     },
     enableUnblockNeteaseMusic: {
@@ -1045,13 +1042,9 @@ export default {
         return this.settings.automaticallyCacheSongs;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'automaticallyCacheSongs',
-          value,
-        });
-        if (value === false) {
-          this.clearCache();
-        }
+        this.submitPreference('setAutomaticCaching', value).then(() =>
+          this.countDBSize()
+        );
       },
     },
     showLyricsTranslation: {
@@ -1137,13 +1130,7 @@ export default {
         return this.settings.enableReversedMode;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'enableReversedMode',
-          value,
-        });
-        if (value === false) {
-          this.$store.state.player.reversed = false;
-        }
+        this.submitPreference('setReversedModeEnabled', value);
       },
     },
     enableGlobalShortcut: {
@@ -1381,7 +1368,7 @@ export default {
       return this.$store.dispatch('session/logout');
     },
     countDBSize() {
-      countDBSize().then(data => {
+      return countDBSize().then(data => {
         if (data === undefined) {
           this.tracksCache = {
             size: '0KB',

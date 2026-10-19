@@ -62,7 +62,10 @@ startApplication({
           notify: message => store.dispatch('showToast', message),
         }),
       },
-      preferences: createPreferenceEffects({ getLocale: () => i18n }),
+      preferences: createPreferenceEffects({
+        getLocale: () => i18n,
+        getPlayer: () => store.state.player,
+      }),
       library: {
         api: libraryApi,
         notifyLikedSongsChanged: () =>
