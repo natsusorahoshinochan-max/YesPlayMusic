@@ -1,5 +1,7 @@
 # 音乐库变更与歌单详情：结构设计
 
+**Last Updated:** 2026-10-20
+
 ## 当前实现与契约
 
 本文描述当前实现的结构与公开契约，对应[音乐库变更与歌单详情需求](../requirements/library-mutations-refactoring.md)。
@@ -10,7 +12,7 @@
 
 library 统一执行写权限、远端参数与结果转换、已确认的本地变化和相关数据更新。独立 playlistDetail module 维护当前歌单、完整曲目 ID、读取范围与分页。页面和全局弹窗提交同一套完整操作并消费业务结果，不追加写入后的集合或详情刷新。
 
-TrackList 删除与 TrackListItem 收藏直接调用 library；列表播放仍沿用父级播放入口，不属于此结构调整的范围。
+TrackList 删除与 TrackListItem 收藏直接调用 library；列表的播放交接见[歌曲行与播放入口](structure-operations.md#歌曲行与播放入口)。
 
 ```mermaid
 flowchart TD
