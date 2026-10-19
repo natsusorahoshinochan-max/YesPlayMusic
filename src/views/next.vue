@@ -6,31 +6,34 @@
       type="playlist"
       dbclick-track-func="none"
     />
-    <h1 v-show="playNextList.length > 0"
+    <h1 v-show="nextRows.length > 0"
       >插队播放
-      <button @click="player.clearPlayNextList()">清除队列</button>
+      <button @click="player.clearNext()">清除队列</button>
     </h1>
     <TrackList
-      v-show="playNextList.length > 0"
-      :tracks="playNextTracks"
+      v-show="nextRows.length > 0"
+      :tracks="nextRows.map(row => row.track)"
+      :queue-entries="nextRows"
       type="playlist"
       :highlight-playing-track="false"
-      dbclick-track-func="playTrackOnListByID"
+      dbclick-track-func="playQueuedTrack"
       item-key="id+index"
       :extra-context-menu-item="['removeTrackFromQueue']"
     />
     <h1>{{ $t('next.nextUp') }}</h1>
     <TrackList
-      :tracks="filteredTracks"
+      :tracks="mainRows.map(row => row.track)"
+      :queue-entries="mainRows"
+      item-key="id+index"
       type="playlist"
       :highlight-playing-track="false"
-      dbclick-track-func="playTrackOnListByID"
+      dbclick-track-func="playQueuedTrack"
     />
   </div>
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex';
+import { mapState } from 'vuex';
 import { getTrackDetail } from '@/api/track';
 import TrackList from '@/components/TrackList.vue';
 
@@ -47,37 +50,33 @@ export default {
   computed: {
     ...mapState(['player']),
     currentTrack() {
-      return this.player.currentTrack;
+      return this.player.state.currentTrack;
     },
-    playerShuffle() {
-      return this.player.shuffle;
+    upcomingKey() {
+      // Reading the snapshot makes queue and mode transitions reactive.
+      this.player.state;
+      return JSON.stringify(this.player.upcoming(100));
     },
-    filteredTracks() {
-      let trackIDs = this.player.list.slice(
-        this.player.current + 1,
-        this.player.current + 100
-      );
-      return trackIDs
-        .map(tid => this.tracks.find(t => t.id === tid))
-        .filter(t => t);
+    upcomingRows() {
+      return JSON.parse(this.upcomingKey);
     },
-    playNextList() {
-      return this.player.playNextList;
+    readyRows() {
+      return this.upcomingRows
+        .map(row => ({
+          ...row,
+          track: this.tracks.find(track => track.id === row.trackId),
+        }))
+        .filter(row => row.track);
     },
-    playNextTracks() {
-      return this.playNextList.map(tid => {
-        return this.tracks.find(t => t.id === tid);
-      });
+    nextRows() {
+      return this.readyRows.filter(row => row.group === 'next');
+    },
+    mainRows() {
+      return this.readyRows.filter(row => row.group === 'main');
     },
   },
   watch: {
-    currentTrack() {
-      this.loadTracks();
-    },
-    playerShuffle() {
-      this.loadTracks();
-    },
-    playNextList() {
+    upcomingKey() {
       this.loadTracks();
     },
   },
@@ -86,27 +85,20 @@ export default {
     this.$parent.$refs.scrollbar.restorePosition();
   },
   methods: {
-    ...mapActions(['playTrackOnListByID']),
-    loadTracks() {
-      // 获取播放列表当前歌曲后100首歌
-      let trackIDs = this.player.list.slice(
-        this.player.current + 1,
-        this.player.current + 100
-      );
-
-      // 将playNextList的歌曲加进trackIDs
-      trackIDs.push(...this.playNextList);
-
-      // 获取已经加载了的歌曲
-      let loadedTrackIDs = this.tracks.map(t => t.id);
-
-      if (trackIDs.length > 0) {
-        getTrackDetail(trackIDs.join(',')).then(data => {
-          let newTracks = data.songs.filter(
-            t => !loadedTrackIDs.includes(t.id)
-          );
-          this.tracks.push(...newTracks);
-        });
+    async loadTracks() {
+      const loaded = new Set(this.tracks.map(track => track.id));
+      const ids = [
+        ...new Set(this.upcomingRows.map(row => row.trackId)),
+      ].filter(id => !loaded.has(id));
+      if (!ids.length) return;
+      try {
+        const data = await getTrackDetail(ids.join(','));
+        const existing = new Set(this.tracks.map(track => track.id));
+        this.tracks.push(
+          ...data.songs.filter(track => !existing.has(track.id))
+        );
+      } catch (error) {
+        console.debug('[upcoming metadata]', error);
       }
     },
   },

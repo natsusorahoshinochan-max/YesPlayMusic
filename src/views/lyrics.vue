@@ -721,13 +721,13 @@ export default {
       }, 50);
     },
     moveToFMTrash() {
-      this.playback.moveToFMTrash();
+      this.playback.discardFMTrack();
     },
     switchRepeatMode() {
-      this.playback.switchRepeatMode();
+      this.playback.cycleRepeat();
     },
     switchShuffle() {
-      this.playback.switchShuffle();
+      this.playback.toggleShuffle();
     },
     getCoverColor() {
       if (this.settings.lyricsBackground !== true) return;

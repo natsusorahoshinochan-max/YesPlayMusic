@@ -67,7 +67,7 @@
         :track-prop="track"
         :track-no="index + 1"
         :highlight-playing-track="highlightPlayingTrack"
-        @dblclick.native="playThisList(track.id || track.songId)"
+        @dblclick.native="playThisList(track.id || track.songId, index)"
         @click.right.native="openMenu($event, track, index)"
       />
     </div>
@@ -99,6 +99,7 @@ export default {
         return [];
       },
     },
+    queueEntries: { type: Array, default: () => [] },
     type: {
       type: String,
       default: 'tracklist',
@@ -184,7 +185,7 @@ export default {
   },
   methods: {
     ...mapMutations(['updateModal']),
-    ...mapActions(['nextTrack', 'showToast']),
+    ...mapActions(['showToast']),
     openMenu(e, track, index = -1) {
       this.rightClickedTrack = track;
       this.rightClickedTrackIndex = index;
@@ -199,13 +200,16 @@ export default {
       };
       this.rightClickedTrackIndex = -1;
     },
-    playThisList(trackID) {
+    playThisList(trackID, rowIndex) {
       if (this.dbclickTrackFunc === 'default') {
         this.playThisListDefault(trackID);
       } else if (this.dbclickTrackFunc === 'none') {
         // do nothing
-      } else if (this.dbclickTrackFunc === 'playTrackOnListByID') {
-        this.player.playTrackOnListByID(trackID);
+      } else if (this.dbclickTrackFunc === 'playQueuedTrack') {
+        return this.player.playQueuedTrack(
+          trackID,
+          this.queueEntries[rowIndex]
+        );
       } else if (this.dbclickTrackFunc === 'playPlaylistByID') {
         this.player.playPlaylistByID(this.id, trackID);
       } else if (this.dbclickTrackFunc === 'playAList') {
@@ -242,10 +246,12 @@ export default {
       }
     },
     play() {
-      this.player.addTrackToPlayNext(this.rightClickedTrack.id, true);
+      return this.player.enqueueNext(this.rightClickedTrack.id, {
+        playNow: true,
+      });
     },
     addToQueue() {
-      this.player.addTrackToPlayNext(this.rightClickedTrack.id);
+      return this.player.enqueueNext(this.rightClickedTrack.id);
     },
     like() {
       return toggleTrackFavoriteWithFeedback(
@@ -296,9 +302,8 @@ export default {
         });
     },
     removeTrackFromQueue() {
-      this.$store.state.player.removeTrackFromQueue(
-        this.rightClickedTrackIndex
-      );
+      const entry = this.queueEntries[this.rightClickedTrackIndex];
+      if (entry?.group === 'next') this.player.removeNext(entry.index);
     },
     async removeTrackFromCloudDisk() {
       if (!confirm(`确定要从云盘删除 ${this.rightClickedTrack.songName}？`))
