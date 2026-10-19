@@ -119,8 +119,10 @@ export default function createSession(
       processing: false,
       qr: { url: '', information: '打开网易云音乐APP扫码登录' },
       hasCredential: Boolean(credentials.get('MUSIC_U')),
+      ownership: snapshot.loginMode ? Object.freeze({}) : null,
     }),
     getters: {
+      ownership: state => state.ownership,
       qr: state => state.qr,
       processing: state => state.processing,
       hasAccount: state => state.loginMode === 'account' && state.hasCredential,
@@ -135,6 +137,7 @@ export default function createSession(
         state.processing = value;
       },
       setIdentity(state, { loginMode, hasCredential }) {
+        state.ownership = loginMode ? Object.freeze({}) : null;
         state.loginMode = loginMode;
         state.hasCredential = hasCredential;
       },
@@ -231,10 +234,22 @@ export default function createSession(
           return false;
         }
       },
-      async invalidate(context) {
+      async invalidate(context, signal) {
+        if (
+          !signal?.ownership ||
+          signal.ownership !== context.getters.ownership ||
+          !context.getters.hasAccount
+        )
+          return false;
         await clearIdentity(context);
+        if (context.getters.ownership !== null) return false;
         notify('登录状态已失效，请重新登录');
-        return navigate('invalidated');
+        try {
+          return await navigate('invalidated');
+        } catch (error) {
+          console.debug('[session] invalidation navigation failed', error);
+          return false;
+        }
       },
       async logout(context) {
         try {

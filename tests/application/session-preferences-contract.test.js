@@ -188,7 +188,9 @@ describe('session and preferences public contracts (#1 and #8)', () => {
         credential: 'valid',
       });
       const before = JSON.parse(JSON.stringify(settingsOf(store)));
-      await store.dispatch(`session/${action}`);
+      await store.dispatch(`session/${action}`, {
+        ownership: store.getters['session/ownership'],
+      });
       expect(store.getters['session/hasLibraryIdentity']).toBe(false);
       expect(store.getters['session/hasAccount']).toBe(false);
       expect(store.getters['library/user']).toEqual({});

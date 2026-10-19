@@ -106,11 +106,7 @@ export function createPlayer({
           throw new Error('invalid-fm-response');
         return response.data;
       },
-      trash: async id => {
-        const response = await fmTrash(id);
-        if (response == null) throw new Error('Missing FM discard response');
-        return response;
-      },
+      trash: id => fmTrash(id),
     },
     resources: createAudioResources({
       cache: getTrackCache(),

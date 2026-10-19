@@ -15,6 +15,7 @@ import request from '@/utils/request';
 export function loginWithPhone(params) {
   return request({
     url: '/login/cellphone',
+    sessionInvalidation: false,
     method: 'post',
     params,
   });
@@ -33,6 +34,7 @@ export function loginWithPhone(params) {
 export function loginWithEmail(params) {
   return request({
     url: '/login',
+    sessionInvalidation: false,
     method: 'post',
     params,
   });
@@ -44,6 +46,7 @@ export function loginWithEmail(params) {
 export function loginQrCodeKey() {
   return request({
     url: '/login/qr/key',
+    sessionInvalidation: false,
     method: 'get',
     params: {
       timestamp: new Date().getTime(),
@@ -62,6 +65,7 @@ export function loginQrCodeKey() {
 export function loginQrCodeCreate(params) {
   return request({
     url: '/login/qr/create',
+    sessionInvalidation: false,
     method: 'get',
     params: {
       ...params,
@@ -78,6 +82,8 @@ export function loginQrCodeCreate(params) {
 export function loginQrCodeCheck(key) {
   return request({
     url: '/login/qr/check',
+    sessionInvalidation: false,
+    acceptedCodes: [800, 801, 802, 803],
     method: 'get',
     params: {
       key,
@@ -105,6 +111,7 @@ export function refreshCookie() {
 export function logout() {
   return request({
     url: '/logout',
+    sessionInvalidation: false,
     method: 'post',
   });
 }
