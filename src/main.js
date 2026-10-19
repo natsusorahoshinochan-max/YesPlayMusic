@@ -89,10 +89,10 @@ startApplication({
       i18n,
       store,
       router,
-      render: h => h(App),
       beforeDestroy() {
         store.state.player.dispose();
       },
+      render: h => h(App),
     }).$mount('#app');
   },
 });

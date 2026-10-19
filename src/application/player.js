@@ -10,6 +10,7 @@ import { createPlaybackReporting } from './playbackReporting';
 import { createPlayerStorage } from './playerStorage';
 import { createPlaybackPlatform } from './playbackPlatform';
 import { createPlayback } from '@/playback';
+import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 import { createAudioResources } from '@/playback/audioResources';
 import { createAudioAdapter } from '@/playback/audioAdapter';
 
@@ -158,7 +159,7 @@ export function createPlayer({
       playback: player,
       settings,
       getLyric,
-      toggleFavorite: id => store.dispatch('library/toggleTrackFavorite', id),
+      toggleFavorite: id => toggleTrackFavoriteWithFeedback(store, id),
       onTitle: title => store.commit?.('updateTitle', title),
       ...platformOptions,
     });
