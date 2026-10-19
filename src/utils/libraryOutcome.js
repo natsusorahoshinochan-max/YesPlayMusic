@@ -19,7 +19,11 @@ export function showLibraryChangeFeedback(store, result, successMessage) {
 }
 
 export async function toggleTrackFavoriteWithFeedback(store, id) {
-  const result = await store.dispatch('library/toggleTrackFavorite', id);
-  showLibraryChangeFeedback(store, result);
-  return result;
+  try {
+    const result = await store.dispatch('library/toggleTrackFavorite', id);
+    showLibraryChangeFeedback(store, result);
+    return result;
+  } catch (error) {
+    await store.dispatch('showToast', error.message || '收藏操作失败');
+  }
 }

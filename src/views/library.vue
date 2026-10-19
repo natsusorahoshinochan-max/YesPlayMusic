@@ -306,9 +306,17 @@ export default {
     },
   },
   created() {
-    setTimeout(() => {
+    this.progressTimer = setTimeout(() => {
       if (!this.show) NProgress.start();
     }, 1000);
+  },
+  deactivated() {
+    clearTimeout(this.progressTimer);
+    NProgress.done();
+  },
+  beforeDestroy() {
+    clearTimeout(this.progressTimer);
+    NProgress.done();
   },
   activated() {
     this.$parent.$refs.scrollbar.restorePosition();
@@ -323,12 +331,16 @@ export default {
       if (this.show) NProgress.done();
       return this.$store
         .dispatch('library/loadPage')
-        .then(() => {
+        .then(async () => {
           this.show = true;
-          this.getRandomLyric();
+          await this.getRandomLyric();
         })
         .catch(() => this.showToast('音乐库加载失败'))
-        .finally(() => NProgress.done());
+        .finally(() => {
+          this.show = true;
+          clearTimeout(this.progressTimer);
+          NProgress.done();
+        });
     },
     playCloudTrack({ track }) {
       return this.$store.state.player.playTracks(
@@ -417,11 +429,15 @@ export default {
     async uploadSongToCloudDisk(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const result = await this.$store.dispatch(
-        'library/uploadCloudTrack',
-        file
-      );
-      showLibraryChangeFeedback(this.$store, result, '已上传到云盘');
+      try {
+        const result = await this.$store.dispatch(
+          'library/uploadCloudTrack',
+          file
+        );
+        showLibraryChangeFeedback(this.$store, result, '已上传到云盘');
+      } catch (error) {
+        this.showToast(error.message || '上传歌曲失败');
+      }
     },
   },
 };

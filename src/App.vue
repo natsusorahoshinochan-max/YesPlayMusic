@@ -99,8 +99,8 @@ export default {
       }
     },
     fetchData() {
-      this.$store.dispatch('library/loadApplication').catch(() => {
-        this.$store.dispatch('showToast', '音乐库加载失败');
+      return this.$store.dispatch('library/loadApplication').catch(() => {
+        return this.$store.dispatch('showToast', '音乐库加载失败');
       });
     },
     handleScroll() {
