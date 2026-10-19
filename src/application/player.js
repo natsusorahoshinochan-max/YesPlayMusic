@@ -1,6 +1,13 @@
+import { createLyrics } from '@/lyrics';
 import { Howl } from 'howler';
 import { personalFM, fmTrash } from '@/api/others';
-import { getMP3, getTrackDetail, getLyric, scrobble } from '@/api/track';
+import {
+  getMP3,
+  getTrackDetail,
+  getLyric,
+  getCloudLyric,
+  scrobble,
+} from '@/api/track';
 import { getPlaylistDetail, intelligencePlaylist } from '@/api/playlist';
 import { getAlbum } from '@/api/album';
 import { getArtist } from '@/api/artist';
@@ -32,12 +39,15 @@ export function createPlayer({
   store,
   getSettings = () => store.getters['preferences/settings'],
   getIdentity = () => ({
+    userId: store.getters['library/user']?.userId,
+    loginMode: store.state.session?.loginMode,
     hasAccount: store.getters['session/hasAccount'],
     vipType: store.getters['library/user'].vipType,
   }),
   storage = localStorage,
   platform: suppliedPlatform,
   platformOptions = {},
+  lyricsOptions = {},
   onPlaybackEvent,
   onStateChange,
   onProgress,
@@ -45,6 +55,7 @@ export function createPlayer({
 } = {}) {
   const persistence = createPlayerStorage(storage);
   let playback;
+  let lyrics;
   let platform = suppliedPlatform;
   let disposed = false;
   const liked = () =>
@@ -118,6 +129,7 @@ export function createPlayer({
     onStateChange(state) {
       if (!disposed) {
         persistence.save(playback.archive());
+        lyrics?.sync();
         publish();
       }
       if (onStateChange) onStateChange(state);
@@ -125,6 +137,7 @@ export function createPlayer({
     onProgress(position, detail) {
       if (!disposed) {
         persistence.saveProgress(position);
+        lyrics?.position();
         platform?.progress(position, detail);
       }
       if (onProgress) onProgress(position, detail);
@@ -134,11 +147,25 @@ export function createPlayer({
       if (onPlaybackEvent) onPlaybackEvent(event);
     },
   });
+  lyrics = createLyrics({
+    playback,
+    getIdentity,
+    getLyric,
+    getCloudLyric,
+    ...lyricsOptions,
+  });
   const unsubscribe = store.subscribe?.(mutation => {
-    if (mutation.type.startsWith('library/')) publish();
+    if (
+      mutation.type.startsWith('session/') ||
+      mutation.type.startsWith('library/')
+    ) {
+      lyrics.sync({ identityReady: mutation.type === 'library/setUser' });
+      publish();
+    }
   });
   const player = Object.freeze({
     ...playback,
+    lyrics,
     get state() {
       return playback.state;
     },
@@ -155,6 +182,7 @@ export function createPlayer({
       if (disposed) return;
       disposed = true;
       unsubscribe?.();
+      lyrics.dispose();
       platform?.dispose();
       playback.dispose();
     },
@@ -163,7 +191,7 @@ export function createPlayer({
     platform = createPlaybackPlatform({
       playback: player,
       settings,
-      getLyric,
+      lyrics,
       toggleFavorite: id => toggleTrackFavoriteWithFeedback(store, id),
       onTitle: title => store.commit?.('updateTitle', title),
       ...platformOptions,
