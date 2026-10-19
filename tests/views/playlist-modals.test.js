@@ -36,9 +36,9 @@ function setup(
   const messages = [];
   const storage = {
     getItem: key => values[key] || null,
-    setItem: (key, value) => {
+    setItem: jest.fn((key, value) => {
       values[key] = value;
-    },
+    }),
   };
   const api = {
     getPlaylistDetail: jest.fn(id =>
@@ -105,10 +105,13 @@ test('creation remains successful when optional addition fails and persists the 
   const { wrapper, store, api, messages, storage } = setup(NewPlaylist, {
     addition: { body: { code: 502, message: '无法添加歌曲' } },
   });
+  await store.dispatch('preferences/applyRestored');
+  storage.setItem.mockClear();
   await wrapper.find('input[type="text"]').setValue('New List');
   await wrapper.find('input[type="checkbox"]').setChecked(true);
   await wrapper.find('button').trigger('click');
   await flush();
+  expect(storage.setItem.mock.calls.map(([key]) => key)).toEqual(['data']);
   expect(api.createPlaylist).toHaveBeenCalledWith({
     name: 'New List',
     privacy: 10,

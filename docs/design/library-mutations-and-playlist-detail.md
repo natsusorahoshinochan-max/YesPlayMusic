@@ -1,18 +1,16 @@
 # 音乐库变更与歌单详情：结构设计
 
-## 状态与目标
+## 当前实现与契约
 
-本文定义已确认、待实现的结构设计，对应[音乐库变更与歌单详情需求](../requirements/library-mutations-refactoring.md)。
+本文描述当前实现的结构与公开契约，对应[音乐库变更与歌单详情需求](../requirements/library-mutations-refactoring.md)。
 
 以 Vuex `library` 的语义化 actions 作为完整写操作的 interface，以独立 `playlistDetail` module 维护当前歌单详情。调用者提交业务意图，library 统一检查执行权限、解释远端结果、维护音乐库集合，并协调当前详情更新。页面负责确认、提示和展示。
 
-## 当前结构与目标结构
+## 当前结构
 
-当前 library 已集中远端写操作及创建后加曲的编排，但向调用者返回远端响应。页面、列表和弹窗仍读取 `code`、`body.code` 等字段，并重复检查执行权限。library 内也包含提示调用。
+library 统一执行写权限、远端参数与结果转换、已确认的本地变化和相关数据更新。独立 playlistDetail module 维护当前歌单、完整曲目 ID、读取范围与分页。页面和全局弹窗提交同一套完整操作并消费业务结果，不追加写入后的集合或详情刷新。
 
-当前歌单页面维护元数据、完整曲目 ID、已加载歌曲和分页位置。TrackList 删除歌曲后调用 `$parent.removeTrack`，页面只过滤已加载歌曲。TrackListItem 的收藏操作也依赖父级方法。添加与创建歌单的弹窗挂在 App 下，与歌单页面没有直接父子关系。
-
-目标结构将远端写入及其数据更新组织为一次完整操作。library 维护音乐库集合；playlistDetail 维护当前详情及分页一致性。页面和弹窗共用写操作，不组织补充刷新。
+TrackList 删除与 TrackListItem 收藏直接调用 library；列表播放仍沿用父级播放入口，不属于此结构调整的范围。
 
 ```mermaid
 flowchart TD
@@ -124,7 +122,7 @@ implementation 管理有序曲目 ID、已经遍历的 ID 范围、已加载歌�
 
 ### 写操作与详情协作
 
-library 通过明确的内部协作 interface 将已确认的变化交给 playlistDetail，例如 `playlistDetail/applyLibraryChange(change)`。该 interface 属于两个 module 之间的 implementation 协作；UI 只调用 library 写操作。
+library 通过内部协作 interface `playlistDetail/applyLibraryChange(change)` 将已确认的变化交给 playlistDetail。该 interface 属于两个 module 之间的 implementation 协作；UI 只调用 library 写操作。
 
 | 变更 | 当前详情的处理 |
 | --- | --- |
@@ -168,7 +166,7 @@ Player、歌词页、TrackList、TrackListItem 和 Electron 入口均调用 `lib
 
 ## 文件职责与调用面调整
 
-| 位置 | 目标职责 |
+| 位置 | 当前职责 |
 | --- | --- |
 | `src/store/modules/library.js` | 完整写操作、执行权限、业务结果、音乐库集合与详情协作 |
 | `src/store/modules/playlistDetail.js` | 当前详情、读取与分页、写入后的详情一致性 |
@@ -190,7 +188,7 @@ Player、歌词页、TrackList、TrackListItem 和 Electron 入口均调用 `lib
 
 网易云属于 **true external**。沿用应用装配的注入位置：生产 adapter 使用实际请求函数，测试 mock adapter 提供受控响应。业务结果解释与操作编排保留在 module implementation，生产和测试 adapter 共用同一套逻辑。
 
-新测试从公开 actions 和 getters 验证完整行为；确认框、提示与导航通过关键页面集成验证。有效测试依据本文编写，过时目录中的测试继续作为归档。
+有效测试从公开 actions 和 getters 验证完整行为；确认框、提示与导航通过关键页面集成验证。有效测试依据本文编写，过时目录中的测试继续作为归档。
 
 | 验证场景 | 可观察结果 |
 | --- | --- |
