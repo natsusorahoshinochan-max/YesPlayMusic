@@ -160,7 +160,7 @@ app
         1
       );
       record(
-        `${scenario}: real renderer platform → session D-Bus raw write → correlated acknowledgement → one metadata publication (${
+        `${scenario}: real renderer platform and session D-Bus raw write deliver correlated acknowledgement and one metadata publication (${
           Date.now() - started
         }ms)`
       );
