@@ -115,8 +115,8 @@ app
       ['no-reply', 103],
     ]) {
       mode = scenario;
-      const baseline = await names();
       const win = await nativeWindow();
+      const baseline = await names();
       const dispose = await createDbus(win);
       const offset = evidence.events.length;
       const started = Date.now();
@@ -163,11 +163,11 @@ app
       );
       win.close();
       assert(win.isDestroyed());
-      dispose();
       await ensureReleased(
         baseline,
         `${scenario}: window.close removes lyrics IPC and releases session bus connection`
       );
+      dispose();
     }
 
     mode = 'no-reply';
