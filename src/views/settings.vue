@@ -1361,9 +1361,7 @@ export default {
       });
     },
     clearCache() {
-      clearDB().then(() => {
-        this.countDBSize();
-      });
+      return clearDB().then(() => this.countDBSize());
     },
     lastfmConnect() {
       lastfmAuth();
