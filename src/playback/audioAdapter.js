@@ -92,7 +92,8 @@ export function createAudioAdapter({
                 rejectPreparation(
                   Object.assign(
                     new Error(`Audio preparation failed: ${detail}`),
-                    failure
+                    failure,
+                    { retryable: failure.code !== 3 && failure.code !== 4 }
                   )
                 );
               }
