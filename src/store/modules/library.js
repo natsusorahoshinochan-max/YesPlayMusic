@@ -54,7 +54,8 @@ export default function createLibrary(
 
   async function loadCollection(context, name, endpoint, limit) {
     const result = await api[endpoint]({ limit });
-    if (result.data) setCollection(context, name, result.data);
+    if (!Array.isArray(result?.data)) throw new Error('Collection unavailable');
+    setCollection(context, name, result.data);
   }
 
   async function loadHistory(context) {
@@ -107,10 +108,39 @@ export default function createLibrary(
     await loadPreview(context);
   }
 
-  function requireAccount(context) {
-    if (context.rootGetters['session/hasAccount']) return true;
-    context.dispatch('showToast', '此操作需要登录网易云账号', { root: true });
-    return false;
+  async function write(context, request, update) {
+    if (!context.rootGetters['session/hasAccount'])
+      return changeResult(accountRequired);
+    let response;
+    const outcome = await performLibraryWrite(async () => {
+      response = await request();
+      return response;
+    });
+    if (outcome.status !== 'succeeded') return changeResult(outcome);
+    return changeResult(outcome, await synchronize(update(response)));
+  }
+
+  function detailChange(context, playlistId, type, extra = {}) {
+    return context.dispatch(
+      'playlistDetail/applyLibraryChange',
+      { playlistId, type, ...extra },
+      { root: true }
+    );
+  }
+
+  function updateFavoriteCollection(context, name, id, favorite) {
+    const collection = context.state.collections[name];
+    setCollection(
+      context,
+      name,
+      favorite
+        ? collection.map(item =>
+            Number(item.id) === Number(id)
+              ? { ...item, subscribed: true }
+              : item
+          )
+        : collection.filter(item => Number(item.id || item.vid) !== Number(id))
+    );
   }
 
   return {
@@ -154,42 +184,64 @@ export default function createLibrary(
         commit('setUser', {});
         commit('setLikedSongPlaylistID', 0);
       },
-      async deletePlaylist(context, id) {
-        if (!requireAccount(context)) return;
-        const result = await api.deletePlaylist(id);
-        if (result.code === 200) await loadPlaylists(context);
-        return result;
+      deletePlaylist(context, id) {
+        return write(
+          context,
+          () => api.deletePlaylist(id),
+          () => [
+            () => updateFavoriteCollection(context, 'playlists', id, false),
+            () => detailChange(context, id, 'deleted'),
+            () => loadPlaylists(context),
+          ]
+        );
       },
-      async uploadCloudTrack(context, file) {
-        if (!requireAccount(context) || !file) return;
-        const result = await api.uploadSong(file);
-        if (result?.code === 200) {
-          setCollection(context, 'cloudDisk', [
-            result.privateCloud,
-            ...context.state.collections.cloudDisk,
-          ]);
-        }
-        return result;
+      uploadCloudTrack(context, file) {
+        return write(
+          context,
+          () => api.uploadSong(file),
+          response => [
+            () => {
+              const track =
+                response?.body?.privateCloud || response?.privateCloud;
+              if (track)
+                setCollection(context, 'cloudDisk', [
+                  track,
+                  ...context.state.collections.cloudDisk.filter(
+                    item => item.songId !== track.songId
+                  ),
+                ]);
+            },
+            () => loadCollection(context, 'cloudDisk', 'cloudDisk', 1000),
+          ]
+        );
       },
-      async deleteCloudTrack(context, id) {
-        if (!requireAccount(context)) return;
-        const result = await api.cloudDiskTrackDelete(id);
-        if (result.code === 200) {
-          setCollection(
-            context,
-            'cloudDisk',
-            context.state.collections.cloudDisk.filter(
-              track => track.songId !== id
-            )
-          );
-        }
-        return result;
+      deleteCloudTrack(context, id) {
+        return write(
+          context,
+          () => api.cloudDiskTrackDelete(id),
+          () => [
+            () =>
+              setCollection(
+                context,
+                'cloudDisk',
+                context.state.collections.cloudDisk.filter(
+                  track => Number(track.songId) !== Number(id)
+                )
+              ),
+            () => loadCollection(context, 'cloudDisk', 'cloudDisk', 1000),
+          ]
+        );
       },
-      async setPlaylistFavorite(context, { id, favorite }) {
-        if (!requireAccount(context)) return;
-        const result = await api.subscribePlaylist({ id, t: favorite ? 1 : 2 });
-        if (result.code === 200) await loadPlaylists(context);
-        return result;
+      setPlaylistFavorite(context, { id, favorite }) {
+        return write(
+          context,
+          () => api.subscribePlaylist({ id, t: favorite ? 1 : 2 }),
+          () => [
+            () => updateFavoriteCollection(context, 'playlists', id, favorite),
+            () => detailChange(context, id, 'favorite', { favorite }),
+            () => loadPlaylists(context),
+          ]
+        );
       },
       async removePlaylistTracks(context, { playlistId, trackIds }) {
         if (!context.rootGetters['session/hasAccount'])
@@ -235,7 +287,8 @@ export default function createLibrary(
         return changeResult(outcome, await synchronize(attempts));
       },
       async changePlaylistTracks(context, params) {
-        if (!requireAccount(context)) return;
+        if (!context.rootGetters['session/hasAccount'])
+          return changeResult(accountRequired);
         const result = await api.addOrRemoveTrackFromPlaylist(params);
         if (result.body?.code === 200) {
           const affectsLikedSongs =
@@ -249,7 +302,8 @@ export default function createLibrary(
         return result;
       },
       async createPlaylist(context, { name, privacy = false, trackID }) {
-        if (!requireAccount(context)) return;
+        if (!context.rootGetters['session/hasAccount'])
+          return changeResult(accountRequired);
         const result = await api.createPlaylist({
           name,
           privacy: privacy ? 10 : 0,
@@ -266,48 +320,88 @@ export default function createLibrary(
         await loadPlaylists(context);
         return { ...result, trackResult };
       },
-      async setAlbumFavorite(context, { id, favorite }) {
-        if (!requireAccount(context)) return;
-        const result = await api.likeAAlbum({ id, t: favorite ? 1 : 0 });
-        if (result.code === 200)
-          await loadCollection(context, 'albums', 'likedAlbums', 2000);
-        return result;
+      setAlbumFavorite(context, { id, favorite }) {
+        return write(
+          context,
+          () => api.likeAAlbum({ id, t: favorite ? 1 : 0 }),
+          () => [
+            () => updateFavoriteCollection(context, 'albums', id, favorite),
+            () => loadCollection(context, 'albums', 'likedAlbums', 2000),
+          ]
+        );
       },
-      async setArtistFavorite(context, { id, favorite }) {
-        if (!requireAccount(context)) return;
-        const result = await api.followAArtist({ id, t: favorite ? 1 : 0 });
-        if (result.code === 200)
-          await loadCollection(context, 'artists', 'likedArtists', 2000);
-        return result;
+      setArtistFavorite(context, { id, favorite }) {
+        return write(
+          context,
+          () => api.followAArtist({ id, t: favorite ? 1 : 0 }),
+          () => [
+            () => updateFavoriteCollection(context, 'artists', id, favorite),
+            () => loadCollection(context, 'artists', 'likedArtists', 2000),
+          ]
+        );
       },
-      async setMVFavorite(context, { id, favorite }) {
-        if (!requireAccount(context)) return;
-        const result = await api.likeAMV({ mvid: id, t: favorite ? 1 : 0 });
-        if (result.code === 200)
-          await loadCollection(context, 'mvs', 'likedMVs', 1000);
-        return result;
+      setMVFavorite(context, { id, favorite }) {
+        return write(
+          context,
+          () => api.likeAMV({ mvid: id, t: favorite ? 1 : 0 }),
+          () => [
+            () => updateFavoriteCollection(context, 'mvs', id, favorite),
+            () => loadCollection(context, 'mvs', 'likedMVs', 1000),
+          ]
+        );
       },
-      async toggleTrackFavorite(context, id) {
-        if (!requireAccount(context)) return;
+      toggleTrackFavorite(context, id) {
         const like = !context.state.collections.songs.includes(id);
-        try {
-          const result = await api.likeATrack({ id, like });
-          if (result.code !== 200) return result;
-          setCollection(
-            context,
-            'songs',
-            like
-              ? [...context.state.collections.songs, id]
-              : context.state.collections.songs.filter(song => song !== id)
-          );
-          if (!context.state.likedSongPlaylistID) await loadPlaylists(context);
-          await loadPreview(context);
-          return result;
-        } catch (error) {
-          await context.dispatch('showToast', '操作失败，专辑下架或版权锁定', {
-            root: true,
-          });
-        }
+        return write(
+          context,
+          () => api.likeATrack({ id, like }),
+          () => {
+            let playlistReady;
+            const identifyPlaylist = () => {
+              if (context.state.likedSongPlaylistID)
+                return Promise.resolve(context.state.likedSongPlaylistID);
+              if (!playlistReady)
+                playlistReady = loadPlaylists(context).then(
+                  () => context.state.likedSongPlaylistID
+                );
+              return playlistReady;
+            };
+            return [
+              () =>
+                setCollection(
+                  context,
+                  'songs',
+                  like
+                    ? [...context.state.collections.songs, id]
+                    : context.state.collections.songs.filter(
+                        song => song !== id
+                      )
+                ),
+              () => {
+                if (!like)
+                  setCollection(
+                    context,
+                    'songsWithDetails',
+                    context.state.collections.songsWithDetails.filter(
+                      track => track.id !== id
+                    )
+                  );
+              },
+              async () => {
+                await identifyPlaylist();
+                await loadPreview(context);
+              },
+              async () => {
+                const playlistId = await identifyPlaylist();
+                if (!like)
+                  await detailChange(context, playlistId, 'tracks-removed', {
+                    trackIds: [id],
+                  });
+                await detailChange(context, playlistId, 'reload');
+              },
+            ];
+          }
+        );
       },
       loadApplication: context => loadLibrary(context, false),
       loadPage: context => loadLibrary(context, true),

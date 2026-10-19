@@ -44,6 +44,8 @@ function setup(account = true) {
     addOrRemoveTrackFromPlaylist: jest
       .fn()
       .mockResolvedValue({ body: { code: 200 } }),
+    subscribePlaylist: jest.fn().mockResolvedValue({ body: { code: 200 } }),
+    deletePlaylist: jest.fn().mockResolvedValue({ code: 200 }),
     userPlaylist: jest.fn().mockResolvedValue({ playlist: [{ id: 20 }] }),
   };
   const store = new Vuex.Store({
@@ -68,10 +70,11 @@ function setup(account = true) {
     },
   });
   const route = Vue.observable({ name: 'playlist', params: { id: 20 } });
+  const router = { go: jest.fn() };
   const wrapper = mount(Playlist, {
     store,
     i18n: initializeLocale('zh-CN'),
-    mocks: { $route: route },
+    mocks: { $route: route, $router: router },
     filters: { resizeImage: value => value, formatDate: value => value },
     stubs: {
       Cover: true,
@@ -90,7 +93,7 @@ function setup(account = true) {
       'svg-icon': true,
     },
   });
-  return { wrapper, store, api, route };
+  return { wrapper, store, api, route, router };
 }
 test('playlist opens store detail, confirms removal, shows feedback and continues browsing', async () => {
   const { wrapper, store, api } = setup();
@@ -137,5 +140,42 @@ test('playlist reacts to target changes and lets library return account-required
   expect(api.addOrRemoveTrackFromPlaylist).not.toHaveBeenCalled();
   expect(store.state.message).toBe('此操作需要登录网易云帐号');
   expect(wrapper.findAll('.song')).toHaveLength(101);
+  wrapper.destroy();
+});
+
+test('playlist favorite applies confirmed state and feedback even when synchronization fails', async () => {
+  const { wrapper, store, api } = setup();
+  await flush();
+  api.userPlaylist.mockRejectedValue(new Error('offline'));
+  api.getPlaylistDetail.mockRejectedValue(new Error('offline'));
+  const favorite = wrapper
+    .findAll('.item')
+    .wrappers.find(item => item.text() === '保存到音乐库');
+  await favorite.trigger('click');
+  await flush();
+  expect(store.getters['playlistDetail/current'].playlist.subscribed).toBe(
+    true
+  );
+  expect(store.state.message).toContain('更新失败');
+  wrapper.destroy();
+});
+test('deleting playlist confirms in UI and navigates after confirmed write despite refresh failure', async () => {
+  const { wrapper, store, api, router } = setup();
+  await flush();
+  jest
+    .spyOn(window, 'confirm')
+    .mockReturnValueOnce(false)
+    .mockReturnValue(true);
+  jest.spyOn(window, 'alert').mockImplementation(() => {});
+  const remove = wrapper
+    .findAll('.item')
+    .wrappers.find(item => item.text() === '删除歌单');
+  await remove.trigger('click');
+  expect(api.deletePlaylist).not.toHaveBeenCalled();
+  api.userPlaylist.mockRejectedValue(new Error('offline'));
+  await remove.trigger('click');
+  await flush();
+  expect(store.getters['playlistDetail/current']).toBeNull();
+  expect(router.go).toHaveBeenCalledWith(-1);
   wrapper.destroy();
 });

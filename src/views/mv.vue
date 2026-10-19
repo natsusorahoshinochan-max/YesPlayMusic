@@ -43,6 +43,7 @@
 </template>
 
 <script>
+import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 import { mvDetail, mvUrl, simiMv } from '@/api/mv';
 import NProgress from 'nprogress';
 import locale from '@/locale';
@@ -127,19 +128,14 @@ export default {
         this.simiMvs = data.mvs;
       });
     },
-    likeMV() {
-      if (!this.$store.getters['session/hasAccount']) {
-        this.showToast(locale.t('toast.needToLogin'));
-        return;
-      }
-      this.$store
-        .dispatch('library/setMVFavorite', {
-          id: this.mv.data.id,
-          favorite: !this.mv.subed,
-        })
-        .then(data => {
-          if (data.code === 200) this.mv.subed = !this.mv.subed;
-        });
+    async likeMV() {
+      const favorite = !this.mv.subed;
+      const result = await this.$store.dispatch('library/setMVFavorite', {
+        id: this.mv.data.id,
+        favorite,
+      });
+      if (result.outcome.status === 'succeeded') this.mv.subed = favorite;
+      showLibraryChangeFeedback(this.$store, result, undefined);
     },
     openMenu(e) {
       this.$refs.mvMenu.openMenu(e);
