@@ -44,10 +44,7 @@
           {{ album.description }}
         </div>
         <div class="buttons" style="margin-top: 32px">
-          <ButtonTwoTone
-            icon-class="play"
-            @click.native="playAlbumByID(album.id)"
-          >
+          <ButtonTwoTone icon-class="play" @click.native="playAlbum(album.id)">
             {{ $t('common.play') }}
           </ButtonTwoTone>
           <ButtonTwoTone
@@ -146,7 +143,7 @@
 
 <script>
 import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
-import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
+import { mapActions, mapState, mapGetters } from 'vuex';
 import { getArtistAlbum } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
 import { getAlbum, albumDynamicDetail } from '@/api/album';
@@ -238,10 +235,9 @@ export default {
     this.loadData(this.$route.params.id);
   },
   methods: {
-    ...mapMutations(['appendTrackToPlayerList']),
-    ...mapActions(['playFirstTrackOnList', 'playTrackOnListByID', 'showToast']),
-    playAlbumByID(id, trackID = 'first') {
-      this.$store.state.player.playAlbumByID(id, trackID);
+    ...mapActions(['showToast']),
+    playAlbum(id, startTrackId) {
+      return this.$store.state.player.playAlbum(id, { startTrackId });
     },
     async likeAlbum(toast = false) {
       const favorite = !this.dynamicDetail.isSub;

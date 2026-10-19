@@ -104,8 +104,10 @@
     <div id="popularTracks" class="popular-tracks">
       <div class="section-title">{{ $t('artist.popularSongs') }}</div>
       <TrackList
+        :id="artist.id"
         :tracks="popularTracks.slice(0, showMorePopTracks ? 24 : 12)"
-        :type="'tracklist'"
+        type="tracklist"
+        dbclick-track-func="playArtist"
       />
 
       <div id="seeMore" class="show-more">
@@ -178,7 +180,7 @@
 
 <script>
 import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
-import { mapMutations, mapActions, mapState } from 'vuex';
+import { mapActions, mapState } from 'vuex';
 import {
   getArtist,
   getArtistAlbum,
@@ -268,8 +270,7 @@ export default {
     }
   },
   methods: {
-    ...mapMutations(['appendTrackToPlayerList']),
-    ...mapActions(['playFirstTrackOnList', 'playTrackOnListByID', 'showToast']),
+    ...mapActions(['showToast']),
     loadData(id, next = undefined) {
       setTimeout(() => {
         if (!this.show) NProgress.start();
@@ -312,14 +313,10 @@ export default {
     goToMv(id) {
       this.$router.push({ path: '/mv/' + id });
     },
-    playPopularSongs(trackID = 'first') {
-      let trackIDs = this.popularTracks.map(t => t.id);
-      this.$store.state.player.replacePlaylist(
-        trackIDs,
-        this.artist.id,
-        'artist',
-        trackID
-      );
+    playPopularSongs(startTrackId) {
+      return this.$store.state.player.playArtist(this.artist.id, {
+        startTrackId,
+      });
     },
     async followArtist() {
       const favorite = !this.artist.followed;

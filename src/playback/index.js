@@ -1,4 +1,5 @@
 import Vue from 'vue';
+import { createSourceOperations } from './sourceOperations';
 
 const clone = value =>
   value == null ? value : JSON.parse(JSON.stringify(value));
@@ -17,6 +18,7 @@ export function createPlayback({
   personalFM,
   delay = ms => new Promise(resolve => setTimeout(resolve, ms)),
   getTrack,
+  sourceLists,
   resources,
   audio,
   onFeedback = () => {},
@@ -463,6 +465,7 @@ export function createPlayback({
     safe(onProgress, state.progress);
   }, 1000);
   const playback = {
+    ...createSourceOperations({ runSelection, sourceLists, feedback }),
     get state() {
       return holder.snapshot;
     },
