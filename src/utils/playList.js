@@ -1,14 +1,16 @@
+import store from '@/store';
 import router from '../router';
-import state from '../store/state';
 import {
   recommendPlaylist,
   dailyRecommendPlaylist,
   getPlaylistDetail,
 } from '@/api/playlist';
-import { isAccountLoggedIn } from '@/utils/auth';
 
 export function hasListSource() {
-  return !state.player.isPersonalFM && state.player.playlistSource.id !== 0;
+  return (
+    !store.state.player.isPersonalFM &&
+    store.state.player.playlistSource.id !== 0
+  );
 }
 
 export function goToListSource() {
@@ -16,19 +18,22 @@ export function goToListSource() {
 }
 
 export function getListSourcePath() {
-  if (state.player.playlistSource.id === state.data.likedSongPlaylistID) {
+  if (
+    store.state.player.playlistSource.id ===
+    store.getters['library/likedSongPlaylistID']
+  ) {
     return '/library/liked-songs';
-  } else if (state.player.playlistSource.type === 'url') {
-    return state.player.playlistSource.id;
-  } else if (state.player.playlistSource.type === 'cloudDisk') {
+  } else if (store.state.player.playlistSource.type === 'url') {
+    return store.state.player.playlistSource.id;
+  } else if (store.state.player.playlistSource.type === 'cloudDisk') {
     return '/library';
   } else {
-    return `/${state.player.playlistSource.type}/${state.player.playlistSource.id}`;
+    return `/${store.state.player.playlistSource.type}/${store.state.player.playlistSource.id}`;
   }
 }
 
 export async function getRecommendPlayList(limit, removePrivateRecommand) {
-  if (isAccountLoggedIn()) {
+  if (store.getters['session/hasAccount']) {
     const playlists = await Promise.all([
       dailyRecommendPlaylist(),
       recommendPlaylist({ limit }),

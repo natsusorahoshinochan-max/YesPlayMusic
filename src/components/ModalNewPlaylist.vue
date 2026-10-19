@@ -66,8 +66,9 @@ export default {
     },
   },
   methods: {
-    ...mapMutations(['updateModal', 'updateData']),
-    ...mapActions(['showToast', 'fetchLikedPlaylist']),
+    ...mapMutations(['updateModal']),
+    ...mapActions(['showToast']),
+    ...mapActions('library', ['fetchLikedPlaylist']),
     close() {
       this.show = false;
       this.title = '';
@@ -95,7 +96,7 @@ export default {
           }
           this.close();
           this.showToast('成功创建歌单');
-          this.updateData({ key: 'libraryPlaylistFilter', value: 'mine' });
+          this.$store.commit('preferences/setLibraryPlaylistFilter', 'mine');
           this.fetchLikedPlaylist();
         }
       });

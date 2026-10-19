@@ -1,6 +1,3 @@
-import { isAccountLoggedIn } from './auth';
-import { refreshCookie } from '@/api/auth';
-import dayjs from 'dayjs';
 import store from '@/store';
 
 export function isTrackPlayable(track) {
@@ -12,11 +9,14 @@ export function isTrackPlayable(track) {
     return result;
   }
   // cloud storage judgement logic
-  if (isAccountLoggedIn() && track?.privilege?.cs) {
+  if (store.getters['session/hasAccount'] && track?.privilege?.cs) {
     return result;
   }
   if (track.fee === 1 || track.privilege?.fee === 1) {
-    if (isAccountLoggedIn() && store.state.data.user.vipType === 11) {
+    if (
+      store.getters['session/hasAccount'] &&
+      store.getters['library/user'].vipType === 11
+    ) {
       result.playable = true;
     } else {
       result.playable = false;
@@ -31,7 +31,7 @@ export function isTrackPlayable(track) {
   ) {
     result.playable = false;
     result.reason = '无版权';
-  } else if (track.privilege?.st < 0 && isAccountLoggedIn()) {
+  } else if (track.privilege?.st < 0 && store.getters['session/hasAccount']) {
     result.playable = false;
     result.reason = '已下架';
   }
@@ -93,23 +93,6 @@ export function throttle(fn, time) {
 export function updateHttps(url) {
   if (!url) return '';
   return url.replace(/^http:/, 'https:');
-}
-
-export function dailyTask() {
-  let lastDate = store.state.data.lastRefreshCookieDate;
-  if (
-    isAccountLoggedIn() &&
-    (lastDate === undefined || lastDate !== dayjs().date())
-  ) {
-    console.debug('[debug][common.js] execute dailyTask');
-    refreshCookie().then(() => {
-      console.debug('[debug][common.js] 刷新cookie');
-      store.commit('updateData', {
-        key: 'lastRefreshCookieDate',
-        value: dayjs().date(),
-      });
-    });
-  }
 }
 
 export function splitSoundtrackAlbumTitle(title) {
@@ -190,7 +173,7 @@ export function bytesToSize(bytes) {
   let megaBytes = marker * marker;
   let gigaBytes = marker * marker * marker;
 
-  let lang = store.state.settings.lang;
+  let lang = store.getters['preferences/settings'].lang;
 
   if (bytes < kiloBytes) return bytes + (lang === 'en' ? ' Bytes' : '字节');
   else if (bytes < megaBytes)

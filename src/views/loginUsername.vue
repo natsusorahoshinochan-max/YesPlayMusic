@@ -53,7 +53,6 @@
 </template>
 
 <script>
-import { mapMutations } from 'vuex';
 import NProgress from 'nprogress';
 import { search } from '@/api/others';
 import { userPlaylist } from '@/api/user';
@@ -77,7 +76,6 @@ export default {
     NProgress.done();
   },
   methods: {
-    ...mapMutations(['updateData']),
     search() {
       if (!this.keyword) return;
       search({ keywords: this.keyword, limit: 9, type: 1002 }).then(data => {
@@ -86,16 +84,15 @@ export default {
       });
     },
     confirm() {
-      this.updateData({ key: 'user', value: this.activeUser });
-      this.updateData({ key: 'loginMode', value: 'username' });
+      this.$store.dispatch('session/selectPublicIdentity', this.activeUser);
       userPlaylist({
         uid: this.activeUser.userId,
         limit: 1,
       }).then(data => {
-        this.updateData({
-          key: 'likedSongPlaylistID',
-          value: data.playlist[0].id,
-        });
+        this.$store.commit(
+          'library/setLikedSongPlaylistID',
+          data.playlist[0].id
+        );
         this.$router.push({ path: '/library' });
       });
     },

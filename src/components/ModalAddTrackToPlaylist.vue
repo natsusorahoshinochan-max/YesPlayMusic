@@ -28,7 +28,7 @@
 </template>
 
 <script>
-import { mapActions, mapMutations, mapState } from 'vuex';
+import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
 import Modal from '@/components/Modal.vue';
 import locale from '@/locale';
 import { addOrRemoveTrackFromPlaylist } from '@/api/playlist';
@@ -44,7 +44,12 @@ export default {
     };
   },
   computed: {
-    ...mapState(['modals', 'data', 'liked']),
+    ...mapGetters({
+      user: 'library/user',
+      likedSongPlaylistID: 'library/likedSongPlaylistID',
+      liked: 'library/collections',
+    }),
+    ...mapState(['modals']),
     show: {
       get() {
         return this.modals.addTrackToPlaylistModal.show;
@@ -65,8 +70,8 @@ export default {
     ownPlaylists() {
       return this.liked.playlists.filter(
         p =>
-          p.creator.userId === this.data.user.userId &&
-          p.id !== this.data.likedSongPlaylistID
+          p.creator.userId === this.user.userId &&
+          p.id !== this.likedSongPlaylistID
       );
     },
   },

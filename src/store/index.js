@@ -1,36 +1,44 @@
 import Vue from 'vue';
 import Vuex from 'vuex';
-import state from './state';
+import { initializePlayerStorage } from '@/application/playerStorage';
+import createState from './state';
 import mutations from './mutations';
-// vuex 自定义插件
-import saveToLocalStorage from './plugins/localStorage';
+import rootActions from './actions';
+import { createPersistence } from './persistence';
+import createSession from './modules/session';
+import createLibrary from './modules/library';
+import createPreferences from './modules/preferences';
 import { getSendSettingsPlugin } from './plugins/sendSettings';
 
 Vue.use(Vuex);
-
 let store;
-
-export function createStore({ actions = {} } = {}) {
-  const plugins = [saveToLocalStorage];
-  if (process.env.IS_ELECTRON === true) {
-    plugins.push(getSendSettingsPlugin());
-  }
-  store = new Vuex.Store({ state, mutations, actions, plugins });
-  if ([undefined, null].includes(store.state.settings.lang)) {
-    const langMapper = new Map()
-      .set('zh', 'zh-CN')
-      .set('zh-TW', 'zh-TW')
-      .set('en', 'en')
-      .set('tr', 'tr');
-    store.state.settings.lang =
-      langMapper.get(
-        langMapper.has(navigator.language)
-          ? navigator.language
-          : navigator.language.slice(0, 2)
-      ) || 'en';
-    localStorage.setItem('settings', JSON.stringify(store.state.settings));
-  }
+const noCredentials = { get: () => null, set() {}, remove() {} };
+export function createStore({
+  storage = localStorage,
+  language = navigator.language,
+  credentials = noCredentials,
+  session = {},
+  library = {},
+  actions = {},
+} = {}) {
+  initializePlayerStorage(storage);
+  const persistence = createPersistence(storage, language);
+  const plugins = [persistence.install];
+  if (process.env.IS_ELECTRON === true) plugins.push(getSendSettingsPlugin());
+  store = new Vuex.Store({
+    state: createState(storage),
+    mutations,
+    actions: { ...rootActions, ...actions },
+    plugins,
+    modules: {
+      session: createSession(persistence.snapshot.session, {
+        ...session,
+        credentials,
+      }),
+      library: createLibrary(persistence.snapshot.library, library),
+      preferences: createPreferences(persistence.snapshot.preferences),
+    },
+  });
   return store;
 }
-
 export { store as default };

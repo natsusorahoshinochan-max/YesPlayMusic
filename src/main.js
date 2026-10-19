@@ -2,19 +2,19 @@ import Vue from 'vue';
 import VueGtag from 'vue-gtag';
 import App from './App.vue';
 import router from './router';
-import { createStore } from './store';
-import actions from './store/actions';
+import store, { createStore } from './store';
+import * as auth from '@/api/auth';
+import { createCredentials } from '@/application/credentials';
+import { libraryApi } from '@/application/library';
 import { initializeTrackCache } from '@/utils/db';
 import { initializeLocale } from '@/locale';
 import { initializeAppearance } from '@/utils/appearance';
 import { configureRequest } from '@/utils/request';
-import { getCookie, doLogout } from '@/utils/auth';
 import { startApplication } from '@/application/startup';
 import { createPlayer } from '@/application/player';
 import '@/assets/icons';
 import '@/utils/filters';
 import './registerServiceWorker';
-import { dailyTask } from '@/utils/common';
 import '@/assets/css/global.scss';
 import NProgress from 'nprogress';
 import '@/assets/css/nprogress.css';
@@ -44,26 +44,36 @@ Vue.use(
 );
 Vue.config.productionTip = false;
 
+const credentials = createCredentials();
 NProgress.configure({ showSpinner: false, trickleSpeed: 100 });
 startApplication({
   createStore() {
-    const store = createStore({ actions });
+    const store = createStore({
+      credentials,
+      session: { auth },
+      library: {
+        api: libraryApi,
+        notifyLikedSongsChanged: () =>
+          store.state.player?.sendSelfToIpcMain?.(),
+      },
+    });
+    store.dispatch('session/restore');
     initializeTrackCache();
     return store;
   },
   initializeLocale,
   initializeAppearance,
   configureRequest,
-  getCookie,
+  getCookie: key => credentials.get(key),
   onSessionInvalid() {
-    doLogout();
+    store.dispatch('session/logout');
     return router.push({
       name: process.env.IS_ELECTRON ? 'loginAccount' : 'login',
     });
   },
   createPlayer,
   mount({ store, i18n }) {
-    dailyTask();
+    store.dispatch('session/refreshDaily');
     return new Vue({
       i18n,
       store,

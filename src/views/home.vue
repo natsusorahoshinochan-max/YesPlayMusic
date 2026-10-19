@@ -75,7 +75,7 @@ import { newAlbums } from '@/api/album';
 import { byAppleMusic } from '@/utils/staticData';
 import { getRecommendPlayList } from '@/utils/playList';
 import NProgress from 'nprogress';
-import { mapState } from 'vuex';
+import { mapGetters } from 'vuex';
 import CoverRow from '@/components/CoverRow.vue';
 import FMCard from '@/components/FMCard.vue';
 import DailyTracksCard from '@/components/DailyTracksCard.vue';
@@ -99,7 +99,8 @@ export default {
     };
   },
   computed: {
-    ...mapState(['settings']),
+    ...mapGetters({ settings: 'preferences/settings' }),
+
     byAppleMusic() {
       return byAppleMusic;
     },

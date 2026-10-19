@@ -61,7 +61,7 @@ export function ipcRenderer(vueInstance) {
   });
 
   ipcRenderer.on('like', () => {
-    store.dispatch('likeATrack', player.currentTrack.id);
+    store.dispatch('library/likeATrack', player.currentTrack.id);
   });
 
   ipcRenderer.on('repeat', () => {
@@ -81,7 +81,7 @@ export function ipcRenderer(vueInstance) {
   });
 
   ipcRenderer.on('rememberCloseAppOption', (event, value) => {
-    store.commit('updateSettings', {
+    store.commit('preferences/updateSettings', {
       key: 'closeAppOption',
       value,
     });

@@ -75,10 +75,9 @@
 </template>
 
 <script>
-import { mapActions, mapMutations, mapState } from 'vuex';
+import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
 import { addOrRemoveTrackFromPlaylist } from '@/api/playlist';
 import { cloudDiskTrackDelete } from '@/api/user';
-import { isAccountLoggedIn } from '@/utils/auth';
 
 import TrackListItem from '@/components/TrackListItem.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
@@ -155,7 +154,8 @@ export default {
     };
   },
   computed: {
-    ...mapState(['liked', 'player']),
+    ...mapGetters({ liked: 'library/collections' }),
+    ...mapState(['player']),
     isRightClickedTrackLiked() {
       return this.liked.songs.includes(this.rightClickedTrack?.id);
     },
@@ -181,7 +181,8 @@ export default {
   },
   methods: {
     ...mapMutations(['updateModal']),
-    ...mapActions(['nextTrack', 'showToast', 'likeATrack']),
+    ...mapActions(['nextTrack', 'showToast']),
+    ...mapActions('library', ['likeATrack']),
     openMenu(e, track, index = -1) {
       this.rightClickedTrack = track;
       this.rightClickedTrackIndex = index;
@@ -236,7 +237,7 @@ export default {
       this.likeATrack(this.rightClickedTrack.id);
     },
     addTrackToPlaylist() {
-      if (!isAccountLoggedIn()) {
+      if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
@@ -252,7 +253,7 @@ export default {
       });
     },
     removeTrackFromPlaylist() {
-      if (!isAccountLoggedIn()) {
+      if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
@@ -298,7 +299,7 @@ export default {
           let newCloudDisk = this.liked.cloudDisk.filter(
             t => t.songId !== trackID
           );
-          this.$store.commit('updateLikedXXX', {
+          this.$store.commit('library/setCollection', {
             name: 'cloudDisk',
             data: newCloudDisk,
           });

@@ -16,8 +16,8 @@
       <Player v-if="enablePlayer" v-show="showPlayer" ref="player" />
     </transition>
     <Toast />
-    <ModalAddTrackToPlaylist v-if="isAccountLoggedIn" />
-    <ModalNewPlaylist v-if="isAccountLoggedIn" />
+    <ModalAddTrackToPlaylist v-if="hasAccount" />
+    <ModalNewPlaylist v-if="hasAccount" />
     <transition v-if="enablePlayer" name="slide-up">
       <Lyrics v-show="showLyrics" />
     </transition>
@@ -32,9 +32,8 @@ import Navbar from './components/Navbar.vue';
 import Player from './components/Player.vue';
 import Toast from './components/Toast.vue';
 import { ipcRenderer } from './electron/ipcRenderer';
-import { isAccountLoggedIn, isLooseLoggedIn } from '@/utils/auth';
 import Lyrics from './views/lyrics.vue';
-import { mapState } from 'vuex';
+import { mapState, mapGetters } from 'vuex';
 
 export default {
   name: 'App',
@@ -54,9 +53,10 @@ export default {
     };
   },
   computed: {
-    ...mapState(['showLyrics', 'settings', 'player', 'enableScrolling']),
-    isAccountLoggedIn() {
-      return isAccountLoggedIn();
+    ...mapGetters({ settings: 'preferences/settings' }),
+    ...mapState(['showLyrics', 'player', 'enableScrolling']),
+    hasAccount() {
+      return this.$store.getters['session/hasAccount'];
     },
     showPlayer() {
       return (
@@ -91,15 +91,15 @@ export default {
       }
     },
     fetchData() {
-      if (!isLooseLoggedIn()) return;
-      this.$store.dispatch('fetchLikedSongs');
-      this.$store.dispatch('fetchLikedSongsWithDetails');
-      this.$store.dispatch('fetchLikedPlaylist');
-      if (isAccountLoggedIn()) {
-        this.$store.dispatch('fetchLikedAlbums');
-        this.$store.dispatch('fetchLikedArtists');
-        this.$store.dispatch('fetchLikedMVs');
-        this.$store.dispatch('fetchCloudDisk');
+      if (!this.$store.getters['session/hasLibraryIdentity']) return;
+      this.$store.dispatch('library/fetchLikedSongs');
+      this.$store.dispatch('library/fetchLikedSongsWithDetails');
+      this.$store.dispatch('library/fetchLikedPlaylist');
+      if (this.$store.getters['session/hasAccount']) {
+        this.$store.dispatch('library/fetchLikedAlbums');
+        this.$store.dispatch('library/fetchLikedArtists');
+        this.$store.dispatch('library/fetchLikedMVs');
+        this.$store.dispatch('library/fetchCloudDisk');
       }
     },
     handleScroll() {

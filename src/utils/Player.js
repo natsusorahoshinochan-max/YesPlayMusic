@@ -5,7 +5,6 @@ import { fmTrash, personalFM } from '@/api/others';
 import { getPlaylistDetail, intelligencePlaylist } from '@/api/playlist';
 import { getLyric, getMP3, getTrackDetail, scrobble } from '@/api/track';
 import store from '@/store';
-import { isAccountLoggedIn } from '@/utils/auth';
 import { cacheTrackSource, getTrackSource } from '@/utils/db';
 import { isCreateMpris, isCreateTray } from '@/utils/platform';
 import { Howl, Howler } from 'howler';
@@ -209,7 +208,9 @@ export default class {
     }
   }
   get isCurrentTrackLiked() {
-    return store.state.liked.songs.includes(this.currentTrack.id);
+    return store.getters['library/collections'].songs.includes(
+      this.currentTrack.id
+    );
   }
 
   _init() {
@@ -378,7 +379,11 @@ export default class {
       if (this._currentTrack.name) {
         setTitle(this._currentTrack);
       }
-      setTrayLikeState(store.state.liked.songs.includes(this.currentTrack.id));
+      setTrayLikeState(
+        store.getters['library/collections'].songs.includes(
+          this.currentTrack.id
+        )
+      );
     }
     this.setOutputDevice();
   }
@@ -406,13 +411,13 @@ export default class {
     });
   }
   _getAudioSourceFromNetease(track) {
-    if (isAccountLoggedIn()) {
+    if (store.getters['session/hasAccount']) {
       return getMP3(track.id).then(result => {
         if (!result.data[0]) return null;
         if (!result.data[0].url) return null;
         if (result.data[0].freeTrialInfo !== null) return null; // 跳过只能试听的歌曲
         const source = result.data[0].url.replace(/^http:/, 'https:');
-        if (store.state.settings.automaticallyCacheSongs) {
+        if (store.getters['preferences/settings'].automaticallyCacheSongs) {
           cacheTrackSource(track, source, result.data[0].br);
         }
         return source;
@@ -428,7 +433,7 @@ export default class {
 
     if (
       process.env.IS_ELECTRON !== true ||
-      store.state.settings.enableUnblockNeteaseMusic === false
+      store.getters['preferences/settings'].enableUnblockNeteaseMusic === false
     ) {
       return null;
     }
@@ -455,21 +460,28 @@ export default class {
 
     const retrieveSongInfo = await ipcRenderer.invoke(
       'unblock-music',
-      store.state.settings.unmSource,
+      store.getters['preferences/settings'].unmSource,
       track,
       {
-        enableFlac: store.state.settings.unmEnableFlac || null,
-        proxyUri: store.state.settings.unmProxyUri || null,
-        searchMode: determineSearchMode(store.state.settings.unmSearchMode),
+        enableFlac: store.getters['preferences/settings'].unmEnableFlac || null,
+        proxyUri: store.getters['preferences/settings'].unmProxyUri || null,
+        searchMode: determineSearchMode(
+          store.getters['preferences/settings'].unmSearchMode
+        ),
         config: {
-          'joox:cookie': store.state.settings.unmJooxCookie || null,
-          'qq:cookie': store.state.settings.unmQQCookie || null,
-          'ytdl:exe': store.state.settings.unmYtDlExe || null,
+          'joox:cookie':
+            store.getters['preferences/settings'].unmJooxCookie || null,
+          'qq:cookie':
+            store.getters['preferences/settings'].unmQQCookie || null,
+          'ytdl:exe': store.getters['preferences/settings'].unmYtDlExe || null,
         },
       }
     );
 
-    if (store.state.settings.automaticallyCacheSongs && retrieveSongInfo?.url) {
+    if (
+      store.getters['preferences/settings'].automaticallyCacheSongs &&
+      retrieveSongInfo?.url
+    ) {
       // 对于来自 bilibili 的音源
       // retrieveSongInfo.url 是音频数据的base64编码
       // 其他音源为实际url
@@ -642,7 +654,7 @@ export default class {
   }
   // OSDLyrics 会检测 Mpris 状态并寻找对应歌词文件，所以要在更新 Mpris 状态之前保证歌词下载完成
   async _updateMprisState(track, metadata) {
-    if (!store.state.settings.enableOsdlyricsSupport) {
+    if (!store.getters['preferences/settings'].enableOsdlyricsSupport) {
       return ipcRenderer?.send('metadata', metadata);
     }
 
@@ -706,7 +718,7 @@ export default class {
   _playDiscordPresence(track, seekTime = 0) {
     if (
       process.env.IS_ELECTRON !== true ||
-      store.state.settings.enableDiscordRichPresence === false
+      store.getters['preferences/settings'].enableDiscordRichPresence === false
     ) {
       return null;
     }
@@ -717,7 +729,7 @@ export default class {
   _pauseDiscordPresence(track) {
     if (
       process.env.IS_ELECTRON !== true ||
-      store.state.settings.enableDiscordRichPresence === false
+      store.getters['preferences/settings'].enableDiscordRichPresence === false
     ) {
       return null;
     }
@@ -884,7 +896,9 @@ export default class {
     if (this._howler?._sounds.length <= 0 || !this._howler?._sounds[0]._node) {
       return;
     }
-    this._howler?._sounds[0]._node.setSinkId(store.state.settings.outputDevice);
+    this._howler?._sounds[0]._node.setSinkId(
+      store.getters['preferences/settings'].outputDevice
+    );
   }
 
   replacePlaylist(
@@ -971,7 +985,9 @@ export default class {
 
   sendSelfToIpcMain() {
     if (process.env.IS_ELECTRON !== true) return false;
-    let liked = store.state.liked.songs.includes(this.currentTrack.id);
+    let liked = store.getters['library/collections'].songs.includes(
+      this.currentTrack.id
+    );
     ipcRenderer?.send('player', {
       playing: this.playing,
       likedCurrentTrack: liked,

@@ -9,7 +9,7 @@ export function startApplication({
   mount,
 }) {
   const store = createStore();
-  const getSettings = () => store.state.settings;
+  const getSettings = () => store.getters['preferences/settings'];
   const i18n = initializeLocale(getSettings().lang);
   initializeAppearance(getSettings);
   configureRequest({ getSettings, getCookie, onSessionInvalid });
