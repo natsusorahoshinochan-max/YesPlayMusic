@@ -1,4 +1,3 @@
-/** @jest-environment node */
 import 'fake-indexeddb/auto';
 import { createPlayer } from '@/application/player';
 import request from '@/utils/request';
@@ -11,7 +10,6 @@ jest.mock('@/store', () => ({
 
 const track = id => ({ id, name: `Track ${id}`, dt: 120000, ar: [], al: {} });
 test('the production assembly reads each real source endpoint and plays through one Playback instance', async () => {
-  global.window = { URL: {}, Blob: class {} };
   const requests = [];
   request.mockImplementation(async config => {
     requests.push(config);
@@ -81,12 +79,10 @@ test('the production assembly reads each real source endpoint and plays through 
     expect(notify).not.toHaveBeenCalled();
   } finally {
     playback.dispose();
-    delete global.window;
   }
 });
 
 test('a production source request failure reaches the application feedback outlet once', async () => {
-  global.window = { URL: {}, Blob: class {} };
   request.mockRejectedValue(new Error('source offline'));
   const dispatch = jest.fn();
   const playback = createPlayer({
@@ -106,6 +102,5 @@ test('a production source request failure reaches the application feedback outle
     expect(dispatch).toHaveBeenCalledWith('showToast', '播放失败，请稍后重试');
   } finally {
     playback.dispose();
-    delete global.window;
   }
 });

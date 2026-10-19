@@ -82,7 +82,7 @@ test.each(['playlist', 'album', 'artist'])(
 test.each([
   ['playlist', 'default'],
   ['album', 'default'],
-  ['artist', 'default'],
+  ['tracklist', 'playArtist'],
   ['tracklist', 'playPlaylist'],
 ])(
   'TrackList %s/%s double click requests its source and chosen start on the shared instance',
@@ -102,7 +102,12 @@ test.each([
       await settle();
       expect(playback.state.currentTrackID).toBe(12);
       expect(playback.state.playlistSource).toEqual({
-        type: type === 'tracklist' ? 'playlist' : type,
+        type:
+          dbclickTrackFunc === 'playArtist'
+            ? 'artist'
+            : type === 'tracklist'
+            ? 'playlist'
+            : type,
         id: 50,
       });
       expect(requests).toHaveLength(1);

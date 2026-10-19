@@ -106,7 +106,8 @@
       <TrackList
         :id="artist.id"
         :tracks="popularTracks.slice(0, showMorePopTracks ? 24 : 12)"
-        type="artist"
+        type="tracklist"
+        dbclick-track-func="playArtist"
       />
 
       <div id="seeMore" class="show-more">
