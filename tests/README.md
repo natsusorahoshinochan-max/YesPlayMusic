@@ -9,9 +9,9 @@
 | `preferences/` | 设置、默认与迁移、选择性保存、页面输入、生产效果 adapter、启动、代理及桌面快捷键 |
 | `store/` | 音乐库写权限与业务结果、创建及加曲、同步失败、当前详情与分页 |
 | `views/` | 歌单页面及全局弹窗通过真实 store 完成操作与展示 |
-| `application/` | 页面与普通 JavaScript 收藏入口、集合/详情/二维码的持久化隔离 |
+| `application/` | 页面与普通 JavaScript 收藏入口、生产云盘上传错误传播、集合/详情/二维码的持久化隔离 |
 | `electron/` | 主进程代理提交与恢复 |
 
-`yarn test --listTests` 查看 Jest 实际发现的有效套件，`yarn test` 运行全部有效测试。当前验证为 19 个套件、160 项测试通过。`tests/obsolete/` 继续排除在 Jest 与 ESLint 外；旧断言不构成保留旧业务行为的依据。
+`yarn test --listTests` 查看 Jest 实际发现的有效套件，`yarn test` 运行全部有效测试并报告套件与测试数量。`tests/obsolete/` 继续排除在 Jest 与 ESLint 外；旧断言不构成保留旧业务行为的依据。
 
 自动化使用受控账号身份与远端响应，不依赖真实账号；无法证明真实服务当前可用性。Web 和 Electron 构建命令、运行环境与桌面交互限制见 [开发环境](../docs/development-environment.md)。
