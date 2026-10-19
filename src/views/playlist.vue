@@ -165,12 +165,13 @@
     </div>
 
     <TrackList
-      :id="playlist.id"
+      :playlist-id="playlist.id"
       :tracks="filteredTracks"
       type="playlist"
       :extra-context-menu-item="
         isUserOwnPlaylist ? ['removeTrackFromPlaylist'] : []
       "
+      @activate="playPlaylist($event.track.id)"
     />
 
     <div class="load-more">

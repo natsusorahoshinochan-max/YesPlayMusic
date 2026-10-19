@@ -104,10 +104,11 @@
     <div id="popularTracks" class="popular-tracks">
       <div class="section-title">{{ $t('artist.popularSongs') }}</div>
       <TrackList
-        :id="artist.id"
         :tracks="popularTracks.slice(0, showMorePopTracks ? 24 : 12)"
         type="tracklist"
-        dbclick-track-func="playArtist"
+        @activate="
+          player.playArtist(artist.id, { startTrackId: $event.track.id })
+        "
       />
 
       <div id="seeMore" class="show-more">
