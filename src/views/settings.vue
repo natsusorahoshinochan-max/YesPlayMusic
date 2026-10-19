@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page" @click="clickOutside">
+  <div class="settings-page" @click.self="clickOutside">
     <div class="container">
       <div v-if="showUserInfo" class="user">
         <div class="left">
@@ -702,7 +702,7 @@
         </div>
       </div>
 
-      <div v-if="isElectron">
+      <div v-if="isElectron" @click.stop>
         <h3>快捷键</h3>
         <div class="item">
           <div class="left">
@@ -725,6 +725,7 @@
           :class="{ 'global-disabled': !enableGlobalShortcut }"
           tabindex="0"
           @keydown="handleShortcutKeydown"
+          @keyup="handleShortcutKeyup"
         >
           <div class="row row-head">
             <div class="col">功能</div>
@@ -815,15 +816,13 @@ import { countDBSize, clearDB } from '@/utils/db';
 import pkg from '../../package.json';
 import cloneDeep from 'lodash/cloneDeep';
 
-const electron =
-  process.env.IS_ELECTRON === true ? window.require('electron') : null;
-const ipcRenderer =
-  process.env.IS_ELECTRON === true ? electron.ipcRenderer : null;
-
 const validShortcutCodes = ['=', '-', '~', '[', ']', ';', "'", ',', '.', '/'];
 
 export default {
   name: 'Settings',
+  beforeRouteLeave(to, from, next) {
+    this.exitRecordShortcut().then(() => next());
+  },
   data() {
     return {
       proxyDraft: cloneDeep(
@@ -956,17 +955,10 @@ export default {
     },
     trayIconTheme: {
       get() {
-        if (this.settings.trayIconTheme === undefined) return 'auto';
         return this.settings.trayIconTheme;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'trayIconTheme',
-          value,
-        });
-        if (this.isElectron) {
-          ipcRenderer.send('updateTrayIcon', value);
-        }
+        this.submitPreference('setTrayIconTheme', value);
       },
     },
     musicQuality: {
@@ -1142,10 +1134,7 @@ export default {
         return this.settings.enableGlobalShortcut;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'enableGlobalShortcut',
-          value,
-        });
+        this.submitPreference('setGlobalShortcutsEnabled', value);
       },
     },
     showLibraryDefault: {
@@ -1320,6 +1309,12 @@ export default {
     this.countDBSize('tracks');
     if (process.env.IS_ELECTRON) this.getAllOutputDevices();
   },
+  deactivated() {
+    this.exitRecordShortcut();
+  },
+  beforeDestroy() {
+    this.exitRecordShortcut();
+  },
   methods: {
     ...mapActions(['showToast']),
     submitPreference(action, payload) {
@@ -1415,13 +1410,14 @@ export default {
       }
       return shortcut.replace('CommandOrControl', 'Ctrl');
     },
-    readyToRecordShortcut(id, type) {
-      if (type === 'globalShortcut' && this.enableGlobalShortcut === false) {
-        return;
-      }
+    async readyToRecordShortcut(id, type) {
+      const allowed = await this.submitPreference('beginShortcutRecording', {
+        id,
+        type,
+      });
+      if (!allowed) return;
       this.shortcutInput = { id, type, recording: true };
       this.recordedShortcut = [];
-      ipcRenderer.send('switchGlobalShortcutStatusTemporary', 'disable');
     },
     handleShortcutKeydown(e) {
       if (this.shortcutInput.recording === false) return;
@@ -1445,27 +1441,22 @@ export default {
         );
       }
     },
-    saveShortcut() {
+    async saveShortcut() {
       const { id, type } = this.shortcutInput;
-      const payload = {
+      await this.submitPreference('saveShortcut', {
         id,
         type,
         shortcut: this.recordedShortcutComputed,
-      };
-      this.$store.commit('preferences/updateShortcut', payload);
-      ipcRenderer.send('updateShortcut', payload);
-      this.showToast('快捷键已保存');
+      });
       this.recordedShortcut = [];
     },
     exitRecordShortcut() {
-      if (this.shortcutInput.recording === false) return;
       this.shortcutInput = { id: '', type: '', recording: false };
       this.recordedShortcut = [];
-      ipcRenderer.send('switchGlobalShortcutStatusTemporary', 'enable');
+      return this.submitPreference('endShortcutRecording');
     },
     restoreDefaultShortcuts() {
-      this.$store.commit('preferences/restoreDefaultShortcuts');
-      ipcRenderer.send('restoreDefaultShortcuts');
+      return this.submitPreference('restoreDefaultShortcuts');
     },
   },
 };

@@ -21,6 +21,12 @@ export function createPreferenceEffects({
       const player = getPlayer();
       if (player) player.reversed = false;
     },
+    applyTrayIconTheme(value) {
+      ipcRenderer?.send('updateTrayIcon', value);
+    },
+    applyShortcuts(control, updateMenu) {
+      ipcRenderer?.send('applyShortcuts', control, updateMenu);
+    },
     applyProxy(config) {
       return ipcRenderer?.invoke('applyProxy', config);
     },
