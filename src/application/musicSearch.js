@@ -9,8 +9,17 @@ export function createMusicSearch(store) {
   });
   return createMusicSearchQuery({
     getIdentity,
-    subscribeIdentity: changed =>
-      store.watch(getIdentity, changed, { deep: true, sync: true }),
+    subscribeIdentity: changed => {
+      const stopTransition = store.subscribeIdentityChanges(changed);
+      const stopProfile = store.watch(getIdentity, changed, {
+        deep: true,
+        sync: true,
+      });
+      return () => {
+        stopTransition();
+        stopProfile();
+      };
+    },
     onError: error =>
       store.dispatch(
         'showToast',
