@@ -14,7 +14,7 @@
 
 `src/electron/windowOperations.js` 的 `close`、`quit` 拥有关闭政策、当前询问及退出协调。`background.js` 构造唯一实例，绑定原生窗口事件；`ipcMain.js`、托盘和 MPRIS 转交意图，Electron 菜单的退出角色通过 `before-quit` 进入同一协调。
 
-记忆选项由主进程 adapter 发送给 renderer，`ipcRenderer.js` 等待 `preferences/setPreference` 完成后确认；主进程再继续执行已选择的窗口动作。确认监听由发送方校验并在完成、发送失败或窗口销毁时释放。设置保存职责仍在[设置操作与持久化](settings-and-persistence.md#electron-设置应用)。原生运行验证入口见[窗口关闭操作说明](../operations/native-window-close.md)。
+记忆选项由主进程 adapter 发送给 renderer，`ipcRenderer.js` 等待 `preferences/setPreference` 完成后确认；主进程再继续执行已选择的窗口动作。主进程 adapter 按发送方与 `requestId` 配对确认，负责在操作完成、发送失败、renderer 崩溃、主 frame 跨文档导航或窗口销毁造成上下文丢失，以及等待超时时结束等待并释放监听与计时器。设置保存职责仍在[设置操作与持久化](settings-and-persistence.md#electron-设置应用)。原生运行验证入口见[窗口关闭操作说明](../operations/native-window-close.md)。
 
 ## 音乐搜索与每日推荐
 
@@ -47,6 +47,6 @@
 
 ## 装配与身份交接
 
-`main.js` 与 `application/` 提供生产 endpoint、存储和平台依赖；`createStore` 接收依赖、注册 module 并连接它们。基础 store 的依赖边界沿用[启动与依赖](session-and-request-results.md#启动与依赖)，注册不创建播放器或发送远端请求。
+`main.js` 通过 `dailyRecommendations.read` 注入推荐 endpoint，并将 `application/lastfm.js` 的 `createLastfmOptions(localStorage)` 结果注入 `lastfm`，提供授权 endpoint、存储与交换 adapter；`createStore` 接收依赖、注册 module 并连接现有 Playback。基础 store 的依赖边界沿用[启动与依赖](session-and-request-results.md#启动与依赖)，注册不创建播放器或发送远端请求。
 
 session 的 `identityChanged` 在凭据与身份替换前同步交接。store 将它交给每日推荐、现有歌词所有者与 `subscribeIdentityChanges` 订阅者；音乐搜索同时监听该交接与资料/VIP 变化，并在 `dispose` 时注销。歌词通过后续 `library/setUser` 接收新身份就绪信号。各内容所有者负责自己的请求采用判定，具体 API 将 `isCurrent` 传给请求层；请求层仍独占授权错误分类与会话失效效果。
