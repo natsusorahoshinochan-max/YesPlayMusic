@@ -45,10 +45,13 @@ export function authGetSession(token) {
   });
 }
 
-export function trackUpdateNowPlaying(params) {
-  params.api_key = apiKey;
-  params.method = 'track.updateNowPlaying';
-  params.sk = JSON.parse(localStorage.getItem('lastfm'))['key'];
+export function trackUpdateNowPlaying(params, authorization) {
+  params = {
+    ...params,
+    api_key: apiKey,
+    method: 'track.updateNowPlaying',
+    sk: authorization.key,
+  };
   const signature = sign(params);
 
   return axios({
@@ -62,10 +65,13 @@ export function trackUpdateNowPlaying(params) {
   });
 }
 
-export function trackScrobble(params) {
-  params.api_key = apiKey;
-  params.method = 'track.scrobble';
-  params.sk = JSON.parse(localStorage.getItem('lastfm'))['key'];
+export function trackScrobble(params, authorization) {
+  params = {
+    ...params,
+    api_key: apiKey,
+    method: 'track.scrobble',
+    sk: authorization.key,
+  };
   const signature = sign(params);
 
   return axios({
