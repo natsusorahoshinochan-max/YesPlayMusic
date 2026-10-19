@@ -4,6 +4,16 @@ import readMetadata from './metadataCache';
 import { mapTrackPlayableStatus } from '@/utils/common';
 import { cacheAlbum, getAlbumFromCache } from '@/utils/db';
 
+function validAlbum(data) {
+  return (
+    data?.album?.id != null &&
+    data.album.artist?.id != null &&
+    typeof data.album.name === 'string' &&
+    Array.isArray(data.songs) &&
+    data.songs.every(song => song && song.id != null)
+  );
+}
+
 /**
  * 获取专辑内容
  * 说明 : 调用此接口 , 传入专辑 id, 可获得专辑内容
@@ -17,7 +27,7 @@ export function getAlbum(id) {
   return readMetadata({
     readCache: async () => {
       const cached = await getAlbumFromCache(id);
-      return cached == null ? cached : convert(cached);
+      return validAlbum(cached) ? convert(cached) : undefined;
     },
     fetchLatest: async () => {
       const data = await request({
@@ -25,6 +35,7 @@ export function getAlbum(id) {
         method: 'get',
         params: { id },
       });
+      if (!validAlbum(data)) throw new Error('专辑读取失败');
       await cacheAlbum(id, data);
       return convert(data);
     },

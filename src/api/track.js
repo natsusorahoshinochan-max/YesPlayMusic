@@ -9,6 +9,33 @@ import {
   getLyricFromCache,
 } from '@/utils/db';
 
+function validTracks(data) {
+  return (
+    Array.isArray(data?.songs) &&
+    data.songs.every(song => song && song.id != null) &&
+    Array.isArray(data.privileges) &&
+    data.privileges.every(privilege => privilege && privilege.id != null)
+  );
+}
+
+function validLyric(data, cloud = false) {
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    (data.code != null && data.code !== 200)
+  )
+    return false;
+  if (cloud) return typeof data.lrc === 'string';
+  return (
+    (typeof data.lrc?.lyric === 'string' ||
+      data.nolyric === true ||
+      data.uncollected === true) &&
+    ['lrc', 'tlyric', 'romalrc'].every(
+      field => data[field] == null || typeof data[field].lyric === 'string'
+    )
+  );
+}
+
 /**
  * 获取音乐 url
  * 说明 : 使用歌单详情接口后 , 能得到的音乐的 id, 但不能得到的音乐 url, 调用此接口, 传入的音乐 id( 可多个 , 用逗号隔开 ), 可以获取对应的音乐的 url,
@@ -41,7 +68,8 @@ export function getTrackDetail(ids, { isCurrent } = {}) {
   return readMetadata({
     readCache: async () => {
       const cached = await getTrackDetailFromCache(idsInArray);
-      return cached == null ? cached : convert(cached);
+      if (cached) cached.privileges = cached.privileges.filter(Boolean);
+      return validTracks(cached) ? convert(cached) : undefined;
     },
     fetchLatest: async () => {
       const data = await request({
@@ -50,6 +78,7 @@ export function getTrackDetail(ids, { isCurrent } = {}) {
         method: 'get',
         params: { ids },
       });
+      if (!validTracks(data)) throw new Error('歌曲详情读取失败');
       await Promise.all(
         data.songs.map(song =>
           cacheTrackDetail(
@@ -73,7 +102,10 @@ export function getTrackDetail(ids, { isCurrent } = {}) {
  */
 export function getLyric(id, { isCurrent } = {}) {
   return readMetadata({
-    readCache: () => getLyricFromCache(id),
+    readCache: async () => {
+      const cached = await getLyricFromCache(id);
+      return validLyric(cached) ? cached : undefined;
+    },
     fetchLatest: async () => {
       const result = await request({
         url: '/lyric',
@@ -81,6 +113,7 @@ export function getLyric(id, { isCurrent } = {}) {
         method: 'get',
         params: { id },
       });
+      if (!validLyric(result)) throw new Error('歌词读取失败');
       await cacheLyric(id, result);
       return result;
     },
@@ -95,7 +128,10 @@ export function getLyric(id, { isCurrent } = {}) {
 export function getCloudLyric(songId, userId, { isCurrent } = {}) {
   const cacheKey = `cloud:${userId}:${songId}`;
   return readMetadata({
-    readCache: () => getLyricFromCache(cacheKey),
+    readCache: async () => {
+      const cached = await getLyricFromCache(cacheKey);
+      return validLyric(cached, true) ? cached : undefined;
+    },
     fetchLatest: async () => {
       const result = await request({
         url: '/api',
@@ -107,6 +143,7 @@ export function getCloudLyric(songId, userId, { isCurrent } = {}) {
           crypto: 'eapi',
         },
       });
+      if (!validLyric(result, true)) throw new Error('云盘歌词读取失败');
       await cacheLyric(cacheKey, result);
       return result;
     },

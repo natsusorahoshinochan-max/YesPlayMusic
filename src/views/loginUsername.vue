@@ -67,6 +67,7 @@ export default {
   data() {
     return {
       keyword: '',
+      searching: false,
       result: [],
       activeUser: {},
     };
@@ -74,13 +75,37 @@ export default {
   created() {
     NProgress.done();
   },
+  beforeDestroy() {
+    this.searchVersion++;
+  },
   methods: {
-    search() {
-      if (!this.keyword) return;
-      search({ keywords: this.keyword, limit: 9, type: 1002 }).then(data => {
-        this.result = data.result.userprofiles;
-        this.activeUser = this.result[0];
-      });
+    async search() {
+      const version = (this.searchVersion = (this.searchVersion || 0) + 1);
+      const keywords = this.keyword;
+      const isCurrent = () => version === this.searchVersion;
+      if (!keywords) {
+        this.searching = false;
+        return;
+      }
+      this.searching = true;
+      try {
+        const data = await search(
+          { keywords, limit: 9, type: 1002 },
+          { isCurrent }
+        );
+        const users = data?.result?.userprofiles;
+        // An empty successful result can omit the profiles field.
+        if (!data?.result || (users != null && !Array.isArray(users)))
+          throw new Error('用户搜索失败');
+        if (!isCurrent()) return;
+        this.result = users || [];
+        this.activeUser = this.result[0] || {};
+      } catch (error) {
+        if (isCurrent())
+          this.$store.dispatch('showToast', error.message || '用户搜索失败');
+      } finally {
+        if (isCurrent()) this.searching = false;
+      }
     },
     confirm() {
       return this.$store.dispatch(
@@ -89,7 +114,7 @@ export default {
       );
     },
     throttleSearch: throttle(function () {
-      this.search();
+      return this.search();
     }, 500),
   },
 };

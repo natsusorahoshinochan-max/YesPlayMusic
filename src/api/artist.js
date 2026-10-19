@@ -17,9 +17,13 @@ export function getArtist(id) {
       timestamp: new Date().getTime(),
     },
   }).then(async data => {
+    if (!data?.artist || !Array.isArray(data.hotSongs))
+      throw new Error('艺人读取失败');
     if (!readIdentity().hasAccount) {
       const trackIDs = data.hotSongs.map(t => t.id);
-      const tracks = await getTrackDetail(trackIDs.join(','));
+      const tracks = trackIDs.length
+        ? await getTrackDetail(trackIDs.join(','))
+        : { songs: [] };
       data.hotSongs = tracks.songs;
       return data;
     }

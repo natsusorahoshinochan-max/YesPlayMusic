@@ -149,7 +149,7 @@ import { getTrackDetail } from '@/api/track';
 import { getAlbum, albumDynamicDetail } from '@/api/album';
 import locale from '@/locale';
 import { splitSoundtrackAlbumTitle, splitAlbumTitle } from '@/utils/common';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 import { groupBy, toPairs, sortBy } from 'lodash';
 
 import ExplicitSymbol from '@/components/ExplicitSymbol.vue';
@@ -232,7 +232,12 @@ export default {
     },
   },
   created() {
+    this.readProgress = createSearchProgress();
     this.loadData(this.$route.params.id);
+  },
+  beforeDestroy() {
+    this.readVersion++;
+    this.readProgress.dispose();
   },
   methods: {
     ...mapActions(['showToast']),
@@ -274,31 +279,51 @@ export default {
             : splitTitle.subtitle;
       }
     },
-    loadData(id) {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
-      getAlbum(id).then(data => {
-        this.album = data.album;
-        this.tracks = data.songs;
-        this.formatTitle();
-        NProgress.done();
-        this.show = true;
-
-        // to get explicit mark
-        let trackIDs = this.tracks.map(t => t.id);
-        getTrackDetail(trackIDs.join(',')).then(data => {
-          this.tracks = data.songs;
-        });
-
-        // get more album by this artist
-        getArtistAlbum({ id: this.album.artist.id, limit: 100 }).then(data => {
-          this.moreAlbums = data.hotAlbums;
-        });
-      });
-      albumDynamicDetail(id).then(data => {
-        this.dynamicDetail = data;
-      });
+    async loadData(id) {
+      const version = (this.readVersion = (this.readVersion || 0) + 1);
+      const current = () => version === this.readVersion;
+      const failed = error => {
+        if (current()) this.showToast(error.message || '专辑读取失败');
+      };
+      this.readProgress.update(true);
+      try {
+        await Promise.all([
+          (async () => {
+            const data = await getAlbum(id);
+            if (!current()) return;
+            this.album = data.album;
+            this.tracks = data.songs;
+            this.formatTitle();
+            this.show = true;
+            await Promise.all([
+              (async () => {
+                if (!data.songs.length) return;
+                const details = await getTrackDetail(
+                  data.songs.map(t => t.id).join(',')
+                );
+                if (current()) this.tracks = details.songs;
+              })().catch(failed),
+              (async () => {
+                const more = await getArtistAlbum({
+                  id: data.album.artist.id,
+                  limit: 100,
+                });
+                if (!Array.isArray(more?.hotAlbums))
+                  throw new Error('艺人专辑读取失败');
+                if (current()) this.moreAlbums = more.hotAlbums;
+              })().catch(failed),
+            ]);
+          })().catch(failed),
+          (async () => {
+            const dynamic = await albumDynamicDetail(id);
+            if (!dynamic || typeof dynamic !== 'object')
+              throw new Error('专辑动态读取失败');
+            if (current()) this.dynamicDetail = dynamic;
+          })().catch(failed),
+        ]);
+      } finally {
+        if (current()) this.readProgress.update(false);
+      }
     },
     toggleFullDescription() {
       this.showFullDescription = !this.showFullDescription;

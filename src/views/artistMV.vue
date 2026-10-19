@@ -9,7 +9,7 @@
     </h1>
     <MvRow :mvs="mvs" subtitle="publishTime" />
     <div class="load-more">
-      <ButtonTwoTone v-show="hasMore" color="grey" @click.native="loadMVs">{{
+      <ButtonTwoTone v-show="hasMore" color="grey" @click.native="loadMVs()">{{
         $t('explore.loadMore')
       }}</ButtonTwoTone>
     </div>
@@ -18,7 +18,7 @@
 
 <script>
 import { artistMv, getArtist } from '@/api/artist';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 import MvRow from '@/components/MvRow.vue';
@@ -44,8 +44,17 @@ export default {
     };
   },
   created() {
+    this.readProgress = createSearchProgress();
     this.id = this.$route.params.id;
     this.loadData();
+  },
+  beforeDestroy() {
+    this.readVersion++;
+    this.readProgress.dispose();
+  },
+  deactivated() {
+    this.readVersion++;
+    this.readProgress.dispose();
   },
   activated() {
     if (this.$route.params.id !== this.id) {
@@ -58,24 +67,54 @@ export default {
     }
   },
   methods: {
-    loadData() {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
-      getArtist(this.id).then(data => {
-        this.artist = data.artist;
-      });
-      this.loadMVs();
+    async loadData() {
+      const version = (this.readVersion = (this.readVersion || 0) + 1);
+      this.readProgress.update(true);
+      try {
+        await Promise.all([
+          getArtist(this.id)
+            .then(data => {
+              if (!data?.artist) throw new Error('艺人读取失败');
+              if (version === this.readVersion) this.artist = data.artist;
+            })
+            .catch(error => {
+              if (version === this.readVersion)
+                this.$store.dispatch(
+                  'showToast',
+                  error.message || '艺人读取失败'
+                );
+            }),
+          this.loadMVs(version),
+        ]);
+      } finally {
+        if (version === this.readVersion) this.readProgress.update(false);
+      }
     },
-    loadMVs() {
-      artistMv({ id: this.id, limit: 100, offset: this.mvs.length }).then(
-        data => {
-          this.mvs.push(...data.mvs);
-          this.hasMore = data.hasMore;
-          NProgress.done();
-          this.show = true;
-        }
-      );
+    async loadMVs(parentVersion) {
+      const version =
+        parentVersion ?? (this.readVersion = (this.readVersion || 0) + 1);
+      if (parentVersion == null) this.readProgress.update(true);
+      try {
+        const data = await artistMv({
+          id: this.id,
+          limit: 100,
+          offset: this.mvs.length,
+        });
+        if (!Array.isArray(data?.mvs)) throw new Error('艺人 MV 读取失败');
+        if (version !== this.readVersion) return;
+        this.mvs.push(...data.mvs);
+        this.hasMore = data.hasMore;
+        this.show = true;
+      } catch (error) {
+        if (version === this.readVersion)
+          this.$store.dispatch(
+            'showToast',
+            error.message || '艺人 MV 读取失败'
+          );
+      } finally {
+        if (parentVersion == null && version === this.readVersion)
+          this.readProgress.update(false);
+      }
     },
   },
 };
