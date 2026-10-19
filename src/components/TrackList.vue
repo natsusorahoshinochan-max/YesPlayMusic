@@ -80,6 +80,7 @@ import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
 import TrackListItem from '@/components/TrackListItem.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
 import locale from '@/locale';
+import { describeLibraryOutcome } from '@/utils/libraryOutcome';
 
 export default {
   name: 'TrackList',
@@ -250,28 +251,20 @@ export default {
         value: this.rightClickedTrack.id,
       });
     },
-    removeTrackFromPlaylist() {
-      if (!this.$store.getters['session/hasAccount']) {
-        this.showToast(locale.t('toast.needToLogin'));
-        return;
-      }
-      if (confirm(`确定要从歌单删除 ${this.rightClickedTrack.name}？`)) {
-        let trackID = this.rightClickedTrack.id;
-        this.$store
-          .dispatch('library/changePlaylistTracks', {
-            op: 'del',
-            pid: this.id,
-            tracks: trackID,
-          })
-          .then(data => {
-            this.showToast(
-              data.body.code === 200
-                ? locale.t('toast.removedFromPlaylist')
-                : data.body.message
-            );
-            if (data.body.code === 200) this.$parent.removeTrack(trackID);
-          });
-      }
+    async removeTrackFromPlaylist() {
+      if (!confirm(`确定要从歌单删除 ${this.rightClickedTrack.name}？`)) return;
+      const result = await this.$store.dispatch(
+        'library/removePlaylistTracks',
+        {
+          playlistId: this.id,
+          trackIds: [this.rightClickedTrack.id],
+        }
+      );
+      this.showToast(
+        result.outcome.status === 'succeeded'
+          ? locale.t('toast.removedFromPlaylist')
+          : describeLibraryOutcome(result.outcome)
+      );
     },
     copyLink() {
       this.$copyText(
