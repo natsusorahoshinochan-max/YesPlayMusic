@@ -31,6 +31,7 @@
 import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
 import Modal from '@/components/Modal.vue';
 import locale from '@/locale';
+import { describeLibraryOutcome } from '@/utils/libraryOutcome';
 
 export default {
   name: 'ModalAddTrackToPlaylist',
@@ -75,21 +76,24 @@ export default {
     close() {
       this.show = false;
     },
-    addTrackToPlaylist(playlistID) {
-      this.$store
-        .dispatch('library/changePlaylistTracks', {
-          op: 'add',
-          pid: playlistID,
-          tracks: this.modals.addTrackToPlaylistModal.selectedTrackID,
-        })
-        .then(data => {
-          if (data.body.code === 200) {
-            this.show = false;
-            this.showToast(locale.t('toast.savedToPlaylist'));
-          } else {
-            this.showToast(data.body.message);
-          }
+    async addTrackToPlaylist(playlistId) {
+      try {
+        const result = await this.$store.dispatch('library/addPlaylistTracks', {
+          playlistId,
+          trackIds: [this.modals.addTrackToPlaylistModal.selectedTrackID],
         });
+        if (result.outcome.status !== 'succeeded') {
+          this.showToast(describeLibraryOutcome(result.outcome));
+          return;
+        }
+        this.close();
+        this.showToast(locale.t('toast.savedToPlaylist'));
+        if (result.synchronization === 'incomplete') {
+          this.showToast('歌曲已添加，部分内容更新失败，请稍后刷新');
+        }
+      } catch (error) {
+        this.showToast(error.message || '添加歌曲失败');
+      }
     },
     newPlaylist() {
       this.updateModal({
