@@ -254,12 +254,24 @@ async function nativeMain() {
         check('Real decoded audio clock advances');
         contents.send('play');
         state = await until('Native pause', value => !value.playing);
-        const paused = state.progress;
-        await delay(650);
+        // Public progress is sampled every 1000ms. Allow one complete
+        // interval to capture the final paused position before taking a baseline.
+        await delay(1100);
+        const paused = (await snapshot()).progress;
+        await delay(1100);
         state = await snapshot();
         assert(
           Math.abs(state.progress - paused) < 0.15,
           'Paused audio clock must remain stable'
+        );
+        check(
+          'Paused clock stays stable across a subsequent sampling interval',
+          {
+            baseline: paused,
+            observed: state.progress,
+            intervalMs: 1100,
+            toleranceSeconds: 0.15,
+          }
         );
         contents.send('setPosition', 1.5);
         await until(
