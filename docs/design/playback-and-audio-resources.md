@@ -1,5 +1,7 @@
 # 播放与音频资源：结构设计
 
+**Last Updated:** 2026-10-20
+
 ## 设计目标
 
 本文定义播放系统的结构与交接，对应[播放与音频资源需求](../requirements/playback-and-audio-resources-refactoring.md)。行为范围与验收要求由需求文档统一维护。
@@ -42,14 +44,15 @@ flowchart TD
 | `playArtist(id, options)` | 歌手歌曲播放；可指定 `startTrackId` |
 | `playIntelligencePlaylist(id, options)` | 心动模式播放；可指定 `startTrackId`、`fresh` |
 | `playTracks(trackIds, options)` | 播放调用者已有的 ID 集合；options 包含 `source`、`startTrackId` |
-| `playQueuedTrack(id, options)` | 选择现有队列歌曲；options 区分主队列与下一首列表，承接已有选择规则 |
+| `playQueuedTrack(id, options)` | 选择现有队列条目；options 的 `group`、`index` 指定队列分组及绝对位置，`personalFM` 指定私人 FM 条目 |
 | `playPersonalFM()` | 进入私人 FM，并执行已有播放或切换动作 |
 | `play()`、`pause()`、`toggle()` | 控制当前音频 |
 | `next(options)`、`previous()` | 切换歌曲；普通播放与私人 FM 的适用规则由 module 判断；FM 卡片用 `next({ personalFM: true })` 明确选择私人 FM 下一首 |
 | `discardFMTrack()` | 完成私人 FM 丢弃当前歌曲的流程 |
 | `seek(seconds)` | 调整播放位置及相应平台输出 |
 | `setVolume(value)`、`toggleMute()` | 调整音量、静音及恢复静音前音量 |
-| `cycleRepeat()`、`toggleShuffle()`、`setReversed(value)` | 修改播放模式，内部执行私人 FM 的已有模式限制 |
+| `setRepeatMode(mode)`、`setShuffle(enabled)` | 设置循环目标 `off` / `one` / `on` 与随机目标；重复目标保持当前队列顺序 |
+| `cycleRepeat()`、`toggleShuffle()`、`setReversed(value)` | 循环切换、随机切换及倒序设置；循环与随机切换委托对应目标设置，模式操作内部处理私人 FM 限制 |
 | `enqueueNext(id, options)` | 加入下一首列表；`options.playNow` 表达已有立即播放选择 |
 | `removeNext(index)`、`clearNext()` | 修改下一首列表 |
 | `applyOutputDevice()` | 应用已保存的输出设备设置 |
@@ -215,7 +218,7 @@ Playback 在明确的状态转换处调用注入的输出函数。输出投影�
 | `src/application/musicData.js` | 绑定应用的设置与身份读取函数，创建音频缓存并连接容量设置 |
 | `src/api/readingContext.js` | 仅保存元数据转换所需的身份读取函数 |
 | `src/utils/common.js` 的可播放状态映射 | 通过显式身份资料完成进程内计算 |
-| `src/application/player.js` | 构建唯一 Playback，组合存储、上报、平台输出和外部观察者 |
+| `src/application/player.js` | 构建唯一 Playback，组合存储、上报、平台输出和外部观察者，建立与释放歌词所有者 |
 | `src/application/playerStorage.js` | 读取旧字段并投影持久化数据；比较持久化投影、单独保存采样进度 |
 | `src/application/playbackReporting.js` | 消费有效实例事件并连接网易云和 Last.fm 请求 |
 | `src/application/playbackPlatform.js` | 注册及释放媒体、IPC 和键盘控制，生成桌面及浏览器投影 |
@@ -230,13 +233,15 @@ Playback 在明确的状态转换处调用注入的输出函数。输出投影�
 
 Playback 的 `dispose()` 供装配使用，释放自身创建的计时器、音频回调和当前资源。页面不负责启动或释放共享播放器。
 
+歌词、授权与平台命令的装配交接见[完整操作职责](structure-operations.md)。
+
 ## 调用面调整
 
 | 调用位置 | 调整后的职责 |
 | --- | --- |
-| 歌单、专辑、歌手、搜索与 TrackList 等播放入口 | 调用具体来源操作或 `playTracks`，提交起始歌曲与来源 |
+| 歌单、专辑、歌手、搜索等页面播放入口 | 接收歌曲行激活，选择具体来源操作或 `playTracks`；每日推荐交给自身所有者 |
 | Player.vue、lyrics.vue | 读取公开状态，通过操作修改音量、进度与播放模式；来源提示读取 `sourceInfo` |
-| next.vue | 使用 `upcoming(limit)`，加载展示资料并按返回顺序呈现 |
+| next.vue | 使用 `upcoming(limit)`，加载展示资料，并把队列条目身份交给行激活路径 |
 | 快捷键、ipcRenderer、既有媒体控制接合 | 调用同一播放方法，`next()` 内部处理模式，`seek()` 替换音频实例访问 |
 | preferenceEffects | 通过 `setReversed(false)` 和 `applyOutputDevice()` 应用播放器效果；通过完整缓存操作清理 |
 | library 桌面收藏同步 | 由应用装配读取 library 与 Playback，交付桌面投影 |
