@@ -9,9 +9,14 @@ export function createPlaybackReporting({
   onError = error =>
     console.debug('[playback reporting] request failed', error),
 }) {
-  const submit = (request, params, authorization) => {
+  const submit = (request, params, authorization, requireResponse = false) => {
     try {
-      Promise.resolve(request(params, authorization)).catch(onError);
+      Promise.resolve(request(params, authorization))
+        .then(response => {
+          if (requireResponse && response == null)
+            throw new Error('Missing NetEase playback report response');
+        })
+        .catch(onError);
     } catch (error) {
       onError(error);
     }
@@ -34,7 +39,12 @@ export function createPlaybackReporting({
     if (event.type !== 'before-replace' && event.type !== 'ended') return;
     const time = Math.floor(event.completed ? durationSeconds : event.position);
     if (time < 1 || !event.recordOnce()) return;
-    submit(neteaseScrobble, { id: track.id, sourceid: event.source.id, time });
+    submit(
+      neteaseScrobble,
+      { id: track.id, sourceid: event.source.id, time },
+      undefined,
+      true
+    );
     const authorization = getLastfmAuthorization();
     if (
       authorization.key !== undefined &&

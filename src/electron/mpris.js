@@ -103,27 +103,83 @@ export function createMpris(window, windowOperations) {
 
 export async function createDbus(window) {
   const bus = dbus.sessionBus();
-  const Variant = dbus.Variant;
-
-  const osdService = await bus.getProxyObject(
-    'org.osdlyrics.Daemon',
-    '/org/osdlyrics/Lyrics'
-  );
-
-  const osdInterface = osdService.getInterface('org.osdlyrics.Lyrics');
-
-  ipcMain.on('sendLyrics', async (e, { track, lyrics, requestId }) => {
-    const metadata = {
-      title: new Variant('s', track.name),
-      artist: new Variant('s', track.ar.map(ar => ar.name).join(', ')),
-    };
-
+  const renderer = window.webContents;
+  const pending = new Set();
+  let disposed = false;
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    ipcMain.removeListener('sendLyrics', publish);
+    window.removeListener('closed', dispose);
+    pending.forEach(stop => stop(new Error('OSD lyrics connection closed')));
+    bus.disconnect();
+  }
+  function bounded(work) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error, result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        pending.delete(finish);
+        if (error) reject(error);
+        else resolve(result);
+      };
+      const timeout = setTimeout(
+        () => finish(new Error('Timed out waiting for OSD lyrics')),
+        5000
+      );
+      pending.add(finish);
+      Promise.resolve()
+        .then(() => {
+          if (disposed || settled)
+            throw new Error('OSD lyrics connection closed');
+          return work();
+        })
+        .then(
+          result => finish(null, result),
+          error => finish(error)
+        );
+    });
+  }
+  bus.on('error', error => {
+    console.debug('[OSD lyrics] connection failed', error);
+    dispose();
+  });
+  window.once('closed', dispose);
+  let osdInterface;
+  async function publish(event, { track, lyrics, requestId }) {
+    if (disposed || event.sender !== renderer) return;
     try {
-      await osdInterface.SetLyricContent(metadata, Buffer.from(lyrics));
+      const metadata = {
+        title: new dbus.Variant('s', track.name),
+        artist: new dbus.Variant('s', track.ar.map(ar => ar.name).join(', ')),
+      };
+      await bounded(() =>
+        osdInterface.SetLyricContent(metadata, Buffer.from(lyrics))
+      );
     } catch (error) {
       console.debug('[OSD lyrics] write failed', error);
     } finally {
-      window.webContents.send('saveLyricFinished', requestId);
+      if (!disposed && !renderer.isDestroyed()) {
+        try {
+          renderer.send('saveLyricFinished', requestId);
+        } catch (error) {
+          console.debug('[OSD lyrics] acknowledgement failed', error);
+        }
+      }
     }
-  });
+  }
+  try {
+    const osdService = await bounded(() =>
+      bus.getProxyObject('org.osdlyrics.Daemon', '/org/osdlyrics/Lyrics')
+    );
+    if (disposed) throw new Error('OSD lyrics connection closed');
+    osdInterface = osdService.getInterface('org.osdlyrics.Lyrics');
+    ipcMain.on('sendLyrics', publish);
+    return dispose;
+  } catch (error) {
+    dispose();
+    throw error;
+  }
 }

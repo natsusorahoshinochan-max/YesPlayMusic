@@ -74,7 +74,9 @@ class Background {
     if (!app.requestSingleInstanceLock()) return this.windowOperations.quit();
 
     // start netease music api
-    this.neteaseMusicAPI = startNeteaseMusicApi();
+    this.neteaseMusicAPI = startNeteaseMusicApi().catch(error => {
+      log(`failed to start NetEase API: ${error.message}`);
+    });
 
     // create Express app
     this.createExpressApp();
@@ -125,14 +127,22 @@ class Background {
     expressApp.use('/', express.static(__dirname + '/'));
     expressApp.use('/api', expressProxy('http://127.0.0.1:10754'));
     expressApp.use('/player', (req, res) => {
-      this.window.webContents
-        .executeJavaScript('window.yesplaymusic.player')
+      return Promise.resolve()
+        .then(() =>
+          this.window.webContents.executeJavaScript(
+            'window.yesplaymusic.player'
+          )
+        )
         .then(result => {
           const progress = result == null ? undefined : result.progress;
           res.send({
             currentTrack: result == null ? undefined : result.currentTrack,
             progress: progress == null ? 0 : progress,
           });
+        })
+        .catch(error => {
+          log(`failed to read player: ${error.message}`);
+          res.status(503).send({ error: 'Player unavailable' });
         });
     });
     this.expressApp = expressApp.listen(27232, '127.0.0.1');
@@ -349,7 +359,11 @@ class Background {
         this.windowOperations
       );
 
-      await restoreProxy(this.window.webContents.session, this.store);
+      try {
+        await restoreProxy(this.window.webContents.session, this.store);
+      } catch (error) {
+        log(`failed to restore proxy: ${error.message}`);
+      }
 
       // check for updates
       this.checkForUpdates();
@@ -375,7 +389,9 @@ class Background {
 
       // try to start osdlyrics process on start
       if (this.store.get('settings.enableOsdlyricsSupport')) {
-        await createDbus(this.window);
+        createDbus(this.window).catch(error => {
+          log(`failed to connect OSD lyrics: ${error.message}`);
+        });
         log('try to start osdlyrics process');
         const osdlyricsProcess = spawn('osdlyrics');
 
