@@ -1,4 +1,5 @@
 import Vue from 'vue';
+import { createSourceOperations } from './sourceOperations';
 
 const clone = value =>
   value == null ? value : JSON.parse(JSON.stringify(value));
@@ -14,6 +15,7 @@ const outcome = (status, reason) =>
 
 export function createPlayback({
   getTrack,
+  sourceLists,
   resources,
   audio,
   onFeedback = () => {},
@@ -313,6 +315,7 @@ export function createPlayback({
         state.playlistSource = clone(source);
         state.isPersonalFM = false;
         publish();
+        return list[index];
       },
       select: (id, options) => select(context, id, options),
     };
@@ -332,6 +335,7 @@ export function createPlayback({
     safe(onProgress, state.progress);
   }, 1000);
   const playback = {
+    ...createSourceOperations({ runSelection, sourceLists, feedback }),
     get state() {
       return holder.snapshot;
     },
