@@ -19,7 +19,7 @@ export function createPreferenceEffects({
     clearCache: clearDB,
     resetReversedMode() {
       const player = getPlayer();
-      if (player) player.reversed = false;
+      player?.setReversed(false);
     },
     applyTrayIconTheme(value) {
       ipcRenderer?.send('updateTrayIcon', value);

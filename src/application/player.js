@@ -1,12 +1,14 @@
 import { Howl } from 'howler';
 import { personalFM, fmTrash } from '@/api/others';
-import { getMP3, getTrackDetail, scrobble } from '@/api/track';
+import { getMP3, getTrackDetail, getLyric, scrobble } from '@/api/track';
 import { getPlaylistDetail, intelligencePlaylist } from '@/api/playlist';
 import { getAlbum } from '@/api/album';
 import { getArtist } from '@/api/artist';
 import { getTrackSource, cacheTrackSource } from '@/utils/db';
 import { trackScrobble, trackUpdateNowPlaying } from '@/api/lastfm';
 import { createPlaybackReporting } from './playbackReporting';
+import { createPlayerStorage } from './playerStorage';
+import { createPlaybackPlatform } from './playbackPlatform';
 import { createPlayback } from '@/playback';
 import { createAudioResources } from '@/playback/audioResources';
 import { createAudioAdapter } from '@/playback/audioAdapter';
@@ -25,7 +27,27 @@ export function createPlaybackFeedback({ notify }) {
   };
 }
 
-export function createPlayer({ store, onPlaybackEvent, ...overrides } = {}) {
+export function createPlayer({
+  store,
+  storage = localStorage,
+  platform: suppliedPlatform,
+  platformOptions = {},
+  onPlaybackEvent,
+  onStateChange,
+  onProgress,
+  ...overrides
+} = {}) {
+  const persistence = createPlayerStorage(storage);
+  let playback;
+  let platform = suppliedPlatform;
+  let disposed = false;
+  const liked = () =>
+    (
+      store.getters['library/collections']?.songs ||
+      store.state.library?.collections?.songs ||
+      []
+    ).includes(playback.state.currentTrackID);
+  const publish = () => platform?.publish(playback.state, liked());
   const settings = () => store.getters['preferences/settings'];
   const ipcRenderer =
     process.env.IS_ELECTRON === true
@@ -37,7 +59,7 @@ export function createPlayer({ store, onPlaybackEvent, ...overrides } = {}) {
     lastfmNowPlaying: trackUpdateNowPlaying,
     getLastfmKey: () => store.state.lastfm?.key,
   });
-  return createPlayback({
+  playback = createPlayback({
     sourceLists: {
       playlist: async (id, { fresh }) => {
         const result = await getPlaylistDetail(id, fresh);
@@ -87,9 +109,60 @@ export function createPlayer({ store, onPlaybackEvent, ...overrides } = {}) {
       notify: message => store.dispatch('showToast', message),
     }),
     ...overrides,
+    onStateChange(state) {
+      if (!disposed) {
+        persistence.save(playback.archive());
+        publish();
+      }
+      if (onStateChange) onStateChange(state);
+    },
+    onProgress(position, detail) {
+      if (!disposed) {
+        persistence.saveProgress(position);
+        platform?.progress(position, detail);
+      }
+      if (onProgress) onProgress(position, detail);
+    },
     onPlaybackEvent(event) {
       reportPlayback(event);
       if (onPlaybackEvent) onPlaybackEvent(event);
     },
   });
+  const unsubscribe = store.subscribe?.(mutation => {
+    if (mutation.type.startsWith('library/')) publish();
+  });
+  const player = Object.freeze({
+    ...playback,
+    get state() {
+      return playback.state;
+    },
+    restoreSaved() {
+      return playback.restore(
+        persistence.initial.archive,
+        persistence.initial.position,
+        {
+          preparePersonalFM: true,
+        }
+      );
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      unsubscribe?.();
+      platform?.dispose();
+      playback.dispose();
+    },
+  });
+  if (platform === undefined) {
+    platform = createPlaybackPlatform({
+      playback: player,
+      settings,
+      getLyric,
+      toggleFavorite: id => store.dispatch('library/toggleTrackFavorite', id),
+      onTitle: title => store.commit?.('updateTitle', title),
+      ...platformOptions,
+    });
+  }
+  publish();
+  return player;
 }
