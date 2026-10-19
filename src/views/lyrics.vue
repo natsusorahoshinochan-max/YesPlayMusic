@@ -521,12 +521,17 @@ export default {
         document.exitFullscreen();
       }
     },
-    addToPlaylist() {
+    async addToPlaylist() {
       if (!this.$store.getters['session/hasAccount']) {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
-      this.$store.dispatch('library/refreshPlaylists');
+      try {
+        await this.$store.dispatch('library/refreshPlaylists');
+      } catch (error) {
+        this.showToast('歌单加载失败，请重试');
+        return;
+      }
       this.updateModal({
         modalName: 'addTrackToPlaylistModal',
         key: 'show',

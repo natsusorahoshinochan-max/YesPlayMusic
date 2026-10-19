@@ -24,44 +24,72 @@ export default function createSession(
     qrRun = null;
   }
 
-  async function createQr(context, run) {
-    const result = await auth.loginQrCodeKey();
-    if (run.stopped) return;
-    if (result?.code !== 200) {
-      if (run.key) scheduleQr(context, run);
-      return;
-    }
-    run.key = result.data.unikey;
+  function failQr(context, run) {
+    if (run.stopped) return false;
+    stopQr();
     context.commit('setQr', {
-      url: `https://music.163.com/login?codekey=${run.key}`,
+      url: '',
+      information: '二维码登录失败，请重试',
     });
-    scheduleQr(context, run);
+    return false;
+  }
+
+  async function createQr(context, run) {
+    try {
+      const result = await auth.loginQrCodeKey();
+      if (run.stopped) return;
+      if (result?.code !== 200 || !result.data?.unikey)
+        return failQr(context, run);
+      run.key = result.data.unikey;
+      context.commit('setQr', {
+        url: `https://music.163.com/login?codekey=${run.key}`,
+      });
+      scheduleQr(context, run);
+    } catch (error) {
+      return failQr(context, run);
+    }
   }
 
   function scheduleQr(context, run) {
     if (run.stopped) return;
     run.timer = time.schedule(async () => {
-      const result = await auth.loginQrCodeCheck(run.key);
-      if (run.stopped) return;
-      if (result?.code === 800) {
-        context.commit('setQr', { information: '二维码已失效，请重新扫码' });
-        await createQr(context, run);
-        return;
+      try {
+        const result = await auth.loginQrCodeCheck(run.key);
+        if (run.stopped) return;
+        if (result?.code === 800) {
+          context.commit('setQr', { information: '二维码已失效，请重新扫码' });
+          await createQr(context, run);
+          return;
+        }
+        if (result?.code === 803) {
+          if (typeof result.cookie !== 'string') return failQr(context, run);
+          stopQr();
+          context.commit('setQr', { information: '登录成功，请稍等...' });
+          try {
+            await enterAccount(
+              context,
+              result.cookie.replaceAll(' HTTPOnly', '')
+            );
+          } catch (error) {
+            context.commit('setQr', {
+              information: '音乐库加载失败，请重试',
+            });
+          }
+          return;
+        }
+        if (result?.code === 802) {
+          context.commit('setQr', {
+            information: '扫描成功，请在手机上确认登录',
+          });
+        } else if (result?.code === 801) {
+          context.commit('setQr', { information: '打开网易云音乐APP扫码登录' });
+        } else {
+          return failQr(context, run);
+        }
+        scheduleQr(context, run);
+      } catch (error) {
+        return failQr(context, run);
       }
-      if (result?.code === 803) {
-        stopQr();
-        context.commit('setQr', { information: '登录成功，请稍等...' });
-        await enterAccount(context, result.cookie.replaceAll(' HTTPOnly', ''));
-        return;
-      }
-      if (result?.code === 802) {
-        context.commit('setQr', {
-          information: '扫描成功，请在手机上确认登录',
-        });
-      } else if (result?.code === 801) {
-        context.commit('setQr', { information: '打开网易云音乐APP扫码登录' });
-      }
-      scheduleQr(context, run);
     }, 1000);
   }
 
@@ -157,25 +185,34 @@ export default function createSession(
                 });
           if (result?.code === 200) {
             await enterAccount(context, result.cookie);
-          } else if (result) {
-            alert(result.msg ?? result.message ?? '账号或密码错误，请检查');
+          } else {
+            alert(result?.msg ?? result?.message ?? '登录失败，请稍后重试');
           }
           return result;
         } catch (error) {
-          alert(`发生错误，请检查你的账号密码是否正确\n${error}`);
+          alert('登录或音乐库加载失败，请稍后重试');
         } finally {
           context.commit('setProcessing', false);
         }
       },
       async selectPublicIdentity({ commit, dispatch }, user) {
-        identityChanged();
-        commit('setIdentity', {
-          loginMode: 'username',
-          hasCredential: Boolean(credentials.get('MUSIC_U')),
-        });
-        commit('library/setUser', user, { root: true });
-        await dispatch('library/loadApplication', null, { root: true });
-        return navigate('publicIdentity');
+        commit('setProcessing', true);
+        try {
+          identityChanged();
+          commit('setIdentity', {
+            loginMode: 'username',
+            hasCredential: Boolean(credentials.get('MUSIC_U')),
+          });
+          commit('library/setUser', user, { root: true });
+          await dispatch('library/loadApplication', null, { root: true });
+          await navigate('publicIdentity');
+          return true;
+        } catch (error) {
+          notify('音乐库加载失败，请重试');
+          return false;
+        } finally {
+          commit('setProcessing', false);
+        }
       },
       async refreshDaily({ state, getters, commit }) {
         if (
@@ -184,8 +221,15 @@ export default function createSession(
           !auth.refreshCookie
         )
           return;
-        await auth.refreshCookie();
-        commit('setLastRefreshCookieDate', now().getDate());
+        try {
+          const result = await auth.refreshCookie();
+          if (result?.code !== 200) throw new Error('Refresh unavailable');
+          commit('setLastRefreshCookieDate', now().getDate());
+          return true;
+        } catch (error) {
+          notify('登录状态刷新失败，请稍后重试');
+          return false;
+        }
       },
       async invalidate(context) {
         await clearIdentity(context);
@@ -194,12 +238,20 @@ export default function createSession(
       },
       async logout(context) {
         try {
-          if (auth.logout) Promise.resolve(auth.logout()).catch(() => {});
-        } catch {
-          // Local exit remains available when the remote service cannot respond.
+          if (auth.logout)
+            Promise.resolve(auth.logout()).catch(error => {
+              console.debug('[session] remote logout failed', error);
+            });
+        } catch (error) {
+          console.debug('[session] remote logout failed', error);
         }
         await clearIdentity(context);
-        return navigate('logout');
+        try {
+          return await navigate('logout');
+        } catch (error) {
+          notify('已退出登录，页面跳转失败');
+          return false;
+        }
       },
     },
   };
