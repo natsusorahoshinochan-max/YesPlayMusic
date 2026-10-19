@@ -17,6 +17,7 @@ export default function createSession(
   }
 ) {
   let qrRun;
+  let ownership = Object.freeze({});
   function stopQr() {
     if (!qrRun) return;
     qrRun.stopped = true;
@@ -93,12 +94,12 @@ export default function createSession(
     }, 1000);
   }
 
-  async function clearIdentity({ commit, dispatch }) {
+  function clearIdentity({ commit, dispatch }) {
     identityChanged();
     credentials.remove('MUSIC_U');
     credentials.remove('__csrf');
     commit('setIdentity', { loginMode: null, hasCredential: false });
-    await dispatch('library/clearIdentity', null, { root: true });
+    return dispatch('library/clearIdentity', null, { root: true });
   }
 
   async function enterAccount({ commit, dispatch }, cookie) {
@@ -119,10 +120,9 @@ export default function createSession(
       processing: false,
       qr: { url: '', information: '打开网易云音乐APP扫码登录' },
       hasCredential: Boolean(credentials.get('MUSIC_U')),
-      ownership: snapshot.loginMode ? Object.freeze({}) : null,
     }),
     getters: {
-      ownership: state => state.ownership,
+      ownership: () => () => ownership,
       qr: state => state.qr,
       processing: state => state.processing,
       hasAccount: state => state.loginMode === 'account' && state.hasCredential,
@@ -137,7 +137,7 @@ export default function createSession(
         state.processing = value;
       },
       setIdentity(state, { loginMode, hasCredential }) {
-        state.ownership = loginMode ? Object.freeze({}) : null;
+        ownership = Object.freeze({});
         state.loginMode = loginMode;
         state.hasCredential = hasCredential;
       },
@@ -237,15 +237,19 @@ export default function createSession(
       async invalidate(context, signal) {
         if (
           !signal?.ownership ||
-          signal.ownership !== context.getters.ownership ||
+          signal.ownership !== context.getters.ownership() ||
           !context.getters.hasAccount
         )
           return false;
-        await clearIdentity(context);
-        if (context.getters.ownership !== null) return false;
+        const cleanup = clearIdentity(context);
+        const retiredOwnership = ownership;
+        await cleanup;
+        if (ownership !== retiredOwnership) return false;
         notify('登录状态已失效，请重新登录');
         try {
-          return await navigate('invalidated');
+          return await navigate('invalidated', {
+            isCurrent: () => ownership === retiredOwnership,
+          });
         } catch (error) {
           console.debug('[session] invalidation navigation failed', error);
           return false;

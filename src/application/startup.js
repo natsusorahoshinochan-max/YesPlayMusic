@@ -22,7 +22,7 @@ export async function startApplication({
   configureRequest({
     getSettings,
     getCookie,
-    getSessionOwnership: () => store.getters['session/ownership'],
+    getSessionOwnership: () => store.getters['session/ownership'](),
     onSessionInvalid,
     environment: requestEnvironment,
   });

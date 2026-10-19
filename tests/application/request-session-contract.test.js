@@ -1,4 +1,7 @@
 import http from 'http';
+import Vue from 'vue';
+import VueRouter from 'vue-router';
+Vue.use(VueRouter);
 import request, { configureRequest } from '@/utils/request';
 import { createRequestEnvironment } from '@/application/requestEnvironment';
 import { createStore } from '@/store';
@@ -23,7 +26,15 @@ function reply(res, body, status = 200) {
 }
 beforeEach(async () => {
   notices = [];
-  router = { currentRoute: { name: 'album', meta: {} }, push: jest.fn() };
+  router = {
+    currentRoute: { name: 'album', meta: {} },
+    push: jest.fn(),
+    beforeEach: () => () => {},
+    beforeResolve: () => () => {},
+  };
+  await setupSession();
+});
+async function setupSession() {
   let token = 'A';
   store = createStore({
     storage: {
@@ -56,11 +67,11 @@ beforeEach(async () => {
   configureRequest({
     getSettings: () => ({}),
     getCookie: () => token,
-    getSessionOwnership: () => store.getters['session/ownership'],
+    getSessionOwnership: () => store.getters['session/ownership'](),
     onSessionInvalid: signal => store.dispatch('session/invalidate', signal),
     environment: createRequestEnvironment({ webBaseURL: baseURL }),
   });
-});
+}
 test('public request rejects business failure with raw information, including HTTP 200 refusal', async () => {
   respond = (req, res) => reply(res, { code: 500, msg: 'refused' });
   await expect(request({ url: '/like' })).rejects.toMatchObject({
@@ -72,8 +83,9 @@ test('public request rejects business failure with raw information, including HT
 });
 
 test('matching concurrent invalidations clear once and preserve the public route', async () => {
-  const ownership = store.getters['session/ownership'];
+  const ownership = store.getters['session/ownership']();
   expect(ownership).toBeDefined();
+  expect(store.state.session).not.toHaveProperty('ownership');
   expect(Object.isFrozen(ownership)).toBe(true);
   respond = (req, res) => reply(res, { code: 301, msg: '需要登录' }, 401);
   const results = await Promise.allSettled([
@@ -97,11 +109,11 @@ test('late invalid response from the previous restored session cannot clear the 
       resolve();
     };
   });
-  const previous = store.getters['session/ownership'];
+  const previous = store.getters['session/ownership']();
   const pending = request({ url: '/user/account' }).catch(error => error);
   await arrived;
   await store.dispatch('session/restore');
-  expect(store.getters['session/ownership']).not.toBe(previous);
+  expect(store.getters['session/ownership']()).not.toBe(previous);
   release();
   expect((await pending).category).toBe('session-invalid');
   expect(store.getters['session/hasAccount']).toBe(true);
@@ -224,11 +236,128 @@ test('full library write propagates original preparation error instead of claimi
 test('invalidation finishing after a new identity handoff leaves its navigation and notices alone', async () => {
   router.currentRoute = { name: 'library', meta: { requireLogin: true } };
   const invalidation = store.dispatch('session/invalidate', {
-    ownership: store.getters['session/ownership'],
+    ownership: store.getters['session/ownership'](),
   });
   respond = (req, res) => reply(res, { playlist: [] });
   const handoff = store.dispatch('session/selectPublicIdentity', { userId: 2 });
   await Promise.all([invalidation, handoff]);
+  expect(notices).toEqual([]);
+  expect(router.push).not.toHaveBeenCalled();
+});
+
+test('real router rejects a lazy invalidation navigation after identity handoff and allows current navigation', async () => {
+  let resolveLogin, loginStarted;
+  const started = new Promise(resolve => {
+    loginStarted = resolve;
+  });
+  router = new VueRouter({
+    mode: 'abstract',
+    routes: [
+      {
+        path: '/library',
+        name: 'library',
+        meta: { requireLogin: true },
+        component: { render: h => h('div') },
+      },
+      { path: '/album', name: 'album', component: { render: h => h('div') } },
+      {
+        path: '/login',
+        name: 'login',
+        component: resolve => {
+          resolveLogin = resolve;
+          loginStarted();
+        },
+      },
+    ],
+  });
+  await router.push({ name: 'library' });
+  await setupSession();
+  let releaseLibrary, libraryArrived;
+  const reading = new Promise(resolve => {
+    libraryArrived = resolve;
+  });
+  respond = (req, res) => {
+    releaseLibrary = () => reply(res, { playlist: [] });
+    libraryArrived();
+  };
+  const invalidation = store.dispatch('session/invalidate', {
+    ownership: store.getters['session/ownership'](),
+  });
+  await started;
+  const handoff = store.dispatch('session/selectPublicIdentity', { userId: 2 });
+  await reading;
+  resolveLogin({ render: h => h('div') });
+  await invalidation;
+  const routeAfterInvalidation = router.currentRoute.name;
+  releaseLibrary();
+  await handoff;
+  expect(routeAfterInvalidation).toBe('library');
+  await router.push({ name: 'album' });
+  expect(router.currentRoute.name).toBe('album');
+  await router.push({ name: 'login' });
+  expect(router.currentRoute.name).toBe('login');
+});
+
+test('real router permits new current navigation while old invalidation is waiting for a lazy component', async () => {
+  let resolveLogin, loginStarted;
+  const started = new Promise(resolve => {
+    loginStarted = resolve;
+  });
+  router = new VueRouter({
+    mode: 'abstract',
+    routes: [
+      {
+        path: '/library',
+        name: 'library',
+        meta: { requireLogin: true },
+        component: { render: h => h('div') },
+      },
+      { path: '/album', name: 'album', component: { render: h => h('div') } },
+      {
+        path: '/login',
+        name: 'login',
+        component: resolve => {
+          resolveLogin = resolve;
+          loginStarted();
+        },
+      },
+    ],
+  });
+  await router.push({ name: 'library' });
+  await setupSession();
+  let releaseLibrary, libraryArrived;
+  const reading = new Promise(resolve => {
+    libraryArrived = resolve;
+  });
+  respond = (req, res) => {
+    releaseLibrary = () => reply(res, { playlist: [] });
+    libraryArrived();
+  };
+  const invalidation = store.dispatch('session/invalidate', {
+    ownership: store.getters['session/ownership'](),
+  });
+  await started;
+  const handoff = store.dispatch('session/selectPublicIdentity', { userId: 2 });
+  await reading;
+  await router.push({ name: 'album' });
+  const currentNavigation = router.currentRoute.name;
+  resolveLogin({ render: h => h('div') });
+  await invalidation;
+  const afterOldResolution = router.currentRoute.name;
+  releaseLibrary();
+  await handoff;
+  expect(currentNavigation).toBe('album');
+  expect(afterOldResolution).toBe('album');
+});
+
+test('a further guest restore retires pending invalidation completion even when visible identity fields are unchanged', async () => {
+  const invalidation = store.dispatch('session/invalidate', {
+    ownership: store.getters['session/ownership'](),
+  });
+  const retired = store.getters['session/ownership']();
+  await store.dispatch('session/restore');
+  expect(store.getters['session/ownership']()).not.toBe(retired);
+  await invalidation;
   expect(notices).toEqual([]);
   expect(router.push).not.toHaveBeenCalled();
 });
