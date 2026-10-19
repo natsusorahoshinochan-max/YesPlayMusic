@@ -4,6 +4,7 @@ import App from './App.vue';
 import router from './router';
 import store, { createStore } from './store';
 import * as auth from '@/api/auth';
+import nativeAlert from '@/utils/nativeAlert';
 import { createCredentials } from '@/application/credentials';
 import { createRequestEnvironment } from '@/application/requestEnvironment';
 import { createSessionEffects } from '@/application/sessionEffects';
@@ -56,6 +57,7 @@ startApplication({
         auth,
         ...createSessionEffects({
           router,
+          alert: nativeAlert,
           notify: message => store.dispatch('showToast', message),
         }),
       },

@@ -113,57 +113,76 @@
 
 <script>
 import QRCode from 'qrcode';
-import md5 from 'crypto-js/md5';
 import NProgress from 'nprogress';
 import nativeAlert from '@/utils/nativeAlert';
-import {
-  loginWithPhone,
-  loginWithEmail,
-  loginQrCodeKey,
-  loginQrCodeCheck,
-} from '@/api/auth';
 
 export default {
   name: 'Login',
   data() {
     return {
-      processing: false,
       mode: 'qrCode',
       countryCode: '+86',
       phoneNumber: '',
       email: '',
       password: '',
-      smsCode: '',
       inputFocus: '',
-      qrCodeKey: '',
       qrCodeSvg: '',
-      qrCodeCheckInterval: null,
-      qrCodeInformation: '打开网易云音乐APP扫码登录',
     };
   },
   computed: {
+    processing() {
+      return this.$store.getters['session/processing'];
+    },
+    qrCodeInformation() {
+      return this.$store.getters['session/qr'].information;
+    },
+    qrCodeUrl() {
+      return this.$store.getters['session/qr'].url;
+    },
     isElectron() {
       return process.env.IS_ELECTRON;
+    },
+  },
+  watch: {
+    qrCodeUrl: {
+      immediate: true,
+      async handler(url) {
+        if (!url) {
+          this.qrCodeSvg = '';
+          return;
+        }
+        try {
+          const svg = await QRCode.toString(url, {
+            width: 192,
+            margin: 0,
+            color: { dark: '#335eea', light: '#00000000' },
+            type: 'svg',
+          });
+          this.qrCodeSvg = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+        } catch (error) {
+          console.error(error);
+        }
+      },
     },
   },
   created() {
     if (['phone', 'email', 'qrCode'].includes(this.$route.query.mode)) {
       this.mode = this.$route.query.mode;
     }
-    this.getQrCodeKey();
+    if (this.mode === 'qrCode') this.$store.dispatch('session/startQrLogin');
+    NProgress.done();
   },
   beforeDestroy() {
-    clearInterval(this.qrCodeCheckInterval);
+    this.$store.dispatch('session/stopQrLogin');
   },
   methods: {
     validatePhone() {
       if (
         this.countryCode === '' ||
-        this.phone === '' ||
+        this.phoneNumber === '' ||
         this.password === ''
       ) {
         nativeAlert('国家区号或手机号不正确');
-        this.processing = false;
         return false;
       }
       return true;
@@ -182,113 +201,23 @@ export default {
       return true;
     },
     login() {
-      if (this.mode === 'phone') {
-        this.processing = this.validatePhone();
-        if (!this.processing) return;
-        loginWithPhone({
-          countrycode: this.countryCode.replace('+', '').replace(/\s/g, ''),
-          phone: this.phoneNumber.replace(/\s/g, ''),
-          password: 'fakePassword',
-          md5_password: md5(this.password).toString(),
-        })
-          .then(this.handleLoginResponse)
-          .catch(error => {
-            this.processing = false;
-            nativeAlert(`发生错误，请检查你的账号密码是否正确\n${error}`);
-          });
-      } else {
-        this.processing = this.validateEmail();
-        if (!this.processing) return;
-        loginWithEmail({
-          email: this.email.replace(/\s/g, ''),
-          password: 'fakePassword',
-          md5_password: md5(this.password).toString(),
-        })
-          .then(this.handleLoginResponse)
-          .catch(error => {
-            this.processing = false;
-            nativeAlert(`发生错误，请检查你的账号密码是否正确\n${error}`);
-          });
-      }
-    },
-    handleLoginResponse(data) {
-      if (!data) {
-        this.processing = false;
-        return;
-      }
-      if (data.code === 200) {
-        this.$store.dispatch('session/acceptCredentials', data.cookie);
-        this.$store.dispatch('library/fetchUserProfile').then(() => {
-          this.$store.dispatch('library/fetchLikedPlaylist').then(() => {
-            this.$router.push({ path: '/library' });
-          });
-        });
-      } else {
-        this.processing = false;
-        nativeAlert(data.msg ?? data.message ?? '账号或密码错误，请检查');
-      }
-    },
-    getQrCodeKey() {
-      return loginQrCodeKey().then(result => {
-        if (result.code === 200) {
-          this.qrCodeKey = result.data.unikey;
-          QRCode.toString(
-            `https://music.163.com/login?codekey=${this.qrCodeKey}`,
-            {
-              width: 192,
-              margin: 0,
-              color: {
-                dark: '#335eea',
-                light: '#00000000',
-              },
-              type: 'svg',
-            }
-          )
-            .then(svg => {
-              this.qrCodeSvg = `data:image/svg+xml;utf8,${encodeURIComponent(
-                svg
-              )}`;
-            })
-            .catch(err => {
-              console.error(err);
-            })
-            .finally(() => {
-              NProgress.done();
-            });
-        }
-        this.checkQrCodeLogin();
+      if (this.processing) return;
+      const valid =
+        this.mode === 'phone' ? this.validatePhone() : this.validateEmail();
+      if (!valid) return;
+      return this.$store.dispatch('session/loginWithPassword', {
+        mode: this.mode,
+        countryCode: this.countryCode,
+        phone: this.phoneNumber,
+        email: this.email,
+        password: this.password,
       });
-    },
-    checkQrCodeLogin() {
-      // 清除二维码检测
-      clearInterval(this.qrCodeCheckInterval);
-      this.qrCodeCheckInterval = setInterval(() => {
-        if (this.qrCodeKey === '') return;
-        loginQrCodeCheck(this.qrCodeKey).then(result => {
-          if (result.code === 800) {
-            this.getQrCodeKey(); // 重新生成QrCode
-            this.qrCodeInformation = '二维码已失效，请重新扫码';
-          } else if (result.code === 802) {
-            this.qrCodeInformation = '扫描成功，请在手机上确认登录';
-          } else if (result.code === 801) {
-            this.qrCodeInformation = '打开网易云音乐APP扫码登录';
-          } else if (result.code === 803) {
-            clearInterval(this.qrCodeCheckInterval);
-            this.qrCodeInformation = '登录成功，请稍等...';
-            result.code = 200;
-            result.cookie = result.cookie.replaceAll(' HTTPOnly', '');
-            this.handleLoginResponse(result);
-          }
-        });
-      }, 1000);
     },
     changeMode(mode) {
       this.mode = mode;
-      if (mode === 'qrCode') {
-        this.checkQrCodeLogin();
-      } else {
-        clearInterval(this.qrCodeCheckInterval);
-      }
+      return this.$store.dispatch(
+        mode === 'qrCode' ? 'session/startQrLogin' : 'session/stopQrLogin'
+      );
     },
   },
 };

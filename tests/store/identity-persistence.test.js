@@ -64,7 +64,9 @@ test('missing credentials never restore an account session and stores have isola
   expect(accountWithoutCredentials.getters['session/hasLibraryIdentity']).toBe(
     false
   );
-  const publicLibrary = createStore();
+  const publicLibrary = createStore({
+    library: { api: { userPlaylist: () => Promise.resolve({ playlist: [] }) } },
+  });
   await publicLibrary.dispatch('session/selectPublicIdentity', { userId: 22 });
   expect(publicLibrary.getters['session/hasAccount']).toBe(false);
   expect(publicLibrary.getters['session/hasLibraryIdentity']).toBe(true);
