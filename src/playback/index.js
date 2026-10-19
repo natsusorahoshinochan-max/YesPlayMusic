@@ -462,7 +462,8 @@ export function createPlayback({
     state.personalFMNextTrack = { id: 0 };
     publish();
     const result = await select(context, target.id, { visited });
-    if (valid(context)) void loadFMNext(context);
+    if (valid(context) && result.status === 'completed')
+      void loadFMNext(context);
     return result;
   }
   function runSelection(work) {
@@ -639,7 +640,11 @@ export function createPlayback({
         }
         publish();
         const result = await select(context, state.personalFMTrack.id);
-        if (valid(context) && !state.personalFMNextTrack?.id)
+        if (
+          valid(context) &&
+          result.status === 'completed' &&
+          !state.personalFMNextTrack?.id
+        )
           void loadFMNext(context);
         return result;
       });
