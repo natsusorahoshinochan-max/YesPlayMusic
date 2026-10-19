@@ -170,10 +170,16 @@ test('active logout completes local cleanup even if the remote transport rejects
 });
 
 test('logout exits a public library identity without resetting preferences or in-memory collections', async () => {
-  const { store } = account({
+  localStorage.setItem(
+    'data',
+    JSON.stringify({ loginMode: 'username', user: { userId: 99 } })
+  );
+  const store = createStore({
+    credentials: createCredentials({
+      cookies: { get: () => undefined, remove() {} },
+    }),
     session: { auth: { logout: () => Promise.resolve() } },
   });
-  await store.dispatch('session/selectPublicIdentity', { userId: 99 });
   store.commit('library/setCollection', { name: 'songs', data: [123] });
   store.commit('preferences/updateSettings', {
     key: 'futurePreference',

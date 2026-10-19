@@ -55,7 +55,6 @@
 <script>
 import NProgress from 'nprogress';
 import { search } from '@/api/others';
-import { userPlaylist } from '@/api/user';
 import { throttle } from '@/utils/common';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
@@ -84,17 +83,10 @@ export default {
       });
     },
     confirm() {
-      this.$store.dispatch('session/selectPublicIdentity', this.activeUser);
-      userPlaylist({
-        uid: this.activeUser.userId,
-        limit: 1,
-      }).then(data => {
-        this.$store.commit(
-          'library/setLikedSongPlaylistID',
-          data.playlist[0].id
-        );
-        this.$router.push({ path: '/library' });
-      });
+      return this.$store.dispatch(
+        'session/selectPublicIdentity',
+        this.activeUser
+      );
     },
     throttleSearch: throttle(function () {
       this.search();

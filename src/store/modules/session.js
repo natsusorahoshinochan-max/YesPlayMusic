@@ -1,3 +1,5 @@
+import md5 from 'crypto-js/md5';
+
 export default function createSession(
   snapshot,
   {
@@ -5,9 +7,63 @@ export default function createSession(
     auth = {},
     navigate = () => {},
     notify = () => {},
+    alert = () => {},
     now = () => new Date(),
+    time = {
+      schedule: (callback, delay) => setTimeout(callback, delay),
+      cancel: handle => clearTimeout(handle),
+    },
   }
 ) {
+  let qrRun;
+  function stopQr() {
+    if (!qrRun) return;
+    qrRun.stopped = true;
+    time.cancel(qrRun.timer);
+    qrRun = null;
+  }
+
+  async function createQr(context, run) {
+    const result = await auth.loginQrCodeKey();
+    if (run.stopped) return;
+    if (result?.code !== 200) {
+      if (run.key) scheduleQr(context, run);
+      return;
+    }
+    run.key = result.data.unikey;
+    context.commit('setQr', {
+      url: `https://music.163.com/login?codekey=${run.key}`,
+    });
+    scheduleQr(context, run);
+  }
+
+  function scheduleQr(context, run) {
+    if (run.stopped) return;
+    run.timer = time.schedule(async () => {
+      const result = await auth.loginQrCodeCheck(run.key);
+      if (run.stopped) return;
+      if (result?.code === 800) {
+        context.commit('setQr', { information: '二维码已失效，请重新扫码' });
+        await createQr(context, run);
+        return;
+      }
+      if (result?.code === 803) {
+        stopQr();
+        context.commit('setQr', { information: '登录成功，请稍等...' });
+        await enterAccount(context, result.cookie.replaceAll(' HTTPOnly', ''));
+        return;
+      }
+      if (result?.code === 802) {
+        context.commit('setQr', {
+          information: '扫描成功，请在手机上确认登录',
+        });
+      } else if (result?.code === 801) {
+        context.commit('setQr', { information: '打开网易云音乐APP扫码登录' });
+      }
+      scheduleQr(context, run);
+    }, 1000);
+  }
+
   async function clearIdentity({ commit, dispatch }) {
     credentials.remove('MUSIC_U');
     credentials.remove('__csrf');
@@ -15,18 +71,38 @@ export default function createSession(
     await dispatch('library/clearIdentity', null, { root: true });
   }
 
+  async function enterAccount({ commit, dispatch }, cookie) {
+    credentials.set(cookie);
+    commit('setIdentity', {
+      loginMode: 'account',
+      hasCredential: Boolean(credentials.get('MUSIC_U')),
+    });
+    await dispatch('library/loadApplication', null, { root: true });
+    await navigate('account');
+  }
+
   return {
     namespaced: true,
     state: () => ({
       ...snapshot,
+      processing: false,
+      qr: { url: '', information: '打开网易云音乐APP扫码登录' },
       hasCredential: Boolean(credentials.get('MUSIC_U')),
     }),
     getters: {
+      qr: state => state.qr,
+      processing: state => state.processing,
       hasAccount: state => state.loginMode === 'account' && state.hasCredential,
       hasLibraryIdentity: (state, getters) =>
         getters.hasAccount || state.loginMode === 'username',
     },
     mutations: {
+      setQr(state, value) {
+        Object.assign(state.qr, value);
+      },
+      setProcessing(state, value) {
+        state.processing = value;
+      },
       setIdentity(state, { loginMode, hasCredential }) {
         state.loginMode = loginMode;
         state.hasCredential = hasCredential;
@@ -36,25 +112,66 @@ export default function createSession(
       },
     },
     actions: {
+      startQrLogin(context) {
+        stopQr();
+        const run = { stopped: false, timer: null, key: '' };
+        qrRun = run;
+        context.commit('setQr', {
+          url: '',
+          information: '打开网易云音乐APP扫码登录',
+        });
+        return createQr(context, run);
+      },
+      stopQrLogin() {
+        stopQr();
+      },
       restore({ state, commit }) {
         commit('setIdentity', {
           loginMode: state.loginMode,
           hasCredential: Boolean(credentials.get('MUSIC_U')),
         });
       },
-      acceptCredentials({ commit }, cookie) {
-        credentials.set(cookie);
-        commit('setIdentity', {
-          loginMode: 'account',
-          hasCredential: Boolean(credentials.get('MUSIC_U')),
-        });
+      async loginWithPassword(
+        context,
+        { mode, countryCode, phone, email, password }
+      ) {
+        context.commit('setProcessing', true);
+        try {
+          const params = {
+            password: 'fakePassword',
+            md5_password: md5(password).toString(),
+          };
+          const result =
+            mode === 'phone'
+              ? await auth.loginWithPhone({
+                  ...params,
+                  countrycode: countryCode.replace('+', '').replace(/\s/g, ''),
+                  phone: phone.replace(/\s/g, ''),
+                })
+              : await auth.loginWithEmail({
+                  ...params,
+                  email: email.replace(/\s/g, ''),
+                });
+          if (result?.code === 200) {
+            await enterAccount(context, result.cookie);
+          } else if (result) {
+            alert(result.msg ?? result.message ?? '账号或密码错误，请检查');
+          }
+          return result;
+        } catch (error) {
+          alert(`发生错误，请检查你的账号密码是否正确\n${error}`);
+        } finally {
+          context.commit('setProcessing', false);
+        }
       },
-      selectPublicIdentity({ commit }, user) {
+      async selectPublicIdentity({ commit, dispatch }, user) {
         commit('setIdentity', {
           loginMode: 'username',
           hasCredential: Boolean(credentials.get('MUSIC_U')),
         });
         commit('library/setUser', user, { root: true });
+        await dispatch('library/loadApplication', null, { root: true });
+        return navigate('publicIdentity');
       },
       async refreshDaily({ state, getters, commit }) {
         if (
