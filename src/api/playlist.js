@@ -198,9 +198,10 @@ export function addOrRemoveTrackFromPlaylist(params) {
  * @param {string} params.op
  * @param {string} params.pid
  */
-export function dailyRecommendTracks() {
+export function dailyRecommendTracks({ isCurrent } = {}) {
   return request({
     url: '/recommend/songs',
+    isCurrent,
     method: 'get',
     params: { timestamp: new Date().getTime() },
   }).then(result => {
