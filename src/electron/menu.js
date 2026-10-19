@@ -77,7 +77,7 @@ export function createMenu(win, store) {
           label: 'Play',
           accelerator: shortcuts.find(s => s.id === 'play').shortcut,
           click: () => {
-            win.webContents.send('play');
+            win.webContents.send('toggle');
           },
         },
         {

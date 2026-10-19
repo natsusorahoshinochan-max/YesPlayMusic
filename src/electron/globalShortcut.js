@@ -16,7 +16,7 @@ export function registerGlobalShortcut(win, store) {
   globalShortcut.register(
     shortcuts.find(s => s.id === 'play').globalShortcut,
     () => {
-      win.webContents.send('play');
+      win.webContents.send('toggle');
     }
   );
   globalShortcut.register(

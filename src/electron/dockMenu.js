@@ -5,7 +5,7 @@ export function createDockMenu(win) {
     {
       label: 'Play',
       click() {
-        win.webContents.send('play');
+        win.webContents.send('toggle');
       },
     },
     { type: 'separator' },
