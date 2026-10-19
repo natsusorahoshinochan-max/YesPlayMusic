@@ -10,12 +10,20 @@ export default function createPreferences(
     persist = () => {},
     applyLanguage = () => {},
     applyAppearance = () => {},
+    applyShortcuts = () => {},
+    applyTrayIconTheme = () => {},
   } = {}
 ) {
+  const shortcutControl = state => ({
+    enabled: state.settings.enableGlobalShortcut !== false,
+    recording: state.shortcutRecording !== null,
+    shortcuts: cloneDeep(state.settings.shortcuts),
+  });
   return {
     namespaced: true,
     state: () => ({
       settings: snapshot.settings,
+      shortcutRecording: null,
       libraryPlaylistFilter: snapshot.libraryPlaylistFilter,
     }),
     getters: {
@@ -80,10 +88,50 @@ export default function createPreferences(
         await persist();
         await applyAppearance(state.settings);
       },
+      async setTrayIconTheme({ commit }, value) {
+        commit('updateSettings', { key: 'trayIconTheme', value });
+        await persist();
+        await applyTrayIconTheme(value);
+      },
+      async setGlobalShortcutsEnabled({ commit, state }, value) {
+        commit('updateSettings', { key: 'enableGlobalShortcut', value });
+        await persist();
+        await applyShortcuts(shortcutControl(state), false);
+      },
+      async beginShortcutRecording({ commit, state }, { id, type }) {
+        if (type === 'globalShortcut' && !state.settings.enableGlobalShortcut)
+          return false;
+        commit('setShortcutRecording', { id, type });
+        await applyShortcuts(shortcutControl(state), false);
+        return true;
+      },
+      async saveShortcut({ commit, state }, { id, type, shortcut }) {
+        const value = state.settings.shortcuts.map(item =>
+          item.id === id ? { ...item, [type]: shortcut } : cloneDeep(item)
+        );
+        commit('updateSettings', { key: 'shortcuts', value });
+        await persist();
+        await applyShortcuts(shortcutControl(state), true);
+      },
+      async endShortcutRecording({ commit, state }) {
+        if (!state.shortcutRecording) return;
+        commit('setShortcutRecording', null);
+        await applyShortcuts(shortcutControl(state), false);
+      },
+      async restoreDefaultShortcuts({ commit, state }) {
+        commit('updateSettings', {
+          key: 'shortcuts',
+          value: cloneDeep(shortcuts),
+        });
+        await persist();
+        await applyShortcuts(shortcutControl(state), true);
+      },
       async applyRestored({ state }) {
         await persist();
         await applyLanguage(state.settings.lang);
         await applyAppearance(state.settings);
+        await applyTrayIconTheme(state.settings.trayIconTheme);
+        await applyShortcuts(shortcutControl(state), true);
       },
     },
     mutations: {
@@ -107,16 +155,8 @@ export default function createPreferences(
           state.settings.enabledPlaylistCategories.push(name);
         }
       },
-      updateShortcut(state, { id, type, shortcut }) {
-        let newShortcut = state.settings.shortcuts.find(s => s.id === id);
-        newShortcut[type] = shortcut;
-        state.settings.shortcuts = state.settings.shortcuts.map(s => {
-          if (s.id !== id) return s;
-          return newShortcut;
-        });
-      },
-      restoreDefaultShortcuts(state) {
-        state.settings.shortcuts = cloneDeep(shortcuts);
+      setShortcutRecording(state, value) {
+        state.shortcutRecording = value;
       },
       setLibraryPlaylistFilter(state, value) {
         state.libraryPlaylistFilter = value;

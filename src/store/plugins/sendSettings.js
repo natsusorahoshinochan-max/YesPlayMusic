@@ -1,11 +1,17 @@
+import cloneDeep from 'lodash/cloneDeep';
+import isEqual from 'lodash/isEqual';
+
 export function getSendSettingsPlugin() {
-  const electron = window.require('electron');
-  const ipcRenderer = electron.ipcRenderer;
+  const { ipcRenderer } = window.require('electron');
   return store => {
-    ipcRenderer.send('settings', store.getters['preferences/settings']);
-    store.subscribe((mutation, state) => {
-      if (!mutation.type.startsWith('preferences/')) return;
-      ipcRenderer.send('settings', state.preferences.settings);
-    });
+    let previous;
+    const sync = () => {
+      const settings = store.getters['preferences/settings'];
+      if (isEqual(settings, previous)) return;
+      ipcRenderer.send('settings', settings);
+      previous = cloneDeep(settings);
+    };
+    sync();
+    store.subscribe(sync);
   };
 }
