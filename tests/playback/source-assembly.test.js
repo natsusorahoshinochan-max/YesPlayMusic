@@ -37,6 +37,7 @@ test('the production assembly reads each real source endpoint and plays through 
   const notify = jest.fn();
   const playback = createPlayer({
     store: {
+      state: { lastfm: {} },
       getters: { 'preferences/settings': {}, 'session/hasAccount': true },
       dispatch: notify,
     },
@@ -90,6 +91,7 @@ test('a production source request failure reaches the application feedback outle
   const dispatch = jest.fn();
   const playback = createPlayer({
     store: {
+      state: { lastfm: {} },
       getters: { 'preferences/settings': {}, 'session/hasAccount': true },
       dispatch,
     },
