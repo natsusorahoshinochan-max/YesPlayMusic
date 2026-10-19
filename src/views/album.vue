@@ -245,22 +245,26 @@ export default {
       return this.$store.state.player.playAlbum(id, { startTrackId });
     },
     async likeAlbum(toast = false) {
-      const favorite = !this.dynamicDetail.isSub;
-      const result = await this.$store.dispatch('library/setAlbumFavorite', {
-        id: this.album.id,
-        favorite,
-      });
-      if (result.outcome.status === 'succeeded')
-        this.dynamicDetail.isSub = favorite;
-      showLibraryChangeFeedback(
-        this.$store,
-        result,
-        toast === true
-          ? favorite
-            ? '已保存到音乐库'
-            : '已从音乐库删除'
-          : undefined
-      );
+      try {
+        const favorite = !this.dynamicDetail.isSub;
+        const result = await this.$store.dispatch('library/setAlbumFavorite', {
+          id: this.album.id,
+          favorite,
+        });
+        if (result.outcome.status === 'succeeded')
+          this.dynamicDetail.isSub = favorite;
+        showLibraryChangeFeedback(
+          this.$store,
+          result,
+          toast === true
+            ? favorite
+              ? '已保存到音乐库'
+              : '已从音乐库删除'
+            : undefined
+        );
+      } catch (error) {
+        this.showToast(error.message || '操作失败，请重试');
+      }
     },
     formatTitle() {
       let splitTitle = splitSoundtrackAlbumTitle(this.album.name);

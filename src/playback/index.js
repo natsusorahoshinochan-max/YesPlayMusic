@@ -136,6 +136,10 @@ export function createPlayback({
     return true;
   }
   function failSelection(context, reason) {
+    if (!valid(context)) return outcome('superseded');
+    fmRequest++;
+    state.personalFMLoading = false;
+    state.personalFMNextLoading = false;
     if (!stopCurrent(context)) return outcome('superseded');
     return feedback(context, outcome('failed', reason));
   }

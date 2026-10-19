@@ -38,7 +38,7 @@ export default function createLibrary(
       setCollection(context, 'songs', ids);
     }
     const tracks = ids.length
-      ? (await api.getTrackDetail(ids.slice(0, 12).join(','))).songs
+      ? (await api.getTrackDetail(ids.slice(0, 12).join(',')))?.songs
       : [];
     if (!Array.isArray(tracks))
       throw new Error('Liked songs preview tracks unavailable');
@@ -66,6 +66,8 @@ export default function createLibrary(
     );
     const data = {};
     ['allData', 'weekData'].forEach((name, index) => {
+      if (!Array.isArray(result[index]?.[name]))
+        throw new Error('Play history unavailable');
       data[name] = result[index][name].map(item => ({
         ...item.song,
         playCount: item.playCount,
@@ -84,7 +86,9 @@ export default function createLibrary(
     if (!context.rootGetters['session/hasLibraryIdentity']) return;
     if (context.rootGetters['session/hasAccount']) {
       const result = await api.userAccount();
-      if (result.code === 200) context.commit('setUser', result.profile);
+      if (result?.code !== 200 || !result.profile?.userId)
+        throw new Error('Account profile unavailable');
+      context.commit('setUser', result.profile);
       reportBackground(context, loadSongs(context));
       reportBackground(
         context,
