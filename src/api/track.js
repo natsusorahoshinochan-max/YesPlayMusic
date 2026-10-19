@@ -1,4 +1,5 @@
 import store from '@/store';
+import readMetadata from './metadataCache';
 import request from '@/utils/request';
 import { mapTrackPlayableStatus } from '@/utils/common';
 import {
@@ -38,34 +39,35 @@ export function getMP3(id) {
  * @param {string} ids - 音乐 id, 例如 ids=405998841,33894312
  */
 export function getTrackDetail(ids) {
-  const fetchLatest = () => {
-    return request({
-      url: '/song/detail',
-      method: 'get',
-      params: {
-        ids,
-      },
-    }).then(data => {
-      data.songs.map(song => {
-        const privileges = data.privileges.find(t => t.id === song.id);
-        cacheTrackDetail(song, privileges);
+  const idsInArray = String(ids).split(',');
+  const convert = data => ({
+    ...data,
+    songs: mapTrackPlayableStatus(data.songs, data.privileges),
+  });
+  return readMetadata({
+    readCache: async () => {
+      const cached = await getTrackDetailFromCache(idsInArray);
+      return cached == null ? cached : convert(cached);
+    },
+    fetchLatest: async () => {
+      const data = await request({
+        url: '/song/detail',
+        method: 'get',
+        params: { ids },
       });
-      data.songs = mapTrackPlayableStatus(data.songs, data.privileges);
-      return data;
-    });
-  };
-  fetchLatest();
-
-  let idsInArray = [String(ids)];
-  if (typeof ids === 'string') {
-    idsInArray = ids.split(',');
-  }
-
-  return getTrackDetailFromCache(idsInArray).then(result => {
-    if (result) {
-      result.songs = mapTrackPlayableStatus(result.songs, result.privileges);
-    }
-    return result ?? fetchLatest();
+      await Promise.all(
+        data.songs.map(song =>
+          cacheTrackDetail(
+            song,
+            data.privileges.find(t => t.id === song.id)
+          )
+        )
+      );
+      const songs = idsInArray
+        .map(id => data.songs.find(song => String(song.id) === id))
+        .filter(Boolean);
+      return convert({ ...data, songs });
+    },
   });
 }
 
@@ -75,23 +77,17 @@ export function getTrackDetail(ids) {
  * @param {number} id - 音乐 id
  */
 export function getLyric(id) {
-  const fetchLatest = () => {
-    return request({
-      url: '/lyric',
-      method: 'get',
-      params: {
-        id,
-      },
-    }).then(result => {
-      cacheLyric(id, result);
+  return readMetadata({
+    readCache: () => getLyricFromCache(id),
+    fetchLatest: async () => {
+      const result = await request({
+        url: '/lyric',
+        method: 'get',
+        params: { id },
+      });
+      await cacheLyric(id, result);
       return result;
-    });
-  };
-
-  fetchLatest();
-
-  return getLyricFromCache(id).then(result => {
-    return result ?? fetchLatest();
+    },
   });
 }
 
@@ -101,30 +97,21 @@ export function getLyric(id) {
  * @param {number} userId - 用户 id
  */
 export function getCloudLyric(songId, userId) {
-  const fetchLatest = () => {
-    return request({
-      url: '/api',
-      method: 'get',
-      params: {
-        uri: `/api/cloud/lyric/get`,
-        data: {
-          songId,
-          userId,
-          lv: '-1',
-          kv: '-1',
+  return readMetadata({
+    readCache: () => getLyricFromCache(songId),
+    fetchLatest: async () => {
+      const result = await request({
+        url: '/api',
+        method: 'get',
+        params: {
+          uri: '/api/cloud/lyric/get',
+          data: { songId, userId, lv: '-1', kv: '-1' },
+          crypto: 'eapi',
         },
-        crypto: 'eapi',
-      },
-    }).then(result => {
-      cacheLyric(songId, result);
+      });
+      await cacheLyric(songId, result);
       return result;
-    });
-  };
-
-  fetchLatest();
-
-  return getLyricFromCache(songId).then(result => {
-    return result ?? fetchLatest();
+    },
   });
 }
 

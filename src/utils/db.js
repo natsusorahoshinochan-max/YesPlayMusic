@@ -116,7 +116,7 @@ export function getTrackSource(id) {
 }
 
 export function cacheTrackDetail(track, privileges) {
-  db.trackDetail.put({
+  return db.trackDetail.put({
     id: track.id,
     detail: track,
     privileges: privileges,
@@ -145,7 +145,7 @@ export function getTrackDetailFromCache(ids) {
 }
 
 export function cacheLyric(id, lyrics) {
-  db.lyric.put({
+  return db.lyric.put({
     id,
     lyrics,
     updateTime: new Date().getTime(),
@@ -160,7 +160,7 @@ export function getLyricFromCache(id) {
 }
 
 export function cacheAlbum(id, album) {
-  db.album.put({
+  return db.album.put({
     id: Number(id),
     album,
     updateTime: new Date().getTime(),

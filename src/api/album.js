@@ -1,4 +1,5 @@
 import request from '@/utils/request';
+import readMetadata from './metadataCache';
 import { mapTrackPlayableStatus } from '@/utils/common';
 import { cacheAlbum, getAlbumFromCache } from '@/utils/db';
 
@@ -8,23 +9,24 @@ import { cacheAlbum, getAlbumFromCache } from '@/utils/db';
  * @param {number} id
  */
 export function getAlbum(id) {
-  const fetchLatest = () => {
-    return request({
-      url: '/album',
-      method: 'get',
-      params: {
-        id,
-      },
-    }).then(data => {
-      cacheAlbum(id, data);
-      data.songs = mapTrackPlayableStatus(data.songs);
-      return data;
-    });
-  };
-  fetchLatest();
-
-  return getAlbumFromCache(id).then(result => {
-    return result ?? fetchLatest();
+  const convert = data => ({
+    ...data,
+    songs: mapTrackPlayableStatus(data.songs),
+  });
+  return readMetadata({
+    readCache: async () => {
+      const cached = await getAlbumFromCache(id);
+      return cached == null ? cached : convert(cached);
+    },
+    fetchLatest: async () => {
+      const data = await request({
+        url: '/album',
+        method: 'get',
+        params: { id },
+      });
+      await cacheAlbum(id, data);
+      return convert(data);
+    },
   });
 }
 
