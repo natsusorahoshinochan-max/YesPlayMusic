@@ -7,7 +7,10 @@ window.startNativePublication = id => {
     id,
     name: `native-track-${id}`,
     ar: [{ name: 'native-artist' }],
-    al: { name: 'native-album', picUrl: '' },
+    al: {
+      name: 'native-album',
+      picUrl: 'https://example.invalid/native-art.jpg',
+    },
     dt: 60000,
   };
   window.nativeAcks = [];

@@ -63,6 +63,9 @@ async function nativeWindow() {
     show: false,
     webPreferences: { nodeIntegration: true, contextIsolation: false },
   });
+  win.webContents.on('console-message', (_, level, message) => {
+    console.log(`[renderer ${level}] ${message}`);
+  });
   await win.loadURL(
     'data:text/html,<h1>Native Linux OSD publication acceptance</h1>'
   );
@@ -121,7 +124,7 @@ app
       const offset = evidence.events.length;
       const started = Date.now();
       await win.webContents.executeJavaScript(
-        `window.startNativePublication(${id})`
+        `try { window.startNativePublication(${id}); null } catch (error) { console.error(error.stack); throw error }`
       );
       await until(
         () =>
@@ -176,7 +179,7 @@ app
     await createDbus(win);
     const offset = evidence.events.length;
     await win.webContents.executeJavaScript(
-      'window.startNativePublication(104)'
+      'try { window.startNativePublication(104) } catch (error) { console.error(error.stack); throw error }'
     );
     await until(
       () =>
