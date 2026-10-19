@@ -4,6 +4,7 @@ import { registerGlobalShortcut } from '@/electron/globalShortcut';
 import cloneDeep from 'lodash/cloneDeep';
 import shortcuts from '@/utils/shortcuts';
 import { createMenu } from './menu';
+import { registerProxy } from './proxy';
 import { isCreateTray, isMac } from '@/utils/platform';
 
 const clc = require('cli-color');
@@ -260,24 +261,7 @@ export function initIpcMain(win, store, trayEventEmitter) {
     });
   });
 
-  ipcMain.on('setProxy', (event, config) => {
-    const proxyRules = `${config.protocol}://${config.server}:${config.port}`;
-    store.set('proxy', proxyRules);
-    win.webContents.session.setProxy(
-      {
-        proxyRules,
-      },
-      () => {
-        log('finished setProxy');
-      }
-    );
-  });
-
-  ipcMain.on('removeProxy', (event, arg) => {
-    log('removeProxy');
-    win.webContents.session.setProxy({});
-    store.set('proxy', '');
-  });
+  registerProxy(ipcMain, win.webContents.session, store);
 
   ipcMain.on('switchGlobalShortcutStatusTemporary', (e, status) => {
     log('switchGlobalShortcutStatusTemporary');
