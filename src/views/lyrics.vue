@@ -105,7 +105,7 @@
                 <div class="buttons">
                   <button-icon
                     :title="$t('player.like')"
-                    @click.native="likeATrack(player.currentTrack.id)"
+                    @click.native="toggleTrackFavorite(player.currentTrack.id)"
                   >
                     <svg-icon
                       :icon-class="
@@ -507,7 +507,7 @@ export default {
   },
   methods: {
     ...mapMutations(['toggleLyrics', 'updateModal']),
-    ...mapActions('library', ['likeATrack']),
+    ...mapActions('library', ['toggleTrackFavorite']),
     initDate() {
       var _this = this;
       clearInterval(this.timer);
@@ -544,7 +544,7 @@ export default {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
-      this.$store.dispatch('library/fetchLikedPlaylist');
+      this.$store.dispatch('library/refreshPlaylists');
       this.updateModal({
         modalName: 'addTrackToPlaylistModal',
         key: 'show',

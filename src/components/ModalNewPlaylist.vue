@@ -32,7 +32,6 @@
 import Modal from '@/components/Modal.vue';
 import locale from '@/locale';
 import { mapMutations, mapState, mapActions } from 'vuex';
-import { createPlaylist, addOrRemoveTrackFromPlaylist } from '@/api/playlist';
 
 export default {
   name: 'ModalNewPlaylist',
@@ -68,7 +67,6 @@ export default {
   methods: {
     ...mapMutations(['updateModal']),
     ...mapActions(['showToast']),
-    ...mapActions('library', ['fetchLikedPlaylist']),
     close() {
       this.show = false;
       this.title = '';
@@ -76,35 +74,31 @@ export default {
       this.resetAfterCreateAddTrackID();
     },
     createPlaylist() {
-      let params = { name: this.title };
-      if (this.private) params.type = 10;
-      createPlaylist(params).then(data => {
-        if (data.code === 200) {
-          if (this.modals.newPlaylistModal.afterCreateAddTrackID !== 0) {
-            addOrRemoveTrackFromPlaylist({
-              op: 'add',
-              pid: data.id,
-              tracks: this.modals.newPlaylistModal.afterCreateAddTrackID,
-            }).then(data => {
-              if (data.body.code === 200) {
-                this.showToast(locale.t('toast.savedToPlaylist'));
-              } else {
-                this.showToast(data.body.message);
-              }
-              this.resetAfterCreateAddTrackID();
-            });
+      this.$store
+        .dispatch('library/createPlaylist', {
+          name: this.title,
+          privacy: this.privatePlaylist,
+          trackID: this.modals.newPlaylistModal.afterCreateAddTrackID,
+        })
+        .then(data => {
+          if (data?.code === 200) {
+            if (data.trackResult) {
+              this.showToast(
+                data.trackResult.body.code === 200
+                  ? locale.t('toast.savedToPlaylist')
+                  : data.trackResult.body.message
+              );
+            }
+            this.close();
+            this.showToast('成功创建歌单');
+            this.$store.commit('preferences/setLibraryPlaylistFilter', 'mine');
           }
-          this.close();
-          this.showToast('成功创建歌单');
-          this.$store.commit('preferences/setLibraryPlaylistFilter', 'mine');
-          this.fetchLikedPlaylist();
-        }
-      });
+        });
     },
     resetAfterCreateAddTrackID() {
       this.updateModal({
         modalName: 'newPlaylistModal',
-        key: 'AfterCreateAddTrackID',
+        key: 'afterCreateAddTrackID',
         value: 0,
       });
     },

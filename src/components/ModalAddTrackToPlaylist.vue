@@ -31,17 +31,11 @@
 import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
 import Modal from '@/components/Modal.vue';
 import locale from '@/locale';
-import { addOrRemoveTrackFromPlaylist } from '@/api/playlist';
 
 export default {
   name: 'ModalAddTrackToPlaylist',
   components: {
     Modal,
-  },
-  data() {
-    return {
-      playlists: [],
-    };
   },
   computed: {
     ...mapGetters({
@@ -82,18 +76,20 @@ export default {
       this.show = false;
     },
     addTrackToPlaylist(playlistID) {
-      addOrRemoveTrackFromPlaylist({
-        op: 'add',
-        pid: playlistID,
-        tracks: this.modals.addTrackToPlaylistModal.selectedTrackID,
-      }).then(data => {
-        if (data.body.code === 200) {
-          this.show = false;
-          this.showToast(locale.t('toast.savedToPlaylist'));
-        } else {
-          this.showToast(data.body.message);
-        }
-      });
+      this.$store
+        .dispatch('library/changePlaylistTracks', {
+          op: 'add',
+          pid: playlistID,
+          tracks: this.modals.addTrackToPlaylistModal.selectedTrackID,
+        })
+        .then(data => {
+          if (data.body.code === 200) {
+            this.show = false;
+            this.showToast(locale.t('toast.savedToPlaylist'));
+          } else {
+            this.showToast(data.body.message);
+          }
+        });
     },
     newPlaylist() {
       this.updateModal({

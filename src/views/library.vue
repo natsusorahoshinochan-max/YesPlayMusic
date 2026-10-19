@@ -216,7 +216,6 @@
 <script>
 import { mapActions, mapMutations, mapGetters } from 'vuex';
 import { randomNum } from '@/utils/common';
-import { uploadSong } from '@/api/user';
 import { getLyric } from '@/api/track';
 import NProgress from 'nprogress';
 import locale from '@/locale';
@@ -243,7 +242,6 @@ export default {
   data() {
     return {
       show: false,
-      likedSongs: [],
       lyric: undefined,
       currentTab: 'playlists',
       playHistoryMode: 'week',
@@ -254,6 +252,7 @@ export default {
       user: 'library/user',
       likedSongPlaylistID: 'library/likedSongPlaylistID',
       liked: 'library/collections',
+      previewReady: 'library/previewReady',
       libraryPlaylistFilter: 'preferences/libraryPlaylistFilter',
     }),
 
@@ -310,7 +309,6 @@ export default {
     setTimeout(() => {
       if (!this.show) NProgress.start();
     }, 1000);
-    this.loadData();
   },
   activated() {
     this.$parent.$refs.scrollbar.restorePosition();
@@ -321,25 +319,16 @@ export default {
     ...mapActions(['showToast']),
     ...mapMutations(['updateModal']),
     loadData() {
-      if (this.liked.songsWithDetails.length > 0) {
-        NProgress.done();
-        this.show = true;
-        this.$store.dispatch('library/fetchLikedSongsWithDetails');
-        this.getRandomLyric();
-      } else {
-        this.$store.dispatch('library/fetchLikedSongsWithDetails').then(() => {
-          NProgress.done();
+      this.show = this.previewReady;
+      if (this.show) NProgress.done();
+      return this.$store
+        .dispatch('library/loadPage')
+        .then(() => {
           this.show = true;
           this.getRandomLyric();
-        });
-      }
-      this.$store.dispatch('library/fetchLikedSongs');
-      this.$store.dispatch('library/fetchLikedPlaylist');
-      this.$store.dispatch('library/fetchLikedAlbums');
-      this.$store.dispatch('library/fetchLikedArtists');
-      this.$store.dispatch('library/fetchLikedMVs');
-      this.$store.dispatch('library/fetchCloudDisk');
-      this.$store.dispatch('library/fetchPlayHistory');
+        })
+        .catch(() => this.showToast('音乐库加载失败'))
+        .finally(() => NProgress.done());
     },
     playLikedSongs() {
       this.$store.state.player.playPlaylistByID(
@@ -406,17 +395,7 @@ export default {
       this.$refs.cloudDiskUploadInput.click();
     },
     uploadSongToCloudDisk(e) {
-      const files = e.target.files;
-      uploadSong(files[0]).then(result => {
-        if (result.code === 200) {
-          let newCloudDisk = this.liked.cloudDisk;
-          newCloudDisk.unshift(result.privateCloud);
-          this.$store.commit('library/setCollection', {
-            name: 'cloudDisk',
-            data: newCloudDisk,
-          });
-        }
-      });
+      this.$store.dispatch('library/uploadCloudTrack', e.target.files[0]);
     },
   },
 };

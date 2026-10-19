@@ -220,7 +220,7 @@ export default {
       this.$parent.playThisList(this.track.id);
     },
     likeThisSong() {
-      this.$parent.likeATrack(this.track.id);
+      this.$parent.toggleTrackFavorite(this.track.id);
     },
   },
 };

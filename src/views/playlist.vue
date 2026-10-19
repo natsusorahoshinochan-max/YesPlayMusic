@@ -221,11 +221,7 @@
 <script>
 import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
 import NProgress from 'nprogress';
-import {
-  getPlaylistDetail,
-  subscribePlaylist,
-  deletePlaylist,
-} from '@/api/playlist';
+import { getPlaylistDetail } from '@/api/playlist';
 import { getTrackDetail } from '@/api/track';
 import nativeAlert from '@/utils/nativeAlert';
 import locale from '@/locale';
@@ -433,21 +429,23 @@ export default {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
-      subscribePlaylist({
-        id: this.playlist.id,
-        t: this.playlist.subscribed ? 2 : 1,
-      }).then(data => {
-        if (data.code === 200) {
-          this.playlist.subscribed = !this.playlist.subscribed;
-          if (toast === true)
-            this.showToast(
-              this.playlist.subscribed ? '已保存到音乐库' : '已从音乐库删除'
-            );
-        }
-        getPlaylistDetail(this.id, true).then(data => {
-          this.playlist = data.playlist;
+      this.$store
+        .dispatch('library/setPlaylistFavorite', {
+          id: this.playlist.id,
+          favorite: !this.playlist.subscribed,
+        })
+        .then(data => {
+          if (data.code === 200) {
+            this.playlist.subscribed = !this.playlist.subscribed;
+            if (toast === true)
+              this.showToast(
+                this.playlist.subscribed ? '已保存到音乐库' : '已从音乐库删除'
+              );
+          }
+          getPlaylistDetail(this.id, true).then(data => {
+            this.playlist = data.playlist;
+          });
         });
-      });
     },
     loadData(id, next = undefined) {
       this.id = id;
@@ -499,14 +497,16 @@ export default {
       }
       let confirmation = confirm(`确定要删除歌单 ${this.playlist.name}？`);
       if (confirmation === true) {
-        deletePlaylist(this.playlist.id).then(data => {
-          if (data.code === 200) {
-            nativeAlert(`已删除歌单 ${this.playlist.name}`);
-            this.$router.go(-1);
-          } else {
-            nativeAlert('发生错误');
-          }
-        });
+        this.$store
+          .dispatch('library/deletePlaylist', this.playlist.id)
+          .then(data => {
+            if (data.code === 200) {
+              nativeAlert(`已删除歌单 ${this.playlist.name}`);
+              this.$router.go(-1);
+            } else {
+              nativeAlert('发生错误');
+            }
+          });
       }
     },
     editPlaylist() {

@@ -43,7 +43,7 @@
 </template>
 
 <script>
-import { mvDetail, mvUrl, simiMv, likeAMV } from '@/api/mv';
+import { mvDetail, mvUrl, simiMv } from '@/api/mv';
 import NProgress from 'nprogress';
 import locale from '@/locale';
 import '@/assets/css/plyr.css';
@@ -132,12 +132,14 @@ export default {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
-      likeAMV({
-        mvid: this.mv.data.id,
-        t: this.mv.subed ? 0 : 1,
-      }).then(data => {
-        if (data.code === 200) this.mv.subed = !this.mv.subed;
-      });
+      this.$store
+        .dispatch('library/setMVFavorite', {
+          id: this.mv.data.id,
+          favorite: !this.mv.subed,
+        })
+        .then(data => {
+          if (data.code === 200) this.mv.subed = !this.mv.subed;
+        });
     },
     openMenu(e) {
       this.$refs.mvMenu.openMenu(e);

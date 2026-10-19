@@ -55,7 +55,7 @@
                   ? $t('player.unlike')
                   : $t('player.like')
               "
-              @click.native="likeATrack(player.currentTrack.id)"
+              @click.native="toggleTrackFavorite(player.currentTrack.id)"
             >
               <svg-icon
                 v-show="!player.isCurrentTrackLiked"
@@ -237,7 +237,7 @@ export default {
   methods: {
     ...mapMutations(['toggleLyrics']),
     ...mapActions(['showToast']),
-    ...mapActions('library', ['likeATrack']),
+    ...mapActions('library', ['toggleTrackFavorite']),
     handleClick(event) {
       if (event.target == this.mouseDownTarget) {
         this.toggleLyrics();
