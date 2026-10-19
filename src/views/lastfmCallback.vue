@@ -11,8 +11,6 @@
 </template>
 
 <script>
-import { authGetSession } from '@/api/lastfm';
-
 export default {
   name: 'LastfmCallback',
   data() {
@@ -25,17 +23,17 @@ export default {
       this.done = true;
       return;
     }
-    authGetSession(token).then(result => {
-      if (!result.data.session) {
+    this.$store
+      .dispatch('lastfm/completeAuthorization', token)
+      .then(() => {
+        this.message = '已成功连接到 Last.fm';
+      })
+      .catch(() => {
         this.message = '连接失败，请重试或联系开发者（无Session）';
+      })
+      .finally(() => {
         this.done = true;
-        return;
-      }
-      localStorage.setItem('lastfm', JSON.stringify(result.data.session));
-      this.$store.commit('updateLastfm', result.data.session);
-      this.message = '已成功连接到 Last.fm';
-      this.done = true;
-    });
+      });
   },
   methods: {
     close() {

@@ -195,7 +195,7 @@ describe('session and preferences public contracts (#1 and #8)', () => {
       expect(credentials.get('MUSIC_U')).toBeUndefined();
       expect(settingsOf(store)).toEqual(before);
       expect(storage.read('settings')).toEqual(before);
-      expect(store.state.lastfm).toEqual(lastfm);
+      expect(store.getters['lastfm/authorization']).toEqual(lastfm);
       expect(storage.read('lastfm')).toEqual(lastfm);
       expect(navigate).toHaveBeenCalledWith(
         action === 'logout' ? 'logout' : 'invalidated'

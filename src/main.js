@@ -94,6 +94,7 @@ startApplication({
       store,
       router,
       beforeDestroy() {
+        store.dispatch('lastfm/stopConnecting');
         store.state.player.dispose();
       },
       render: h => h(App),
