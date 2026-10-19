@@ -72,6 +72,6 @@ App 调用 `library/loadApplication`，音乐库页调用 `library/loadPage`，�
 
 ## 验证边界
 
-测试从真实 Vuex 组合的公开操作进入，覆盖密码与二维码登录、公开身份、恢复、退出、失效、加载与收藏变更；HTTP、存储、时间和应用效果使用受控 adapter。集成测试覆盖真实组件、locale、Player 首次请求、Electron 设置和喜欢状态同步，以及存储样本的读取与写回。
+现有实现对应的测试套件位于 `tests/obsolete/`，供查阅，默认测试运行不包含这些套件。当前有效套件为空。后续验收依据已确认的需求与设计建立测试，通过公开 interface 验证目标行为。
 
 spec #1 不承诺共享会话验证、完整登录尝试隔离、旧请求结果屏蔽、并发失效去重、完整账号集合重置、请求合并或统一失败契约。这些已确认目标及其验收条件保留在独立的[行为完善需求](../requirements/session-behavior-improvements.md)，不作为当前结构实现的能力描述。

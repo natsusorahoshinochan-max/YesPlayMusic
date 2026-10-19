@@ -2,6 +2,7 @@ module.exports = {
   testEnvironment: 'jsdom',
   testEnvironmentOptions: { url: 'http://localhost/' },
   testMatch: ['<rootDir>/tests/**/*.test.js'],
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/tests/obsolete/'],
   moduleFileExtensions: ['js', 'json', 'vue'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

@@ -66,17 +66,18 @@ yarn lint --no-fix
 curl --fail http://127.0.0.1:3000/login/status
 ```
 
-自动测试使用 Jest 29、jsdom、Vue 2 SFC 转换与 Vue Test Utils。当前 Jest、babel-jest 与 jsdom 测试环境的 Node 范围为 `^14.15.0 || ^16.10.0 || >=18`；本项目验证使用声明范围内的 Node 16.20.2。环境测试验证真实 Vue 组件编译、`@/` 别名解析、Vuex 操作、响应式展示和本地存储。会话与音乐库测试通过公开接口使用真实 Vuex 模块，覆盖密码与二维码登录、恢复、公开身份、退出、失效、加载与收藏变更。请求与应用集成测试覆盖 Web/Electron 参数、存储兼容、启动接线、Player 首次请求，以及桌面设置和喜欢状态同步。业务验收以 [spec #1](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/1) 及其 tickets 为准；独立的[行为完善需求](requirements/session-behavior-improvements.md) 不属于已实现测试契约。
+自动测试工具保留 Jest 29、jsdom、Vue 2 SFC 转换与 Vue Test Utils。Jest、babel-jest 与 jsdom 测试环境的 Node 范围为 `^14.15.0 || ^16.10.0 || >=18`；本项目使用 Node 16.20.2。
+
+过时测试位于 `tests/obsolete/`，Jest 与 ESLint 均排除此目录。当前没有有效测试套件，`yarn test --listTests` 返回空列表，`yarn test` 以非零状态报告没有测试。新测试依据[设置结构重构需求](requirements/settings-refactoring.md)、[音乐库变更结构重构需求](requirements/library-mutations-refactoring.md)及对应设计编写，从公开 interface 验证目标行为。
 
 Browserslist 固定为 4.24.0、node-releases 固定为 2.0.18，满足测试工具的依赖范围并保持 Node 16 可安装。
 
 ## 运行基线
 
 - 常规依赖安装与 `--frozen-lockfile` 安装均通过；Electron 可执行文件保持可用。
-- `yarn test` 覆盖 10 个测试套件、56 项测试。
 - Web 生产构建通过；Electron renderer 与主进程 bundle 构建通过（`--skipElectronBuild`）；开发首页可显示推荐内容。
 - Web API 的登录状态接口正常返回访客结果。
-- Electron 主进程创建窗口并触发 ready-to-show，内置 API 对推荐内容请求返回成功。自动化测试使用受控认证与传输 adapter；桌面完整交互与真实账号登录尚未手动验证。
+- Electron 主进程创建窗口并触发 ready-to-show，内置 API 对推荐内容请求返回成功。桌面完整交互尚未手动验证。
 - lint 存在 6 个错误、7 个警告。错误为桌面主进程和 IPC 中的未使用参数，以及 API 服务中未使用的 import。
 - Electron 启动日志存在 Discord IPC 连接失败和 Vue Devtools 安装失败；应用窗口与内置 API 已继续启动。
 
