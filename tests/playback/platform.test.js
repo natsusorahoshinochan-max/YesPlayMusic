@@ -9,7 +9,7 @@ const track = {
   ar: [{ name: 'Artist' }],
   al: { name: 'Album', picUrl: '/cover' },
 };
-function setup(options = {}) {
+function setup(options = {}, playbackOptions = {}) {
   const ipc = new EventEmitter();
   ipc.send = jest.fn();
   const actions = {};
@@ -41,6 +41,7 @@ function setup(options = {}) {
     },
     onStateChange: state => platform?.publish(state),
     onProgress: value => platform?.progress(value),
+    ...playbackOptions,
   });
   platform = createPlaybackPlatform({
     playback,
@@ -227,5 +228,63 @@ test('disposing platform clears media metadata and ignores an outstanding lyric 
   resolveLyrics({ lrc: { lyric: 'late' } });
   for (let i = 0; i < 8; i++) await Promise.resolve();
   expect(ipc.send.mock.calls).toHaveLength(sent);
+  playback.dispose();
+});
+
+test('new metadata publishes its own progress while the previous audio awaits replacement', async () => {
+  let finishSource;
+  let sample;
+  const source = new Promise(resolve => {
+    finishSource = resolve;
+  });
+  const { playback, platform, mediaSession } = setup(
+    {},
+    {
+      getTrack: async id => ({
+        ...track,
+        id,
+        name: id === 7 ? 'Seven' : 'Eight',
+      }),
+      resources: {
+        resolve: current =>
+          current.id === 7
+            ? Promise.resolve({ kind: 'url', url: '/seven' })
+            : source,
+      },
+      setInterval: callback => {
+        sample = callback;
+        return 1;
+      },
+      clearInterval() {},
+    }
+  );
+  await playback.playTracks([7]);
+  playback.seek(37);
+  expect(window.yesplaymusic.player.progress).toBe(37);
+  const selection = playback.playTracks([8]);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(window.yesplaymusic.player).toMatchObject({
+    currentTrackID: 8,
+    progress: 0,
+  });
+  expect(mediaSession.metadata.title).toBe('Eight');
+  expect(mediaSession.setPositionState).toHaveBeenLastCalledWith({
+    duration: 90,
+    playbackRate: 1,
+    position: 0,
+  });
+  // The old audio is still live, but its operation no longer owns timer output.
+  expect(playback.position()).toBe(37);
+  sample();
+  expect(window.yesplaymusic.player.progress).toBe(0);
+  expect(mediaSession.setPositionState).toHaveBeenLastCalledWith({
+    duration: 90,
+    playbackRate: 1,
+    position: 0,
+  });
+  finishSource({ kind: 'url', url: '/eight' });
+  await selection;
+  platform.dispose();
   playback.dispose();
 });

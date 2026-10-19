@@ -172,7 +172,7 @@ export function createPlaybackPlatform({
       publishedSnapshot = {
         ...state,
         likedCurrentTrack: liked,
-        progress: playback.position(),
+        progress: state.progress,
       };
       publicExport.player = publishedSnapshot;
       send('player', publishedSnapshot);
@@ -195,7 +195,7 @@ export function createPlaybackPlatform({
         }
         if (session)
           session.playbackState = state.playing ? 'playing' : 'paused';
-        discord(state);
+        discord(state, state.progress);
       }
       if (
         createMpris &&
@@ -211,7 +211,7 @@ export function createPlaybackPlatform({
           publishMetadata(state.currentTrack, state);
         }
       }
-      updatePosition(playback.position());
+      updatePosition(state.progress);
     },
     progress(position, detail = {}) {
       if (disposed) return;
