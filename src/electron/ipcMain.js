@@ -1,6 +1,7 @@
 import { app, dialog, ipcMain } from 'electron';
 import UNM from '@unblockneteasemusic/rust-napi';
 import { applyDesktopShortcuts, applyTrayIconTheme } from './preferences';
+import { registerProxy } from './proxy';
 import { isCreateTray, isMac } from '@/utils/platform';
 
 const clc = require('cli-color');
@@ -251,24 +252,7 @@ export function initIpcMain(win, store, trayEventEmitter) {
     });
   });
 
-  ipcMain.on('setProxy', (event, config) => {
-    const proxyRules = `${config.protocol}://${config.server}:${config.port}`;
-    store.set('proxy', proxyRules);
-    win.webContents.session.setProxy(
-      {
-        proxyRules,
-      },
-      () => {
-        log('finished setProxy');
-      }
-    );
-  });
-
-  ipcMain.on('removeProxy', (event, arg) => {
-    log('removeProxy');
-    win.webContents.session.setProxy({});
-    store.set('proxy', '');
-  });
+  registerProxy(ipcMain, win.webContents.session, store);
 
   ipcMain.on('applyShortcuts', (_, control, updateMenu) => {
     applyDesktopShortcuts(win, store, control, updateMenu);

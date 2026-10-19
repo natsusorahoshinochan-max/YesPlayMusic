@@ -9,6 +9,7 @@ export default function createPreferences(
   {
     persist = () => {},
     applyLanguage = () => {},
+    applyProxy = () => {},
     applyAppearance = () => {},
     applyShortcuts = () => {},
     applyTrayIconTheme = () => {},
@@ -125,6 +126,24 @@ export default function createPreferences(
         });
         await persist();
         await applyShortcuts(shortcutControl(state), true);
+      },
+      async submitProxy({ commit, state }, config) {
+        const value = mergeWith(
+          {},
+          state.settings.proxyConfig,
+          config,
+          (previous, next) =>
+            Array.isArray(next) ? cloneDeep(next) : undefined
+        );
+        value.port = Number(value.port) || null;
+        if (!value.server || !value.port || value.protocol === 'noProxy')
+          value.protocol = 'noProxy';
+        commit('updateSettings', { key: 'proxyConfig', value });
+        await persist();
+        await applyProxy(cloneDeep(value));
+      },
+      async disableProxy({ dispatch }) {
+        await dispatch('submitProxy', { protocol: 'noProxy' });
       },
       async applyRestored({ state }) {
         await persist();

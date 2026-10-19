@@ -20,6 +20,7 @@ import {
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 import { startNeteaseMusicApi } from './electron/services';
 import { initIpcMain } from './electron/ipcMain.js';
+import { restoreProxy } from './electron/proxy';
 import { createTray } from '@/electron/tray';
 import { createTouchBar } from './electron/touchBar';
 import { createDockMenu } from './electron/dockMenu';
@@ -400,13 +401,7 @@ class Background {
       // init ipcMain
       initIpcMain(this.window, this.store, this.trayEventEmitter);
 
-      // set proxy
-      const proxyRules = this.store.get('proxy');
-      if (proxyRules) {
-        this.window.webContents.session.setProxy({ proxyRules }, result => {
-          log('finished setProxy', result);
-        });
-      }
+      await restoreProxy(this.window.webContents.session, this.store);
 
       // check for updates
       this.checkForUpdates();

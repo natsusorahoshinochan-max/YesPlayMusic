@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-page" @click="clickOutside">
+  <div class="settings-page" @click.self="clickOutside">
     <div class="container">
       <div v-if="showUserInfo" class="user">
         <div class="left">
@@ -814,6 +814,7 @@ import { auth as lastfmAuth } from '@/api/lastfm';
 import { bytesToSize } from '@/utils/common';
 import { countDBSize, clearDB } from '@/utils/db';
 import pkg from '../../package.json';
+import cloneDeep from 'lodash/cloneDeep';
 
 const electron =
   process.env.IS_ELECTRON === true ? window.require('electron') : null;
@@ -826,6 +827,9 @@ export default {
   name: 'Settings',
   data() {
     return {
+      proxyDraft: cloneDeep(
+        this.$store.getters['preferences/settings'].proxyConfig
+      ),
       tracksCache: {
         size: '0KB',
         length: 0,
@@ -1172,32 +1176,18 @@ export default {
     },
     proxyProtocol: {
       get() {
-        return this.settings.proxyConfig?.protocol || 'noProxy';
+        return this.proxyDraft.protocol || 'noProxy';
       },
       set(value) {
-        let config = this.settings.proxyConfig || {};
-        config.protocol = value;
-        if (value === 'noProxy') {
-          ipcRenderer.send('removeProxy');
-          this.showToast('已关闭代理');
-        }
-        this.$store.commit('preferences/updateSettings', {
-          key: 'proxyConfig',
-          value: config,
-        });
+        this.$set(this.proxyDraft, 'protocol', value);
       },
     },
     proxyServer: {
       get() {
-        return this.settings.proxyConfig?.server || '';
+        return this.proxyDraft.server || '';
       },
       set(value) {
-        let config = this.settings.proxyConfig || {};
-        config.server = value;
-        this.$store.commit('preferences/updateSettings', {
-          key: 'proxyConfig',
-          value: config,
-        });
+        this.$set(this.proxyDraft, 'server', value);
       },
     },
     enableRealIP: {
@@ -1224,15 +1214,10 @@ export default {
     },
     proxyPort: {
       get() {
-        return this.settings.proxyConfig?.port || '';
+        return this.proxyDraft.port || '';
       },
       set(value) {
-        let config = this.settings.proxyConfig || {};
-        config.port = value;
-        this.$store.commit('preferences/updateSettings', {
-          key: 'proxyConfig',
-          value: config,
-        });
+        this.$set(this.proxyDraft, 'port', value);
       },
     },
     unmSource: {
@@ -1413,18 +1398,10 @@ export default {
       this.$store.commit('updateLastfm', {});
     },
     sendProxyConfig() {
-      if (this.proxyProtocol === 'noProxy') return;
-      const config = this.settings.proxyConfig;
-      if (
-        config.server === '' ||
-        !config.port ||
-        config.protocol === 'noProxy'
-      ) {
-        ipcRenderer.send('removeProxy');
-      } else {
-        ipcRenderer.send('setProxy', config);
-      }
-      this.showToast('已更新代理设置');
+      return this.submitPreference(
+        this.proxyProtocol === 'noProxy' ? 'disableProxy' : 'submitProxy',
+        cloneDeep(this.proxyDraft)
+      );
     },
     clickOutside() {
       this.exitRecordShortcut();
