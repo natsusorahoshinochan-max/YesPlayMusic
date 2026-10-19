@@ -2,8 +2,15 @@ import Vue from 'vue';
 import VueGtag from 'vue-gtag';
 import App from './App.vue';
 import router from './router';
-import store from './store';
-import i18n from '@/locale';
+import { createStore } from './store';
+import actions from './store/actions';
+import { initializeTrackCache } from '@/utils/db';
+import { initializeLocale } from '@/locale';
+import { initializeAppearance } from '@/utils/appearance';
+import { configureRequest } from '@/utils/request';
+import { getCookie, doLogout } from '@/utils/auth';
+import { startApplication } from '@/application/startup';
+import { createPlayer } from '@/application/player';
 import '@/assets/icons';
 import '@/utils/filters';
 import './registerServiceWorker';
@@ -38,11 +45,30 @@ Vue.use(
 Vue.config.productionTip = false;
 
 NProgress.configure({ showSpinner: false, trickleSpeed: 100 });
-dailyTask();
-
-new Vue({
-  i18n,
-  store,
-  router,
-  render: h => h(App),
-}).$mount('#app');
+startApplication({
+  createStore() {
+    const store = createStore({ actions });
+    initializeTrackCache();
+    return store;
+  },
+  initializeLocale,
+  initializeAppearance,
+  configureRequest,
+  getCookie,
+  onSessionInvalid() {
+    doLogout();
+    return router.push({
+      name: process.env.IS_ELECTRON ? 'loginAccount' : 'login',
+    });
+  },
+  createPlayer,
+  mount({ store, i18n }) {
+    dailyTask();
+    return new Vue({
+      i18n,
+      store,
+      router,
+      render: h => h(App),
+    }).$mount('#app');
+  },
+});
