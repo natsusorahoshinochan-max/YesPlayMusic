@@ -45,7 +45,7 @@ flowchart TD
 | `playQueuedTrack(id, options)` | 选择现有队列歌曲；options 区分主队列与下一首列表，承接已有选择规则 |
 | `playPersonalFM()` | 进入私人 FM，并执行已有播放或切换动作 |
 | `play()`、`pause()`、`toggle()` | 控制当前音频 |
-| `next()`、`previous()` | 切换歌曲；普通播放与私人 FM 的适用规则由 module 判断 |
+| `next(options)`、`previous()` | 切换歌曲；普通播放与私人 FM 的适用规则由 module 判断；FM 卡片用 `next({ personalFM: true })` 明确选择私人 FM 下一首 |
 | `discardFMTrack()` | 完成私人 FM 丢弃当前歌曲的流程 |
 | `seek(seconds)` | 调整播放位置及相应平台输出 |
 | `setVolume(value)`、`toggleMute()` | 调整音量、静音及恢复静音前音量 |
@@ -65,7 +65,7 @@ flowchart TD
 - 私人 FM 的展示资料与加载状态。
 - 当前音源的 `sourceInfo`，供页面生成来源提示。
 
-`upcoming(limit)` 提供有限长度的待播条目，包含歌曲 ID、主队列或下一首列表的分组信息，以及删除下一首条目所需的位置。它与实际下一首选择共用规则，调用者按返回顺序展示。
+`upcoming(limit)` 提供有限长度的待播条目，包含歌曲 ID、主队列或下一首列表的分组信息，以及删除下一首条目所需的位置。私人 FM 条目另含 `personalFM: true`，将该条目传给 `playQueuedTrack` 时选择对应推荐。它与实际下一首选择共用规则，调用者按返回顺序展示。
 
 `position()` 读取即时音频位置，供需要即时值的歌词和桌面入口使用。普通进度展示使用响应式快照。
 

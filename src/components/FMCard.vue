@@ -85,10 +85,10 @@ export default {
   },
   methods: {
     play() {
-      this.playback.playPersonalFM();
+      return this.playback.playPersonalFM();
     },
     next() {
-      this.playback.next();
+      return this.playback.next({ personalFM: true });
     },
     goToAlbum() {
       const album = this.track.album || this.track.al;

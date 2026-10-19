@@ -201,3 +201,75 @@ test('FM exhausted empty recommendations retries six times and superseded retry 
   expect(q.state.currentTrackID).toBe(5);
   expect(load).toHaveBeenCalledTimes(1);
 });
+test('restore can prepare missing FM recommendations while keeping ordinary mode and later user selection owns late initialization', async () => {
+  const ready = deferred();
+  const { playback: p } = setup({
+    personalFM: { load: () => ready.promise, trash: async () => {} },
+  });
+  await p.restore({ _list: [1, 2], _current: 0, _enabled: false }, 0, {
+    preparePersonalFM: true,
+  });
+  ready.resolve([track(7), track(8)]);
+  await flush();
+  expect(p.state.isPersonalFM).toBe(false);
+  expect(p.state.personalFMTrack.id).toBe(7);
+  expect(p.state.personalFMNextTrack.id).toBe(8);
+  expect(p.state.enabled).toBe(false);
+  const late = deferred();
+  const { playback: q } = setup({
+    personalFM: { load: () => late.promise, trash: async () => {} },
+  });
+  await q.restore({}, 0, { preparePersonalFM: true });
+  await q.playTracks([5]);
+  late.resolve([track(9), track(10)]);
+  await flush();
+  expect(q.state.currentTrackID).toBe(5);
+  expect(q.state.personalFMTrack.id).toBe(0);
+});
+test('FM entry controls keep explicit FM intent from ordinary playback and upcoming selection consumes the recommendation', async () => {
+  const trash = jest.fn(async () => {});
+  const { playback: p } = setup({
+    personalFM: { load: async () => [track(7), track(8)], trash },
+  });
+  await p.playPersonalFM();
+  await p.playTracks([1, 2]);
+  expect((await p.next({ personalFM: true })).status).toBe('completed');
+  expect(p.state.currentTrackID).toBe(8);
+  expect(p.state.isPersonalFM).toBe(true);
+  const { playback: q } = setup({
+    personalFM: { load: async () => [track(7), track(8)], trash },
+  });
+  await q.playPersonalFM();
+  await q.playTracks([1, 2]);
+  await q.discardFMTrack();
+  expect(q.state.currentTrackID).toBe(8);
+  expect(trash).toHaveBeenCalledWith(7);
+  const { playback: r } = setup({
+    personalFM: { load: async () => [track(7), track(8)], trash },
+  });
+  await r.playPersonalFM();
+  const row = r.upcoming(1)[0];
+  expect(await r.playQueuedTrack(row.trackId, row)).toEqual({
+    status: 'completed',
+  });
+  expect(r.state.currentTrackID).toBe(8);
+  expect(r.state.isPersonalFM).toBe(true);
+});
+test('rejected FM requests report a failed outcome and one matching application feedback', async () => {
+  const feedback = [];
+  const { playback: p } = setup({
+    personalFM: {
+      load: async () => {
+        throw new Error('network');
+      },
+    },
+    onFeedback: event => feedback.push(event),
+  });
+  expect(await p.playPersonalFM()).toEqual({
+    status: 'failed',
+    reason: 'fm-timeout',
+  });
+  expect(feedback.map(({ status, reason }) => ({ status, reason }))).toEqual([
+    { status: 'failed', reason: 'fm-timeout' },
+  ]);
+});

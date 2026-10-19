@@ -144,15 +144,20 @@ export function createPlayback({
       return bounded &&
         state.personalFMNextTrack?.id &&
         state.personalFMNextTrack.id !== state.personalFMTrack?.id
-        ? [{ trackId: state.personalFMNextTrack.id, group: 'main', index: 0 }]
+        ? [
+            {
+              trackId: state.personalFMNextTrack.id,
+              group: 'main',
+              index: 0,
+              personalFM: true,
+            },
+          ]
         : [];
-    const result = nextList
-      .slice(0, bounded)
-      .map((trackId, nextIndex) => ({
-        trackId,
-        group: 'next',
-        index: nextIndex,
-      }));
+    const result = nextList.slice(0, bounded).map((trackId, nextIndex) => ({
+      trackId,
+      group: 'next',
+      index: nextIndex,
+    }));
     let position = state.shuffle ? shuffledIndex : index;
     while (result.length < bounded) {
       position = nextMain(position);
@@ -175,7 +180,10 @@ export function createPlayback({
     let id;
     let remaining = list.length + nextList.length;
     do {
-      if (remaining-- <= 0) return outcome('unavailable', 'queue-ended');
+      if (remaining-- <= 0) {
+        publish();
+        return outcome('unavailable', 'queue-ended');
+      }
       if (direction === 1 && nextList.length) id = nextList.shift();
       else {
         const target = nextMain(
@@ -356,7 +364,8 @@ export function createPlayback({
       }
       feedback(context, outcome('unavailable', 'fm-empty'));
     } catch (error) {
-      if (valid(context)) feedback(context, outcome('failed', 'fm-timeout'));
+      if (valid(context))
+        return feedback(context, outcome('failed', 'fm-timeout'));
     } finally {
       if (valid(context)) {
         state.personalFMLoading = false;
@@ -399,7 +408,8 @@ export function createPlayback({
     if (!target?.id) {
       const tracks = await loadFM(context);
       if (!valid(context)) return outcome('superseded');
-      if (!tracks) return outcome('unavailable', 'fm-empty');
+      if (!Array.isArray(tracks))
+        return tracks || outcome('unavailable', 'fm-empty');
       target = tracks[0];
     }
     if (visited.has(target.id)) return outcome('unavailable', 'queue-ended');
@@ -466,8 +476,19 @@ export function createPlayback({
           : feedback(context, outcome('unavailable', 'empty-queue'));
       });
     },
-    playQueuedTrack(id, { group = 'main', index: selectedIndex } = {}) {
+    playQueuedTrack(
+      id,
+      {
+        group = 'main',
+        index: selectedIndex,
+        personalFM: fmSelection = false,
+      } = {}
+    ) {
       return runSelection(context => {
+        if (fmSelection)
+          return id === state.personalFMNextTrack?.id
+            ? advanceFM(context)
+            : outcome('unavailable', 'missing-track');
         if (group === 'next') {
           const position =
             selectedIndex == null ? nextList.indexOf(id) : selectedIndex;
@@ -488,8 +509,8 @@ export function createPlayback({
         return context.select(id);
       });
     },
-    next() {
-      if (state.isPersonalFM)
+    next({ personalFM: forcePersonalFM = false } = {}) {
+      if (state.isPersonalFM || forcePersonalFM)
         return state.personalFMLoading
           ? Promise.resolve(outcome('unavailable', 'fm-loading'))
           : runSelection(context => advanceFM(context));
@@ -562,7 +583,8 @@ export function createPlayback({
         ) {
           const tracks = await loadFM(context);
           if (!valid(context)) return outcome('superseded');
-          if (!tracks) return outcome('unavailable', 'fm-empty');
+          if (!Array.isArray(tracks))
+            return tracks || outcome('unavailable', 'fm-empty');
           state.personalFMTrack = clone(tracks[0]);
           state.personalFMNextTrack = clone(tracks[1] || { id: 0 });
         }
@@ -574,10 +596,18 @@ export function createPlayback({
       });
     },
     discardFMTrack() {
-      if (!state.isPersonalFM || state.personalFMLoading)
+      if (state.personalFMLoading)
         return Promise.resolve(outcome('unavailable', 'fm-loading'));
-      const id = state.personalFMTrack.id;
       return runSelection(async context => {
+        if (!state.personalFMTrack?.id) {
+          const tracks = await loadFM(context);
+          if (!valid(context)) return outcome('superseded');
+          if (!Array.isArray(tracks))
+            return tracks || outcome('unavailable', 'fm-empty');
+          state.personalFMTrack = clone(tracks[0]);
+          state.personalFMNextTrack = clone(tracks[1] || { id: 0 });
+        }
+        const id = state.personalFMTrack.id;
         const result = await advanceFM(context);
         if (valid(context) && result.status === 'completed') {
           await personalFM.trash(id);
@@ -653,7 +683,7 @@ export function createPlayback({
         _personalFMNextTrack: state.personalFMNextTrack,
       });
     },
-    restore(archive, position = 0) {
+    restore(archive, position = 0, { preparePersonalFM = false } = {}) {
       const saved = clone(archive);
       return runSelection(context => {
         context.installQueue(saved._list || [], saved._playlistSource, null);
@@ -688,6 +718,28 @@ export function createPlayback({
         state.volume = saved._volume == null ? 1 : saved._volume;
         volumeBeforeMuted = saved._volumeBeforeMuted || 1;
         publish();
+        if (
+          preparePersonalFM &&
+          personalFM &&
+          (!state.personalFMTrack?.id ||
+            !state.personalFMNextTrack?.id ||
+            state.personalFMTrack.id === state.personalFMNextTrack.id)
+        ) {
+          // Initialization belongs to this restore operation, including when
+          // ordinary playback or a disabled player is being restored.
+          Promise.resolve()
+            .then(() => valid(context) && personalFM.load())
+            .then(tracks => {
+              if (!valid(context) || !tracks?.length) return;
+              state.personalFMTrack = clone(tracks[0]);
+              state.personalFMNextTrack = clone(tracks[1] || { id: 0 });
+              publish();
+            })
+            .catch(error => {
+              if (valid(context))
+                console.debug('[personal FM initialization]', error);
+            });
+        }
         return saved._enabled && saved._currentTrack?.id
           ? context.select(saved._currentTrack.id, {
               autoplay: false,

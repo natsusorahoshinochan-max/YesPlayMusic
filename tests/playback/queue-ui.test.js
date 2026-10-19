@@ -6,6 +6,10 @@ import { createPlayback } from '@/playback';
 import TrackList from '@/components/TrackList.vue';
 import Next from '@/views/next.vue';
 import FMCard from '@/components/FMCard.vue';
+import Search from '@/views/search.vue';
+import Player from '@/components/Player.vue';
+import Lyrics from '@/views/lyrics.vue';
+jest.mock('@/assets/css/slider.css', () => ({}));
 import request from '@/utils/request';
 jest.mock('@/utils/request', () => ({ __esModule: true, default: jest.fn() }));
 const localVue = createLocalVue();
@@ -23,8 +27,12 @@ const settled = async () => {
   await Vue.nextTick();
 };
 function fixture() {
+  const played = [];
   const p = createPlayback({
     getTrack: async id => track(id),
+    onPlaybackEvent: event => {
+      if (event.type === 'played') played.push(event.track.id);
+    },
     resources: {
       resolve: async () => ({ kind: 'url', url: '/audio' }),
       prefetch: async () => {},
@@ -53,7 +61,7 @@ function fixture() {
       'session/hasAccount': () => true,
     },
   });
-  return { p, store };
+  return { p, store, played };
 }
 const mocks = { $t: x => x };
 test('upcoming page preserves duplicate occurrence positions through TrackList selection and removal', async () => {
@@ -94,7 +102,7 @@ test('upcoming page preserves duplicate occurrence positions through TrackList s
   p.dispose();
 });
 test('FM card renders empty recommendations safely and controls the real FM playback snapshot', async () => {
-  const { p, store } = fixture();
+  const { p, store, played } = fixture();
   const card = shallowMount(FMCard, {
     localVue,
     store,
@@ -107,9 +115,46 @@ test('FM card renders empty recommendations safely and controls the real FM play
   await settled();
   expect(card.vm.track.id).toBe(7);
   expect(card.vm.isPlaying).toBe(true);
+  await p.playTracks([1, 2]);
+  played.length = 0;
   await card.vm.next();
   await settled();
   expect(card.vm.track.id).toBe(8);
+  expect(p.state.isPersonalFM).toBe(true);
+  expect(p.archive()._current).toBe(0);
+  expect(played).toEqual([8]);
   card.destroy();
+  p.dispose();
+});
+
+test('search playNow honors queued head and player/lyrics mode controls use public operations', async () => {
+  const { p, store } = fixture();
+  await p.playTracks([1, 2]);
+  p.enqueueNext(8);
+  expect(
+    await Search.methods.playTrackInSearchResult.call({ $store: store }, 9)
+  ).toEqual({ status: 'completed' });
+  expect(p.state.currentTrackID).toBe(8);
+  expect(p.upcoming(1)[0].trackId).toBe(9);
+  const receiver = {
+    playback: p,
+    get player() {
+      return p.state;
+    },
+  };
+  Player.methods.switchRepeatMode.call(receiver);
+  Player.methods.switchShuffle.call(receiver);
+  Player.methods.switchReversed.call(receiver);
+  expect([p.state.repeatMode, p.state.shuffle, p.state.reversed]).toEqual([
+    'on',
+    true,
+    true,
+  ]);
+  Lyrics.methods.switchRepeatMode.call(receiver);
+  Lyrics.methods.switchShuffle.call(receiver);
+  expect([p.state.repeatMode, p.state.shuffle]).toEqual(['one', false]);
+  await p.playPersonalFM();
+  await Player.methods.moveToFMTrash.call(receiver);
+  expect(p.state.currentTrackID).toBe(8);
   p.dispose();
 });
