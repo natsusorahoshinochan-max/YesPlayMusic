@@ -10,7 +10,8 @@ export function createPlaybackFeedback({ notify }) {
     if (event.status === 'superseded' || event.status === 'completed') return;
     if (event.reason === 'unsupported-format')
       notify('无法播放: 不支持的音频格式');
-    else if (event.reason === 'no-source') notify('无法播放当前歌曲');
+    else if (event.reason === 'no-source')
+      notify(`无法播放 ${event.track?.name || '当前歌曲'}`);
     else if (event.status === 'failed') notify('播放失败，请稍后重试');
   };
 }

@@ -14,7 +14,7 @@ export function createPreferenceEffects({
     },
     applyAppearance: applySettingsAppearance,
     applyOutputDevice() {
-      return getPlayer()?.setOutputDevice();
+      return getPlayer()?.applyOutputDevice();
     },
     clearCache: clearDB,
     resetReversedMode() {

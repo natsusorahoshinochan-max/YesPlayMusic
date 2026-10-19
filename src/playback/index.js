@@ -56,7 +56,10 @@ export function createPlayback({
   const holder = observe({ snapshot: freeze(clone(state)) });
   const safe = (receiver, value) => {
     try {
-      receiver(value);
+      const returned = receiver(value);
+      if (returned && typeof returned.catch === 'function') {
+        returned.catch(error => console.debug('[playback receiver]', error));
+      }
     } catch (error) {
       console.debug('[playback receiver]', error);
     }
@@ -68,7 +71,14 @@ export function createPlayback({
   const valid = context => !disposed && context.id === operationId;
   function feedback(context, result) {
     if (valid(context))
-      safe(onFeedback, freeze({ ...result, operationId: context.id }));
+      safe(
+        onFeedback,
+        freeze({
+          ...result,
+          operationId: context.id,
+          track: clone(state.currentTrack),
+        })
+      );
     return result;
   }
   function emit(instance, type, completed = false) {
@@ -263,7 +273,7 @@ export function createPlayback({
       if (prepared && (!current || current.handle !== prepared))
         prepared.dispose();
       if (!valid(context)) return outcome('superseded');
-      if (error.code === 3 || error.code === 4) {
+      if (error?.code === 3 || error?.code === 4) {
         const reason = error.code === 4 ? 'unsupported-format' : 'audio-decode';
         if (error.code === 4) feedback(context, outcome('unavailable', reason));
         await advance(context, direction, visited);
