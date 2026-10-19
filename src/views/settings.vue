@@ -811,7 +811,6 @@
 import { mapState, mapActions, mapGetters } from 'vuex';
 import { auth as lastfmAuth } from '@/api/lastfm';
 import { bytesToSize } from '@/utils/common';
-import { changeAppearance, changeThemeColor } from '@/utils/appearance';
 import { countDBSize, clearDB } from '@/utils/db';
 import pkg from '../../package.json';
 
@@ -919,8 +918,7 @@ export default {
         return this.settings.lang;
       },
       set(lang) {
-        this.$i18n.locale = lang;
-        this.$store.commit('preferences/changeLang', lang);
+        this.submitPreference('setLanguage', lang);
       },
     },
     musicLanguage: {
@@ -928,7 +926,7 @@ export default {
         return this.settings.musicLanguage ?? 'all';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'musicLanguage',
           value,
         });
@@ -940,16 +938,7 @@ export default {
         return this.settings.appearance;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'appearance',
-          value,
-        });
-        changeAppearance(value);
-        const resolvedAppearance =
-          value === 'auto'
-            ? document.body?.getAttribute('data-theme') || 'light'
-            : value;
-        changeThemeColor(this.themeColor, resolvedAppearance);
+        this.submitPreference('setAppearance', value);
       },
     },
     themeColor: {
@@ -958,15 +947,7 @@ export default {
         return this.settings.themeColor;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
-          key: 'themeColor',
-          value,
-        });
-        const resolvedAppearance =
-          this.settings.appearance === 'auto'
-            ? document.body?.getAttribute('data-theme') || 'light'
-            : this.settings.appearance;
-        changeThemeColor(value, resolvedAppearance);
+        this.submitPreference('setThemeColor', value);
       },
     },
     trayIconTheme: {
@@ -1000,7 +981,7 @@ export default {
         return this.settings.lyricFontSize;
       },
       set(value) {
-        this.$store.commit('preferences/changeLyricFontSize', value);
+        this.submitPreference('setPreference', { key: 'lyricFontSize', value });
       },
     },
     outputDevice: {
@@ -1028,7 +1009,7 @@ export default {
         return value !== undefined ? value : true;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'enableUnblockNeteaseMusic',
           value,
         });
@@ -1040,7 +1021,7 @@ export default {
         return this.settings.showPlaylistsByAppleMusic;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'showPlaylistsByAppleMusic',
           value,
         });
@@ -1052,7 +1033,7 @@ export default {
         return this.settings.nyancatStyle;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'nyancatStyle',
           value,
         });
@@ -1078,7 +1059,7 @@ export default {
         return this.settings.showLyricsTranslation;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'showLyricsTranslation',
           value,
         });
@@ -1089,7 +1070,7 @@ export default {
         return this.settings.lyricsBackground || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'lyricsBackground',
           value,
         });
@@ -1100,7 +1081,7 @@ export default {
         return this.settings.showLyricsTime;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'showLyricsTime',
           value,
         });
@@ -1111,7 +1092,7 @@ export default {
         return this.settings.enableOsdlyricsSupport;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'enableOsdlyricsSupport',
           value,
         });
@@ -1122,7 +1103,7 @@ export default {
         return this.settings.closeAppOption;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'closeAppOption',
           value,
         });
@@ -1133,7 +1114,7 @@ export default {
         return this.settings.enableDiscordRichPresence;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'enableDiscordRichPresence',
           value,
         });
@@ -1144,7 +1125,7 @@ export default {
         return this.settings.subTitleDefault;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'subTitleDefault',
           value,
         });
@@ -1181,7 +1162,7 @@ export default {
         return this.settings.showLibraryDefault || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'showLibraryDefault',
           value,
         });
@@ -1192,7 +1173,7 @@ export default {
         return this.settings.cacheLimit || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'cacheLimit',
           value,
         });
@@ -1233,7 +1214,7 @@ export default {
         return this.settings.enableRealIP || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'enableRealIP',
           value: value,
         });
@@ -1244,7 +1225,7 @@ export default {
         return this.settings.realIP || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'realIP',
           value: value,
         });
@@ -1272,9 +1253,9 @@ export default {
       },
       /** @param {string?} value */
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmSource',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1283,7 +1264,7 @@ export default {
         return this.settings.unmSearchMode || 'fast-first';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmSearchMode',
           value: value,
         });
@@ -1294,9 +1275,9 @@ export default {
         return this.settings.unmEnableFlac || false;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmEnableFlac',
-          value: value || false,
+          value,
         });
       },
     },
@@ -1305,9 +1286,9 @@ export default {
         return this.settings.unmProxyUri || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmProxyUri',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1316,9 +1297,9 @@ export default {
         return this.settings.unmJooxCookie || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmJooxCookie',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1327,9 +1308,9 @@ export default {
         return this.settings.unmQQCookie || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmQQCookie',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1338,9 +1319,9 @@ export default {
         return this.settings.unmYtDlExe || '';
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'unmYtDlExe',
-          value: value.length && value,
+          value,
         });
       },
     },
@@ -1349,7 +1330,7 @@ export default {
         return this.settings.linuxEnableCustomTitlebar;
       },
       set(value) {
-        this.$store.commit('preferences/updateSettings', {
+        this.submitPreference('setPreference', {
           key: 'linuxEnableCustomTitlebar',
           value,
         });
@@ -1369,6 +1350,13 @@ export default {
   },
   methods: {
     ...mapActions(['showToast']),
+    submitPreference(action, payload) {
+      return this.$store
+        .dispatch(`preferences/${action}`, payload)
+        .catch(error => {
+          this.showToast(error.message || '设置保存失败');
+        });
+    },
     getAllOutputDevices() {
       navigator.mediaDevices.enumerateDevices().then(devices => {
         this.allOutputDevices = devices.filter(device => {

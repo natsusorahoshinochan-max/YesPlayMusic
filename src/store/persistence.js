@@ -1,17 +1,28 @@
 import cloneDeep from 'lodash/cloneDeep';
+import isEqual from 'lodash/isEqual';
+import mergeWith from 'lodash/mergeWith';
 import defaults from './initLocalStorage';
 import pkg from '../../package.json';
 
 export function createPersistence(storage, language = 'en') {
   const version = storage.getItem('appVersion');
+  const saved = {
+    settings: JSON.parse(storage.getItem('settings')),
+    data: JSON.parse(storage.getItem('data')),
+  };
+  const pending = {};
+  let ready;
   const data = {
     ...cloneDeep(defaults.data),
     ...JSON.parse(storage.getItem('data')),
   };
-  const settings = {
-    ...cloneDeep(defaults.settings),
-    ...JSON.parse(storage.getItem('settings')),
-  };
+  const restoredSettings = JSON.parse(storage.getItem('settings'));
+  const settings = mergeWith(
+    {},
+    defaults.settings,
+    restoredSettings,
+    (previous, value) => (Array.isArray(value) ? cloneDeep(value) : undefined)
+  );
   const missingShortcuts = defaults.settings.shortcuts.filter(
     shortcut =>
       !settings.shortcuts.some(existing => existing.id === shortcut.id)
@@ -34,28 +45,59 @@ export function createPersistence(storage, language = 'en') {
       libraryPlaylistFilter: data.libraryPlaylistFilter ?? 'all',
     },
   };
-  const write = state => {
-    storage.setItem('settings', JSON.stringify(state.preferences.settings));
-    storage.setItem(
-      'data',
-      JSON.stringify({
+  function write(key, value) {
+    if (pending[key] && isEqual(pending[key].value, value))
+      return pending[key].promise;
+    if (!pending[key] && isEqual(saved[key], value)) return;
+    const snapshot = cloneDeep(value);
+    const perform = () => {
+      const result = storage.setItem(key, JSON.stringify(snapshot));
+      if (!result || typeof result.then !== 'function') {
+        saved[key] = snapshot;
+        return;
+      }
+      return Promise.resolve(result).then(() => {
+        saved[key] = snapshot;
+      });
+    };
+    const result = pending[key]
+      ? pending[key].promise.catch(() => {}).then(perform)
+      : perform();
+    if (!result) return;
+    const entry = { value: snapshot };
+    entry.promise = result.finally(() => {
+      if (pending[key] === entry) delete pending[key];
+    });
+    pending[key] = entry;
+    return entry.promise;
+  }
+  const save = state =>
+    Promise.all([
+      write('settings', state.preferences.settings),
+      write('data', {
         ...data,
         loginMode: state.session.loginMode,
         lastRefreshCookieDate: state.session.lastRefreshCookieDate,
         user: state.library.user,
         likedSongPlaylistID: state.library.likedSongPlaylistID,
         libraryPlaylistFilter: state.preferences.libraryPlaylistFilter,
-      })
-    );
-  };
+      }),
+    ]);
   return {
     snapshot,
+    save,
+    get ready() {
+      return ready;
+    },
     install(store) {
-      write(store.state);
-      storage.setItem('appVersion', JSON.stringify(pkg.version));
+      ready = save(store.state).then(() => {
+        if (version !== JSON.stringify(pkg.version))
+          return storage.setItem('appVersion', JSON.stringify(pkg.version));
+      });
+      ready.catch(() => {});
       store.subscribe((mutation, state) => {
         if (/^(preferences|session|library)\//.test(mutation.type))
-          write(state);
+          save(state).catch(() => {});
       });
     },
   };

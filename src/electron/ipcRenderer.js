@@ -81,10 +81,14 @@ export function ipcRenderer(vueInstance) {
   });
 
   ipcRenderer.on('rememberCloseAppOption', (event, value) => {
-    store.commit('preferences/updateSettings', {
-      key: 'closeAppOption',
-      value,
-    });
+    store
+      .dispatch('preferences/setPreference', {
+        key: 'closeAppOption',
+        value,
+      })
+      .catch(error =>
+        store.dispatch('showToast', error.message || '设置保存失败')
+      );
   });
 
   ipcRenderer.on('setPosition', (event, position) => {

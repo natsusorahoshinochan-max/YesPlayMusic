@@ -10,7 +10,8 @@ import { createRequestEnvironment } from '@/application/requestEnvironment';
 import { createSessionEffects } from '@/application/sessionEffects';
 import { libraryApi } from '@/application/library';
 import { initializeTrackCache } from '@/utils/db';
-import { initializeLocale } from '@/locale';
+import i18n, { initializeLocale } from '@/locale';
+import { createPreferenceEffects } from '@/application/preferenceEffects';
 import { initializeAppearance } from '@/utils/appearance';
 import { configureRequest } from '@/utils/request';
 import { startApplication } from '@/application/startup';
@@ -61,6 +62,7 @@ startApplication({
           notify: message => store.dispatch('showToast', message),
         }),
       },
+      preferences: createPreferenceEffects({ getLocale: () => i18n }),
       library: {
         api: libraryApi,
         notifyLikedSongsChanged: () =>

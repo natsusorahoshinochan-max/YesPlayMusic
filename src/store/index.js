@@ -20,6 +20,7 @@ export function createStore({
   credentials = noCredentials,
   session = {},
   library = {},
+  preferences = {},
   playlistDetail = {},
   actions = {},
 } = {}) {
@@ -27,7 +28,7 @@ export function createStore({
   const persistence = createPersistence(storage, language);
   const plugins = [persistence.install];
   if (process.env.IS_ELECTRON === true) plugins.push(getSendSettingsPlugin());
-  store = new Vuex.Store({
+  const createdStore = new Vuex.Store({
     state: createState(storage),
     mutations,
     actions: { ...rootActions, ...actions },
@@ -42,9 +43,16 @@ export function createStore({
         api: library.api,
         ...playlistDetail,
       }),
-      preferences: createPreferences(persistence.snapshot.preferences),
+      preferences: createPreferences(persistence.snapshot.preferences, {
+        ...preferences,
+        persist: async () => {
+          await persistence.ready;
+          await persistence.save(createdStore.state);
+        },
+      }),
     },
   });
-  return store;
+  store = createdStore;
+  return createdStore;
 }
 export { store as default };

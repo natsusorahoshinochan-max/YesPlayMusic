@@ -1,7 +1,6 @@
 import { playlistCategories } from '@/utils/staticData';
 import shortcuts from '@/utils/shortcuts';
 
-console.debug('[debug][initLocalStorage.js]');
 const enabledPlaylistCategories = playlistCategories
   .filter(c => c.enable)
   .map(c => c.name);
@@ -24,6 +23,14 @@ let localStorage = {
     nyancatStyle: false,
     showLyricsTranslation: true,
     lyricsBackground: true,
+    showLyricsTime: false,
+    unmSource: '',
+    unmSearchMode: 'fast-first',
+    unmEnableFlac: false,
+    unmProxyUri: '',
+    unmJooxCookie: '',
+    unmQQCookie: '',
+    unmYtDlExe: '',
     enableOsdlyricsSupport: false,
     closeAppOption: 'ask',
     enableDiscordRichPresence: false,

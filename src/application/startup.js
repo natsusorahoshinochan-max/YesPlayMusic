@@ -1,4 +1,4 @@
-export function startApplication({
+export async function startApplication({
   createStore,
   initializeLocale,
   initializeAppearance,
@@ -12,7 +12,6 @@ export function startApplication({
   const store = createStore();
   const getSettings = () => store.getters['preferences/settings'];
   const i18n = initializeLocale(getSettings().lang);
-  initializeAppearance(getSettings);
   configureRequest({
     getSettings,
     getCookie,
@@ -20,5 +19,7 @@ export function startApplication({
     environment: requestEnvironment,
   });
   store.state.player = createPlayer();
+  await store.dispatch('preferences/applyRestored');
+  initializeAppearance(getSettings);
   return mount({ store, i18n });
 }
