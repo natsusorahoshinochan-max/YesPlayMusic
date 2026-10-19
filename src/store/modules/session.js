@@ -1,7 +1,20 @@
 export default function createSession(
   snapshot,
-  { credentials, auth = {}, navigate = () => {}, now = () => new Date() }
+  {
+    credentials,
+    auth = {},
+    navigate = () => {},
+    notify = () => {},
+    now = () => new Date(),
+  }
 ) {
+  async function clearIdentity({ commit, dispatch }) {
+    credentials.remove('MUSIC_U');
+    credentials.remove('__csrf');
+    commit('setIdentity', { loginMode: null, hasCredential: false });
+    await dispatch('library/clearIdentity', null, { root: true });
+  }
+
   return {
     namespaced: true,
     state: () => ({
@@ -53,14 +66,19 @@ export default function createSession(
         await auth.refreshCookie();
         commit('setLastRefreshCookieDate', now().getDate());
       },
-      logout({ commit, dispatch }) {
-        if (auth.logout) auth.logout();
-        credentials.remove('MUSIC_U');
-        credentials.remove('__csrf');
-        commit('setIdentity', { loginMode: null, hasCredential: false });
-        return dispatch('library/clearIdentity', null, { root: true }).then(
-          () => navigate()
-        );
+      async invalidate(context) {
+        await clearIdentity(context);
+        notify('登录状态已失效，请重新登录');
+        return navigate('invalidated');
+      },
+      async logout(context) {
+        try {
+          if (auth.logout) Promise.resolve(auth.logout()).catch(() => {});
+        } catch {
+          // Local exit remains available when the remote service cannot respond.
+        }
+        await clearIdentity(context);
+        return navigate('logout');
       },
     },
   };
