@@ -2,7 +2,7 @@
 
 ## 工具与激活
 
-本机为 macOS arm64。项目本地使用 Node 16.20.2、Yarn 1.22.22；系统默认 Node 不变。Node 与 Yarn 位于被 Git 忽略的 `.direnv/runtime/`，本地配置位于 `.env`。
+本机为 macOS arm64。项目本地使用 Node 16.20.2、Yarn 1.22.22；系统默认 Node 不变。Node 与 Yarn 位于被 Git 忽略的 `.direnv/runtime/`，本地配置位于 `.env`。`package.json` 声明 Node 14 或 16；当前执行验证使用 Node 16.20.2，未验证 Node 14 运行。
 
 在项目根目录的新终端执行：
 
@@ -61,22 +61,23 @@ Web 地址为 http://127.0.0.1:20201 。Electron 内置 API 与 Web API 分别�
 ```sh
 yarn test
 yarn build
+yarn vue-cli-service electron:build --skipElectronBuild
 yarn lint --no-fix
 curl --fail http://127.0.0.1:3000/login/status
 ```
 
-自动测试使用 Jest 29、jsdom、Vue 2 SFC 转换与 Vue Test Utils。环境测试验证真实 Vue 组件编译、`@/` 别名解析、Vuex 操作、响应式展示和本地存储。会话与音乐库目标行为测试由相应重构任务提供。
+自动测试使用 Jest 29、jsdom、Vue 2 SFC 转换与 Vue Test Utils。当前 Jest、babel-jest 与 jsdom 测试环境的 Node 范围为 `^14.15.0 || ^16.10.0 || >=18`；本项目验证使用声明范围内的 Node 16.20.2。环境测试验证真实 Vue 组件编译、`@/` 别名解析、Vuex 操作、响应式展示和本地存储。会话与音乐库测试通过公开接口使用真实 Vuex 模块，覆盖密码与二维码登录、恢复、公开身份、退出、失效、加载与收藏变更。请求与应用集成测试覆盖 Web/Electron 参数、存储兼容、启动接线、Player 首次请求，以及桌面设置和喜欢状态同步。业务验收以 [spec #1](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/1) 及其 tickets 为准；独立的[行为完善需求](requirements/session-behavior-improvements.md) 不属于已实现测试契约。
 
 Browserslist 固定为 4.24.0、node-releases 固定为 2.0.18，满足测试工具的依赖范围并保持 Node 16 可安装。
 
 ## 运行基线
 
 - 常规依赖安装与 `--frozen-lockfile` 安装均通过；Electron 可执行文件保持可用。
-- `yarn test` 通过：1 个测试套件、2 项环境测试。
-- Web 生产构建通过；开发首页可显示推荐内容。
+- `yarn test` 覆盖 10 个测试套件、56 项测试。
+- Web 生产构建通过；Electron renderer 与主进程 bundle 构建通过（`--skipElectronBuild`）；开发首页可显示推荐内容。
 - Web API 的登录状态接口正常返回访客结果。
-- Electron 主进程创建窗口并触发 ready-to-show，内置 API 对推荐内容请求返回成功；桌面交互与真实账号登录尚未验证。
+- Electron 主进程创建窗口并触发 ready-to-show，内置 API 对推荐内容请求返回成功。自动化测试使用受控认证与传输 adapter；桌面完整交互与真实账号登录尚未手动验证。
 - lint 存在 6 个错误、7 个警告。错误为桌面主进程和 IPC 中的未使用参数，以及 API 服务中未使用的 import。
 - Electron 启动日志存在 Discord IPC 连接失败和 Vue Devtools 安装失败；应用窗口与内置 API 已继续启动。
 
-本地日志位于 `.direnv/test.log`、`.direnv/install-verify.log`、`.direnv/web-build.log`、`.direnv/web-serve.log`、`.direnv/api.log`、`.direnv/electron-serve.log` 和 `.direnv/lint.log`。这些日志用于定位运行问题，业务验收依据对应 spec 与 tickets。
+本地验证日志位于被 Git 忽略的 `.direnv/`，仅用于定位运行问题。
