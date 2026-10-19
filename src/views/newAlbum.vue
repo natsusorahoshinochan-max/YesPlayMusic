@@ -16,7 +16,7 @@
 
 <script>
 import { newAlbums } from '@/api/album';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 
 import CoverRow from '@/components/CoverRow.vue';
 
@@ -30,13 +30,28 @@ export default {
     };
   },
   created() {
-    newAlbums({
-      area: 'EA',
-      limit: 100,
-    }).then(data => {
-      this.albums = data.albums;
-      NProgress.done();
-    });
+    this.readProgress = createSearchProgress();
+    this.loadData();
+  },
+  beforeDestroy() {
+    this.readVersion++;
+    this.readProgress.dispose();
+  },
+  methods: {
+    async loadData() {
+      const version = (this.readVersion = (this.readVersion || 0) + 1);
+      this.readProgress.update(true);
+      try {
+        const data = await newAlbums({ area: 'EA', limit: 100 });
+        if (!Array.isArray(data?.albums)) throw new Error('新碟读取失败');
+        if (version === this.readVersion) this.albums = data.albums;
+      } catch (error) {
+        if (version === this.readVersion)
+          this.$store.dispatch('showToast', error.message || '新碟读取失败');
+      } finally {
+        if (version === this.readVersion) this.readProgress.update(false);
+      }
+    },
   },
 };
 </script>

@@ -76,6 +76,7 @@ export function createMusicSearchQuery({
         throw new Error(response?.msg || response?.message || '搜索失败');
       const result = response.result;
       const page = result[config.field] ?? [];
+      if (!Array.isArray(page)) throw new Error('搜索结果读取失败');
       let items = page;
       if (category === 'tracks' && page.length) {
         const details = await getTrackDetail(

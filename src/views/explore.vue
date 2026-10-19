@@ -65,7 +65,7 @@
 
 <script>
 import { mapActions, mapGetters } from 'vuex';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 import { topPlaylist, highQualityPlaylist, toplists } from '@/api/playlist';
 import { playlistCategories } from '@/utils/staticData';
 import { getRecommendPlayList } from '@/utils/playList';
@@ -111,6 +111,16 @@ export default {
       return 'none';
     },
   },
+  created() {
+    this.readProgress = createSearchProgress();
+  },
+  beforeDestroy() {
+    this.readVersion++;
+    this.readProgress.dispose();
+  },
+  deactivated() {
+    this.readProgress.dispose();
+  },
   activated() {
     this.loadData();
     this.$parent.$refs.scrollbar.restorePosition();
@@ -118,17 +128,10 @@ export default {
   methods: {
     ...mapActions('preferences', ['togglePlaylistCategory']),
     loadData() {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
-      const queryCategory = this.$route.query.category;
-      if (queryCategory === undefined) {
-        this.playlists = [];
-        this.activeCategory = '全部';
-      } else {
-        this.activeCategory = queryCategory;
-      }
-      this.getPlaylist();
+      const category = this.$route.query.category ?? '全部';
+      if (category !== this.activeCategory) this.playlists = [];
+      this.activeCategory = category;
+      return this.getPlaylist({ replace: true });
     },
     goToCategory(Category) {
       this.showCatOptions = false;
@@ -138,51 +141,55 @@ export default {
       this.playlists.push(...playlists);
       this.loadingMore = false;
       this.showLoadMoreButton = true;
-      NProgress.done();
       this.show = true;
     },
-    getPlaylist() {
+    async getPlaylist({ replace = false } = {}) {
+      const version = (this.readVersion = (this.readVersion || 0) + 1);
+      const category = this.activeCategory;
       this.loadingMore = true;
-      if (this.activeCategory === '推荐歌单') {
-        return this.getRecommendPlayList();
+      this.readProgress.update(true);
+      try {
+        let items;
+        let more = false;
+        if (category === '推荐歌单') {
+          items = await getRecommendPlayList(100, true);
+        } else if (category === '排行榜') {
+          const data = await toplists();
+          items = data?.list;
+        } else {
+          const data =
+            category === '精品歌单'
+              ? await highQualityPlaylist({
+                  limit: 50,
+                  before:
+                    !replace && this.playlists.length
+                      ? this.playlists[this.playlists.length - 1].updateTime
+                      : 0,
+                })
+              : await topPlaylist({
+                  cat: category,
+                  offset: replace ? 0 : this.playlists.length,
+                });
+          items = data?.playlists;
+          more = data?.more;
+        }
+        if (!Array.isArray(items)) throw new Error('歌单读取失败');
+        if (version !== this.readVersion) return;
+        if (replace || ['推荐歌单', '排行榜'].includes(category))
+          this.playlists = [];
+        this.updatePlaylist(items);
+        this.hasMore = more;
+      } catch (error) {
+        if (version === this.readVersion)
+          this.$store.dispatch('showToast', error.message || '歌单读取失败');
+      } finally {
+        if (version === this.readVersion) {
+          this.loadingMore = false;
+          this.showLoadMoreButton = true;
+          this.show = true;
+          this.readProgress.update(false);
+        }
       }
-      if (this.activeCategory === '精品歌单') {
-        return this.getHighQualityPlaylist();
-      }
-      if (this.activeCategory === '排行榜') {
-        return this.getTopLists();
-      }
-      return this.getTopPlayList();
-    },
-    getRecommendPlayList() {
-      getRecommendPlayList(100, true).then(list => {
-        this.playlists = [];
-        this.updatePlaylist(list);
-      });
-    },
-    getHighQualityPlaylist() {
-      let playlists = this.playlists;
-      let before =
-        playlists.length !== 0 ? playlists[playlists.length - 1].updateTime : 0;
-      highQualityPlaylist({ limit: 50, before }).then(data => {
-        this.updatePlaylist(data.playlists);
-        this.hasMore = data.more;
-      });
-    },
-    getTopLists() {
-      toplists().then(data => {
-        this.playlists = [];
-        this.updatePlaylist(data.list);
-      });
-    },
-    getTopPlayList() {
-      topPlaylist({
-        cat: this.activeCategory,
-        offset: this.playlists.length,
-      }).then(data => {
-        this.updatePlaylist(data.playlists);
-        this.hasMore = data.more;
-      });
     },
     getCatsByBigCat(name) {
       return playlistCategories.filter(c => c.bigCat === name);

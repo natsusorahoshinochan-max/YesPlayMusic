@@ -373,18 +373,22 @@ export default {
     },
     getRandomLyric() {
       if (this.liked.songs.length === 0) return;
-      getLyric(
+      return getLyric(
         this.liked.songs[randomNum(0, this.liked.songs.length - 1)]
-      ).then(data => {
-        if (data.lrc !== undefined) {
-          const isInstrumental = data.lrc.lyric
-            .split('\n')
-            .filter(l => l.includes('纯音乐，请欣赏'));
-          if (isInstrumental.length === 0) {
-            this.lyric = data.lrc.lyric;
+      )
+        .then(data => {
+          if (data.lrc !== undefined) {
+            const isInstrumental = data.lrc.lyric
+              .split('\n')
+              .filter(l => l.includes('纯音乐，请欣赏'));
+            if (isInstrumental.length === 0) {
+              this.lyric = data.lrc.lyric;
+            }
           }
-        }
-      });
+        })
+        .catch(error => {
+          console.debug('[library lyric]', error);
+        });
     },
     openAddPlaylistModal() {
       if (!this.$store.getters['session/hasAccount']) {

@@ -74,7 +74,7 @@ import { toplistOfArtists } from '@/api/artist';
 import { newAlbums } from '@/api/album';
 import { byAppleMusic } from '@/utils/staticData';
 import { getRecommendPlayList } from '@/utils/playList';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 import { mapGetters } from 'vuex';
 import CoverRow from '@/components/CoverRow.vue';
 import FMCard from '@/components/FMCard.vue';
@@ -105,53 +105,84 @@ export default {
       return byAppleMusic;
     },
   },
+  created() {
+    this.readProgress = createSearchProgress();
+  },
+  beforeDestroy() {
+    this.readVersion++;
+    this.readProgress.dispose();
+  },
+  deactivated() {
+    this.readVersion++;
+    this.readProgress.dispose();
+  },
   activated() {
     this.loadData();
     this.$parent.$refs.scrollbar.restorePosition();
   },
   methods: {
-    loadData() {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
-      getRecommendPlayList(10, false).then(items => {
-        this.recommendPlaylist.items = items;
-        NProgress.done();
-        this.show = true;
-      });
-      newAlbums({
-        area: this.settings.musicLanguage ?? 'ALL',
-        limit: 10,
-      }).then(data => {
-        this.newReleasesAlbum.items = data.albums;
-      });
-
-      const toplistOfArtistsAreaTable = {
-        all: null,
-        zh: 1,
-        ea: 2,
-        jp: 4,
-        kr: 3,
-      };
-      toplistOfArtists(
-        toplistOfArtistsAreaTable[this.settings.musicLanguage ?? 'all']
-      ).then(data => {
-        let indexs = [];
-        while (indexs.length < 6) {
-          let tmp = ~~(Math.random() * 100);
-          if (!indexs.includes(tmp)) indexs.push(tmp);
+    async loadData() {
+      const version = (this.readVersion = (this.readVersion || 0) + 1);
+      const current = () => version === this.readVersion;
+      this.readProgress.update(true);
+      const area = { all: null, zh: 1, ea: 2, jp: 4, kr: 3 };
+      try {
+        await Promise.all(
+          [
+            getRecommendPlayList(10, false).then(items => {
+              if (!Array.isArray(items)) throw new Error('推荐歌单读取失败');
+              if (current()) this.recommendPlaylist.items = items;
+            }),
+            newAlbums({
+              area: this.settings.musicLanguage ?? 'ALL',
+              limit: 10,
+            }).then(data => {
+              if (!Array.isArray(data?.albums)) throw new Error('新碟读取失败');
+              if (current()) this.newReleasesAlbum.items = data.albums;
+            }),
+            toplistOfArtists(area[this.settings.musicLanguage ?? 'all']).then(
+              data => {
+                if (!Array.isArray(data?.list?.artists))
+                  throw new Error('推荐艺人读取失败');
+                if (!current()) return;
+                const count = Math.min(6, data.list.artists.length);
+                const indexes = [];
+                while (indexes.length < count) {
+                  const index = Math.floor(
+                    Math.random() * data.list.artists.length
+                  );
+                  if (!indexes.includes(index)) indexes.push(index);
+                }
+                this.recommendArtists.indexs = indexes;
+                this.recommendArtists.items = data.list.artists.filter(
+                  (artist, index) => indexes.includes(index)
+                );
+              }
+            ),
+            toplists().then(data => {
+              if (!Array.isArray(data?.list)) throw new Error('排行榜读取失败');
+              if (current())
+                this.topList.items = data.list.filter(item =>
+                  this.topList.ids.includes(item.id)
+                );
+            }),
+            this.$store.dispatch('dailyRecommendations/load'),
+          ].map(job =>
+            Promise.resolve(job).catch(error => {
+              if (current())
+                this.$store.dispatch(
+                  'showToast',
+                  error.message || '首页读取失败'
+                );
+            })
+          )
+        );
+      } finally {
+        if (current()) {
+          this.show = true;
+          this.readProgress.update(false);
         }
-        this.recommendArtists.indexs = indexs;
-        this.recommendArtists.items = data.list.artists.filter((l, index) =>
-          indexs.includes(index)
-        );
-      });
-      toplists().then(data => {
-        this.topList.items = data.list.filter(l =>
-          this.topList.ids.includes(l.id)
-        );
-      });
-      this.$refs.DailyTracksCard.loadDailyTracks();
+      }
     },
   },
 };
