@@ -1,4 +1,4 @@
-import store from '@/store';
+import { readIdentity } from './readingContext';
 import readMetadata from './metadataCache';
 import request from '@/utils/request';
 import { mapTrackPlayableStatus } from '@/utils/common';
@@ -15,20 +15,14 @@ import {
  * !!!未登录状态返回试听片段(返回字段包含被截取的正常歌曲的开始时间和结束时间)
  * @param {string} id - 音乐的 id，例如 id=405998841,33894312
  */
-export function getMP3(id) {
-  const getBr = () => {
-    // 当返回的 quality >= 400000时，就会优先返回 hi-res
-    const quality =
-      store.getters['preferences/settings']?.musicQuality ?? '320000';
-    return quality === 'flac' ? '350000' : quality;
-  };
-
+export function getMP3(id, { quality } = {}) {
+  if (quality == null) throw new Error('Audio quality must be provided');
   return request({
     url: '/song/url',
     method: 'get',
     params: {
       id,
-      br: getBr(),
+      br: quality === 'flac' ? '350000' : quality,
     },
   });
 }
@@ -42,7 +36,7 @@ export function getTrackDetail(ids) {
   const idsInArray = String(ids).split(',');
   const convert = data => ({
     ...data,
-    songs: mapTrackPlayableStatus(data.songs, data.privileges),
+    songs: mapTrackPlayableStatus(data.songs, data.privileges, readIdentity()),
   });
   return readMetadata({
     readCache: async () => {

@@ -4,18 +4,17 @@
 
 ## 模块与公开接口
 
-Vuex 是唯一响应式状态来源。页面通过 getters 读取身份和数据，通过 actions 执行完整操作；普通 JavaScript 调用者读取同一 store 的 getters。
+会话身份和音乐库数据由 Vuex 提供响应式状态。页面通过 getters 读取身份和数据，通过 actions 执行完整操作；普通 JavaScript 调用者读取同一 store 的 getters。
 
 | 位置 | 职责与公开接口 |
 | --- | --- |
 | `src/store/modules/session.js` | 身份查询 `hasAccount`、`hasLibraryIdentity`；`restore`、`loginWithPassword`、`startQrLogin`、`stopQrLogin`、`selectPublicIdentity`、`logout`、`invalidate`、`refreshDaily`；展示查询 `processing`、`qr` |
 | `src/store/modules/library.js` | 资料、喜欢歌单标识、收藏、云盘与历史；查询 `user`、`likedSongPlaylistID`、`collections`、`previewReady`；加载 `loadApplication`、`loadPage`、`refreshPlaylists` |
-| library 的写操作 | `toggleTrackFavorite`、`setPlaylistFavorite`、`createPlaylist`、`deletePlaylist`、`changePlaylistTracks`、`setAlbumFavorite`、`setArtistFavorite`、`setMVFavorite`、`uploadCloudTrack`、`deleteCloudTrack`；封装权限检查、请求、集合更新和必要刷新 |
-| `src/store/modules/preferences.js` | 设置和音乐库歌单筛选偏好，提供专用 getters 与 mutations；动态设置通过 `updateSettings` 响应式写入 |
-| `src/store/persistence.js` | 读取存储、补齐默认值与支持的迁移，拆分初始状态，将持久化字段合并回原 schema |
-| `src/application/` | 认证凭据与请求环境适配、endpoint 集合、导航和提示效果、启动顺序、Player 构造与存储兼容 |
+| `src/application/` | 装配认证凭据、请求环境、endpoint 集合、导航和提示效果，连接会话恢复与后续启动依赖 |
 
-session 的工厂接收 credentials、auth、导航、提示、时钟与调度依赖；library 的工厂接收 endpoint 集合和喜欢状态通知。两者不导入全局 store、router 或浏览器存储。endpoint 继续调用 `request(config)`，无需逐一工厂化。
+session 的工厂接收 credentials、auth、导航、提示、时钟与调度依赖；library 的工厂接收 endpoint 集合。两者不导入全局 store、router 或浏览器存储。endpoint 继续调用 `request(config)`，无需逐一工厂化。
+
+音乐库写操作与当前歌单详情的接口及协作由[音乐库变更与歌单详情设计](library-mutations-and-playlist-detail.md)维护；设置接口、默认值、迁移和持久化由[设置操作与持久化设计](settings-and-persistence.md)维护。播放器的公开状态与应用接合由[播放与音频资源设计](playback-and-audio-resources.md)维护。
 
 ## 身份与完整操作
 
@@ -35,8 +34,6 @@ App 调用 `library/loadApplication`，音乐库页调用 `library/loadPage`，�
 
 音乐库页已有 `previewReady` 时立即展示并刷新；否则等待页面入口成功后展示。`previewReady` 可以表达空歌单已经完成加载，不能用详情数组是否为空替代。页面保留自身进度条和加载失败展示的收尾。
 
-收藏操作在 library 内维护集合。歌曲喜欢状态变化通过注入的 `notifyLikedSongsChanged` 通知当前 Player，再由 Player 同步 Electron IPC；调用者不拼接集合写入和桌面通知。
-
 ## 请求与环境适配
 
 `src/utils/request.js` 使用 Axios，返回成功响应的业务数据。应用必须调用 `configureRequest` 提供设置读取、凭据读取、失效处理和请求环境；缺少失效处理会拒绝配置，未配置时不允许发送请求。请求实现不导入 router 或 session。
@@ -45,33 +42,24 @@ App 调用 `library/loadApplication`，音乐库页调用 `library/loadPage`，�
 
 `src/application/requestEnvironment.js` 集中选择 Web/Electron API 地址，并配置 cookie、realIP 和 HTTP/HTTPS proxy。跨源 Web API 在参数中携带现有 `MUSIC_U`；相对 Web 地址与 Electron 继续使用浏览器凭据传输。`src/application/credentials.js` 统一浏览器 cookie 与 `cookie-*` 本地存储的读写和删除。
 
-## 状态与持久化
+## 会话状态与持久化交接
 
-| 内存归属 | 数据 | 磁盘归属 |
-| --- | --- | --- |
-| session | loginMode、lastRefreshCookieDate | `data` 中对应字段 |
-| session | 凭据存在状态、登录处理中、二维码展示 | 不持久化；凭据由独立 adapter 管理 |
-| library | user、likedSongPlaylistID | `data` 中对应字段 |
-| library | collections、previewReady | 仅内存 |
-| preferences | libraryPlaylistFilter、settings | `data.libraryPlaylistFilter` 与 `settings` |
-| 独立功能 | Player、Last.fm、曲目缓存 | 各自原存储 |
-
-单一持久化实现对 session、library、preferences mutations 写回；沿用 `data/settings` schema，保留 `data` 的未知字段和动态设置。初始化补齐默认设置与快捷键，保留支持的外观迁移；Player 的兼容迁移由 `src/application/playerStorage.js` 执行。退出后的写回使用当前身份字段，不把恢复时的用户资料重新覆盖回来。
+session 管理登录模式、凭据存在状态、每日刷新日期、登录处理状态和二维码展示。凭据通过 credentials adapter 管理；`src/store/persistence.js` 接收 session 和 library 的当前状态，按[持久化投影](settings-and-persistence.md#选择性持久化)保存身份字段。
 
 ## 启动与依赖
 
 `src/main.js` 提供应用装配，`src/application/startup.js` 显式规定执行顺序：
 
-1. 构造 store，同步读取本地数据、注册模块和安装持久化；执行会话恢复并初始化曲目缓存。模块注册本身不发请求，也不构造 Player。
-2. 从恢复的设置初始化 locale 和外观。locale 不在导入时读取 store。
+1. 构造 store，同步读取本地数据、注册模块和安装持久化。模块注册本身不发请求，也不构造播放器。
+2. 从恢复的设置初始化 locale。locale 不在导入时读取 store。
 3. 配置请求环境、凭据、设置查询和会话失效效果。
-4. 构造 Player 并安装保存与 IPC 的 Proxy 行为。Player 的首次请求已有完整请求接线。
-5. 发起每日凭据刷新，挂载 Vue；App 在创建时调用应用音乐库入口，音乐库页激活时调用页面入口和每日刷新。
+4. 执行会话恢复并等待曲目缓存初始化尝试完成，再交给[播放装配](playback-and-audio-resources.md#依赖与启动装配)创建播放器并发起恢复。
+5. 等待恢复设置应用完成，安装外观监听，再进入挂载。挂载函数发起每日凭据刷新并创建 Vue 根实例；App 在创建时调用应用音乐库入口，音乐库页激活时调用页面入口和每日刷新。
 
-路由守卫、Player、公共页面及工具使用统一身份 getters。store 通过注入获得认证与 library API，不再在基础构造中静态依赖 Player、混合 common 或 endpoint。外观实现位于不依赖 store 的 `src/utils/appearance.js`。旧 `src/utils/auth.js`、旧混合状态与整对象写入路径已移除。
+路由守卫、播放器、公共页面及工具使用统一身份 getters。store 通过注入获得认证与 library API；基础构造不静态依赖播放器、混合 common 或 endpoint。
 
 ## 验证边界
 
-现有实现对应的测试套件位于 `tests/obsolete/`，供查阅，默认测试运行不包含这些套件。当前有效套件为空。后续验收依据已确认的需求与设计建立测试，通过公开 interface 验证目标行为。
+测试套件、覆盖领域和归档说明见[测试组织](../../tests/README.md)。
 
 spec #1 不承诺共享会话验证、完整登录尝试隔离、旧请求结果屏蔽、并发失效去重、完整账号集合重置、请求合并或统一失败契约。这些已确认目标及其验收条件保留在独立的[行为完善需求](../requirements/session-behavior-improvements.md)，不作为当前结构实现的能力描述。

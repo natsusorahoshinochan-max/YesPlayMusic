@@ -1,6 +1,4 @@
-import store from '@/store';
-
-export function isTrackPlayable(track) {
+export function isTrackPlayable(track, identity) {
   let result = {
     playable: true,
     reason: '',
@@ -9,14 +7,11 @@ export function isTrackPlayable(track) {
     return result;
   }
   // cloud storage judgement logic
-  if (store.getters['session/hasAccount'] && track?.privilege?.cs) {
+  if (identity.hasAccount && track?.privilege?.cs) {
     return result;
   }
   if (track.fee === 1 || track.privilege?.fee === 1) {
-    if (
-      store.getters['session/hasAccount'] &&
-      store.getters['library/user'].vipType === 11
-    ) {
+    if (identity.hasAccount && identity.vipType === 11) {
       result.playable = true;
     } else {
       result.playable = false;
@@ -31,14 +26,14 @@ export function isTrackPlayable(track) {
   ) {
     result.playable = false;
     result.reason = '无版权';
-  } else if (track.privilege?.st < 0 && store.getters['session/hasAccount']) {
+  } else if (track.privilege?.st < 0 && identity.hasAccount) {
     result.playable = false;
     result.reason = '已下架';
   }
   return result;
 }
 
-export function mapTrackPlayableStatus(tracks, privileges = []) {
+export function mapTrackPlayableStatus(tracks, privileges = [], identity) {
   if (tracks?.length === undefined) return tracks;
   return tracks.map(t => {
     const privilege = privileges.find(item => item.id === t.id) || {};
@@ -47,7 +42,7 @@ export function mapTrackPlayableStatus(tracks, privileges = []) {
     } else {
       t.privilege = privilege;
     }
-    let result = isTrackPlayable(t);
+    let result = isTrackPlayable(t, identity);
     t.playable = result.playable;
     t.reason = result.reason;
     return t;
@@ -166,14 +161,12 @@ export function splitAlbumTitle(title) {
   };
 }
 
-export function bytesToSize(bytes) {
+export function bytesToSize(bytes, lang) {
   let marker = 1024; // Change to 1000 if required
   let decimal = 2; // Change as required
   let kiloBytes = marker;
   let megaBytes = marker * marker;
   let gigaBytes = marker * marker * marker;
-
-  let lang = store.getters['preferences/settings'].lang;
 
   if (bytes < kiloBytes) return bytes + (lang === 'en' ? ' Bytes' : '字节');
   else if (bytes < megaBytes)

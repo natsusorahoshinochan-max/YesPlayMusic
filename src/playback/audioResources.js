@@ -63,7 +63,9 @@ export function createAudioResources({
           url: `https://music.163.com/song/media/outer/url?id=${track.id}`,
           sourceInfo: { from: 'netease', cached: false },
         };
-      const response = await getMP3(track.id);
+      const response = await getMP3(track.id, {
+        quality: settings().musicQuality,
+      });
       if (!response || !Array.isArray(response.data))
         throw new Error('Invalid NetEase audio response');
       const entry = response.data[0];

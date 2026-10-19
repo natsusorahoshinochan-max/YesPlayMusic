@@ -121,6 +121,24 @@ export function createPlayback({
     instance.released = true;
     instance.handle.dispose();
   }
+  function stopCurrent(context) {
+    if (!valid(context)) return false;
+    const previous = current;
+    emit(previous, 'before-replace');
+    if (!valid(context)) return false;
+    release(previous);
+    current = null;
+    state.playing = false;
+    state.sourceInfo = null;
+    state.progress = 0;
+    publish();
+    safe(onProgress, 0);
+    return true;
+  }
+  function failSelection(context, reason) {
+    if (!stopCurrent(context)) return outcome('superseded');
+    return feedback(context, outcome('failed', reason));
+  }
   function shuffleQueue(anchor) {
     const order = list.map((_, i) => i).filter(i => i !== anchor);
     for (let i = order.length - 1; i > 0; i--) {
@@ -348,7 +366,7 @@ export function createPlayback({
           ? outcome('unavailable', reason)
           : outcome('superseded');
       }
-      return feedback(context, outcome('failed', error));
+      return failSelection(context, error);
     }
   }
   async function handleError(context, instance, error) {
@@ -377,8 +395,7 @@ export function createPlayback({
       }
       feedback(context, outcome('unavailable', 'fm-empty'));
     } catch (error) {
-      if (valid(context))
-        return feedback(context, outcome('failed', 'fm-timeout'));
+      if (valid(context)) return failSelection(context, 'fm-timeout');
     } finally {
       if (valid(context)) {
         state.personalFMLoading = false;
@@ -457,7 +474,6 @@ export function createPlayback({
       installQueue(ids, source = {}, startTrackId) {
         if (!valid(context)) return;
         list = Array.from(ids);
-        nextList = [];
         index =
           startTrackId == null ? 0 : Math.max(0, list.indexOf(startTrackId));
         shuffleQueue(startTrackId == null ? null : index);
@@ -472,10 +488,19 @@ export function createPlayback({
     if (disposed) return Promise.resolve(outcome('superseded'));
     return Promise.resolve()
       .then(() => (valid(context) ? work(context) : outcome('superseded')))
+      .then(result => {
+        if (!valid(context)) return outcome('superseded');
+        if (
+          result.status === 'unavailable' &&
+          current &&
+          current.operationId !== context.id &&
+          !stopCurrent(context)
+        )
+          return outcome('superseded');
+        return result;
+      })
       .catch(error =>
-        valid(context)
-          ? feedback(context, outcome('failed', error))
-          : outcome('superseded')
+        valid(context) ? failSelection(context, error) : outcome('superseded')
       );
   }
   const timer = schedule(() => {

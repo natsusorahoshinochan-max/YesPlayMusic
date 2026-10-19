@@ -85,4 +85,4 @@ YPM_RUNTIME_ROOT="$PWD" node scripts/verify-playback-runtime.cjs
 
 脚本创建独立的临时访客 profile，退出后清理。验证使用真实缓存音频、Howler、Blob URL、默认输出设备、原生播放控制、桌面状态和 `/player`；fixture 歌曲的元数据刷新指向本地 HTTP 服务。结果默认写入 `/tmp/yesplaymusic-spec17-context/runtime25-result.json`，可用 `YPM_RUNTIME_RESULT` 指定；读取结果中的检查项与错误确认实际通过范围。
 
-Web 使用正常页面交互验证播放；Linux MPRIS 和其他目标平台的原生能力在对应系统验证。听歌记录与 Last.fm 生产请求参数通过[受控 API 接合套件](../tests/README.md)验证。
+Web 使用正常页面交互验证播放；Linux MPRIS 和其他目标平台的原生能力在对应系统验证。听歌记录与 Last.fm 生产请求参数的测试套件位置见[归档索引](../tests/obsolete/README.md)。

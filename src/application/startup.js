@@ -12,6 +12,10 @@ export async function startApplication({
 }) {
   const store = createStore();
   const getSettings = () => store.getters['preferences/settings'];
+  const getIdentity = () => ({
+    hasAccount: store.getters['session/hasAccount'],
+    vipType: store.getters['library/user'].vipType,
+  });
   const i18n = initializeLocale(getSettings().lang);
   configureRequest({
     getSettings,
@@ -19,8 +23,8 @@ export async function startApplication({
     onSessionInvalid,
     environment: requestEnvironment,
   });
-  await initializeDependencies(store);
-  store.state.player = createPlayer({ store });
+  await initializeDependencies(store, { getSettings, getIdentity });
+  store.state.player = createPlayer({ store, getSettings, getIdentity });
   // Restoration starts before mounting but does not hold the UI behind remote I/O.
   store.state.player.restoreSaved?.().catch(error => {
     console.debug('[playback restore]', error);

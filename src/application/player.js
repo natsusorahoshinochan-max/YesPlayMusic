@@ -4,7 +4,7 @@ import { getMP3, getTrackDetail, getLyric, scrobble } from '@/api/track';
 import { getPlaylistDetail, intelligencePlaylist } from '@/api/playlist';
 import { getAlbum } from '@/api/album';
 import { getArtist } from '@/api/artist';
-import { getTrackSource, cacheTrackSource } from '@/utils/db';
+import { getTrackCache } from '@/utils/db';
 import { trackScrobble, trackUpdateNowPlaying } from '@/api/lastfm';
 import { createPlaybackReporting } from './playbackReporting';
 import { createPlayerStorage } from './playerStorage';
@@ -30,6 +30,11 @@ export function createPlaybackFeedback({ notify }) {
 
 export function createPlayer({
   store,
+  getSettings = () => store.getters['preferences/settings'],
+  getIdentity = () => ({
+    hasAccount: store.getters['session/hasAccount'],
+    vipType: store.getters['library/user'].vipType,
+  }),
   storage = localStorage,
   platform: suppliedPlatform,
   platformOptions = {},
@@ -49,7 +54,7 @@ export function createPlayer({
       []
     ).includes(playback.state.currentTrackID);
   const publish = () => platform?.publish(playback.state, liked());
-  const settings = () => store.getters['preferences/settings'];
+  const settings = getSettings;
   const ipcRenderer =
     process.env.IS_ELECTRON === true
       ? window.require('electron').ipcRenderer
@@ -93,9 +98,9 @@ export function createPlayer({
       trash: fmTrash,
     },
     resources: createAudioResources({
-      cache: { getTrackSource, cacheTrackSource },
+      cache: getTrackCache(),
       getMP3,
-      hasAccount: () => store.getters['session/hasAccount'],
+      hasAccount: () => getIdentity().hasAccount,
       isElectron: process.env.IS_ELECTRON === true,
       settings,
       unblock: (...args) => ipcRenderer.invoke(...args),

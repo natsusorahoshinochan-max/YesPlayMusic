@@ -1,3 +1,4 @@
+import { readIdentity } from './readingContext';
 import request from '@/utils/request';
 import { mapTrackPlayableStatus } from '@/utils/common';
 
@@ -23,7 +24,11 @@ export function search(params) {
     params,
   }).then(data => {
     if (data.result?.song !== undefined)
-      data.result.song.songs = mapTrackPlayableStatus(data.result.song.songs);
+      data.result.song.songs = mapTrackPlayableStatus(
+        data.result.song.songs,
+        [],
+        readIdentity()
+      );
     return data;
   });
 }

@@ -812,7 +812,7 @@
 import { mapState, mapActions, mapGetters } from 'vuex';
 import { auth as lastfmAuth } from '@/api/lastfm';
 import { bytesToSize } from '@/utils/common';
-import { countDBSize, clearDB } from '@/utils/db';
+import { getTrackCache } from '@/utils/db';
 import pkg from '../../package.json';
 import cloneDeep from 'lodash/cloneDeep';
 
@@ -1348,20 +1348,24 @@ export default {
       return this.$store.dispatch('session/logout');
     },
     countDBSize() {
-      return countDBSize().then(data => {
-        if (data === undefined) {
-          this.tracksCache = {
-            size: '0KB',
-            length: 0,
-          };
-          return;
-        }
-        this.tracksCache.size = bytesToSize(data.bytes);
-        this.tracksCache.length = data.length;
-      });
+      return getTrackCache()
+        .countDBSize()
+        .then(data => {
+          if (data === undefined) {
+            this.tracksCache = {
+              size: '0KB',
+              length: 0,
+            };
+            return;
+          }
+          this.tracksCache.size = bytesToSize(data.bytes, this.settings.lang);
+          this.tracksCache.length = data.length;
+        });
     },
     clearCache() {
-      return clearDB().then(() => this.countDBSize());
+      return getTrackCache()
+        .clearDB()
+        .then(() => this.countDBSize());
     },
     lastfmConnect() {
       lastfmAuth();

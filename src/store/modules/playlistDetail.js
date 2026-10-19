@@ -84,7 +84,6 @@ export default function createPlaylistDetail({ api = {} } = {}) {
         });
       } catch (error) {
         if (retained?.playlist && request === generation) {
-          const traversed = Math.min(range, playlist.trackIds.length);
           const confirmedTracks = new Map(
             [...retained.tracks, ...context.state.current.tracks].map(track => [
               track.id,
@@ -95,8 +94,6 @@ export default function createPlaylistDetail({ api = {} } = {}) {
             tracks: playlist.trackIds
               .map(track => confirmedTracks.get(track.id))
               .filter(Boolean),
-            traversed,
-            hasMore: traversed < playlist.trackIds.length,
           });
         }
         throw error;

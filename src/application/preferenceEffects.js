@@ -1,5 +1,5 @@
 import { applySettingsAppearance } from '@/utils/appearance';
-import { clearDB } from '@/utils/db';
+import { getTrackCache } from '@/utils/db';
 
 export function createPreferenceEffects({
   getLocale,
@@ -16,7 +16,7 @@ export function createPreferenceEffects({
     applyOutputDevice() {
       return getPlayer()?.applyOutputDevice();
     },
-    clearCache: clearDB,
+    clearCache: () => getTrackCache().clearDB(),
     resetReversedMode() {
       const player = getPlayer();
       player?.setReversed(false);

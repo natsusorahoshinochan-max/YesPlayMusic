@@ -1,6 +1,5 @@
 import axios from 'axios';
 import Dexie from 'dexie';
-import store from '@/store';
 import { createAudioCache } from '@/audioCache';
 // import pkg from "../../package.json";
 
@@ -29,39 +28,45 @@ db.version(1).stores({
   trackSources: '&id',
 });
 
-const audioCache = createAudioCache({
-  db,
-  download: url =>
+let trackCache;
+
+export function getTrackCache() {
+  if (!trackCache) throw new Error('Music data has not been configured');
+  return trackCache;
+}
+
+export function configureTrackCache({
+  getLimitBytes,
+  isElectron = Boolean(process.env.IS_ELECTRON),
+  download = url =>
     axios
       .get(url, { responseType: 'arraybuffer' })
       .then(response => response.data),
-  getLimitBytes: () => {
-    const limit = store.getters['preferences/settings'].cacheLimit;
-    return limit === false ? false : limit * Math.pow(1024, 2);
-  },
-});
-
-export function initializeTrackCache() {
-  if (!process.env.IS_ELECTRON) return Promise.resolve();
-  return audioCache.initializeTrackCache();
+  downloadCover = url => axios.get(url),
+}) {
+  const cache = createAudioCache({ db, download, getLimitBytes });
+  trackCache = {
+    ...cache,
+    initializeTrackCache() {
+      return isElectron ? cache.initializeTrackCache() : Promise.resolve();
+    },
+    cacheTrackSource(track, url, bitRate, from = 'netease') {
+      if (!isElectron) return Promise.resolve();
+      const cover = track.al?.picUrl?.replace(/^http:/, 'https:');
+      if (cover) {
+        for (const size of [512, 224, 1024]) {
+          Promise.resolve()
+            .then(() => downloadCover(`${cover}?param=${size}y${size}`))
+            .catch(error => {
+              console.debug('[audio cache] cover download failed', error);
+            });
+        }
+      }
+      return cache.cacheTrackSource(track, url, bitRate, from);
+    },
+  };
+  return trackCache;
 }
-
-export function cacheTrackSource(track, url, bitRate, from = 'netease') {
-  if (!process.env.IS_ELECTRON) return Promise.resolve();
-  const cover = track.al?.picUrl?.replace(/^http:/, 'https:');
-  if (cover) {
-    for (const size of [512, 224, 1024]) {
-      axios.get(`${cover}?param=${size}y${size}`).catch(error => {
-        console.debug('[audio cache] cover download failed', error);
-      });
-    }
-  }
-  return audioCache.cacheTrackSource(track, url, bitRate, from);
-}
-
-export const getTrackSource = audioCache.getTrackSource;
-export const countDBSize = audioCache.countDBSize;
-export const clearDB = audioCache.clearDB;
 
 export function cacheTrackDetail(track, privileges) {
   return db.trackDetail.put({

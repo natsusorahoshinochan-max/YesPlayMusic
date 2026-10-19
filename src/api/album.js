@@ -1,3 +1,4 @@
+import { readIdentity } from './readingContext';
 import request from '@/utils/request';
 import readMetadata from './metadataCache';
 import { mapTrackPlayableStatus } from '@/utils/common';
@@ -11,7 +12,7 @@ import { cacheAlbum, getAlbumFromCache } from '@/utils/db';
 export function getAlbum(id) {
   const convert = data => ({
     ...data,
-    songs: mapTrackPlayableStatus(data.songs),
+    songs: mapTrackPlayableStatus(data.songs, [], readIdentity()),
   });
   return readMetadata({
     readCache: async () => {

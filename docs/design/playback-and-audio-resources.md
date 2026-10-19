@@ -56,6 +56,8 @@ flowchart TD
 
 未指定起始歌曲时使用已有首曲规则。调用者传入的 ID 集合由 module 接收并建立自己的集合，后续外部修改不会改变内部队列。
 
+替换主队列保留下一首列表；清空下一首列表由 `clearNext()` 表达。
+
 ### 读取
 
 `playback.state` 提供只读响应式快照，包含：
@@ -114,6 +116,8 @@ const details = await getTrackDetail(rows.map(row => row.trackId).join(','));
 自动跳歌和重新取源携带原操作归属，使用内部流程继续执行。它们不能通过重新调用外部播放入口取得新编号。重复选择同一歌曲也使用不同编号，归属判断不依赖歌曲 ID 相等。
 
 音频回调同时关联其音频实例和操作编号。已经失效的实例不能发布播放状态、触发跳歌或覆盖进度。音量与模式修改不取得选曲归属。
+
+最新操作最终失败时，Playback 交付旧实例的最终上报事件并释放仍持有的音频，清空当前音源，将实际播放状态设为停止、进度归零，再交付失败反馈。空列表或无效选择以 `unavailable` 结束时，若仍持有归属已过期的旧音频，也执行相同收束；无音源的自动跳歌和反馈继续使用各自处理路径。过时操作只结束自身任务。
 
 ## 音频资源与音频 adapter
 
@@ -206,8 +210,11 @@ Playback 在明确的状态转换处调用注入的输出函数。输出投影�
 | --- | --- |
 | `src/playback/index.js`、`sourceOperations.js` | Playback、来源操作与私有队列；操作编号覆盖完整选择流程 |
 | `src/playback/audioResources.js`、`audioAdapter.js` | 来源与预取、Howler 与临时地址的独立持有和释放 |
-| `src/audioCache/index.js`、`src/utils/db.js` | 串行缓存提交、真实数据库及下载接线 |
+| `src/audioCache/index.js`、`src/utils/db.js` | 串行缓存提交、真实数据库及下载 adapter；缓存实例由显式配置创建 |
 | `src/api/metadataCache.js` 与各元数据 API | 缓存读取编排与各类型转换 |
+| `src/application/musicData.js` | 绑定应用的设置与身份读取函数，创建音频缓存并连接容量设置 |
+| `src/api/readingContext.js` | 仅保存元数据转换所需的身份读取函数 |
+| `src/utils/common.js` 的可播放状态映射 | 通过显式身份资料完成进程内计算 |
 | `src/application/player.js` | 构建唯一 Playback，组合存储、上报、平台输出和外部观察者 |
 | `src/application/playerStorage.js` | 读取旧字段并投影持久化数据；比较持久化投影、单独保存采样进度 |
 | `src/application/playbackReporting.js` | 消费有效实例事件并连接网易云和 Last.fm 请求 |
@@ -216,7 +223,7 @@ Playback 在明确的状态转换处调用注入的输出函数。输出投影�
 启动装配的关系为：
 
 1. 恢复 store 与配置，配置请求环境。
-2. 创建缓存及元数据读取依赖；缓存初始化进入其提交顺序。
+2. `startup` 建立同一组 `getSettings`、`getIdentity`，交给 `configureMusicData` 和 Playback 装配；数据接线先于会话恢复中的读取，缓存初始化进入其提交顺序。音源读取将设置中的音质显式传给 `getMP3`。
 3. 创建 Playback、音频 adapter 及反馈和桌面输出连接。
 4. 启动播放器恢复；恢复选曲也携带操作归属，后续用户选择可以取代它。
 5. 依照现有应用启动顺序应用恢复设置并挂载页面。
@@ -259,7 +266,7 @@ Playback 输出 `played`、`before-replace`、`ended` 事件，包含 `operation
 | 应用反馈 | 页面、快捷键、桌面入口及后续音频错误共用反馈，过时操作无提示 |
 | Web 与 Electron 接合 | 实际播放、设备应用和桌面调用与 adapters 的接线 |
 
-自动测试使用 `fake-indexeddb` 执行真实 Dexie，音频生命周期测试运行生产 adapter 并控制 Howler、URL 与设备边界。组合测试运行实际来源 API、元数据缓存、音频缓存、资源和应用装配。真实音频与 Electron 能力通过[运行验证入口](../development-environment.md#electron-播放运行验证)检查；有效套件位置见[测试组织](../../tests/README.md)。
+自动测试使用 `fake-indexeddb` 执行真实 Dexie，音频生命周期测试运行生产 adapter 并控制 Howler、URL 与设备边界。组合测试运行实际来源 API、元数据缓存、音频缓存、资源和应用装配。真实音频与 Electron 能力通过[运行验证入口](../development-environment.md#electron-播放运行验证)检查；测试套件状态与归档位置见[测试组织](../../tests/README.md)。
 
 ## 方案选择与取舍
 

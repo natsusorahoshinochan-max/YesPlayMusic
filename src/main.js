@@ -9,7 +9,8 @@ import { createCredentials } from '@/application/credentials';
 import { createRequestEnvironment } from '@/application/requestEnvironment';
 import { createSessionEffects } from '@/application/sessionEffects';
 import { libraryApi } from '@/application/library';
-import { initializeTrackCache } from '@/utils/db';
+import { getTrackCache } from '@/utils/db';
+import { configureMusicData } from '@/application/musicData';
 import i18n, { initializeLocale } from '@/locale';
 import { createPreferenceEffects } from '@/application/preferenceEffects';
 import { initializeAppearance } from '@/utils/appearance';
@@ -70,11 +71,14 @@ startApplication({
     });
     return store;
   },
-  async initializeDependencies(store) {
+  async initializeDependencies(store, reads) {
+    configureMusicData(reads);
     await store.dispatch('session/restore');
-    await initializeTrackCache().catch(error => {
-      console.debug('[audio cache] initialization failed', error);
-    });
+    await getTrackCache()
+      .initializeTrackCache()
+      .catch(error => {
+        console.debug('[audio cache] initialization failed', error);
+      });
   },
   initializeLocale,
   initializeAppearance,

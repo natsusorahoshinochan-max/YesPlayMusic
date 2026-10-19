@@ -1,3 +1,4 @@
+import { readIdentity } from './readingContext';
 import request from '@/utils/request';
 import { mapTrackPlayableStatus } from '@/utils/common';
 
@@ -53,7 +54,8 @@ export function getPlaylistDetail(id, noCache = false) {
     if (data.playlist) {
       data.playlist.tracks = mapTrackPlayableStatus(
         data.playlist.tracks,
-        data.privileges || []
+        data.privileges || [],
+        readIdentity()
       );
     }
     return data;
@@ -204,7 +206,8 @@ export function dailyRecommendTracks() {
   }).then(result => {
     result.data.dailySongs = mapTrackPlayableStatus(
       result.data.dailySongs,
-      result.data.privileges
+      result.data.privileges,
+      readIdentity()
     );
     return result;
   });
