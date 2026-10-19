@@ -26,6 +26,7 @@ let requests;
 let player;
 let handles;
 let feedback;
+let fmTracks;
 const storage = { getItem: () => null, setItem() {}, removeItem() {} };
 beforeAll(async () => {
   server = http.createServer((req, res) => {
@@ -61,7 +62,7 @@ beforeAll(async () => {
         : path === '/playlist/detail'
         ? { playlist: { trackIds: [{ id: 2 }] } }
         : path === '/personal_fm'
-        ? { data: [track(6), track(7)] }
+        ? { data: fmTracks }
         : path === '/lyric'
         ? { lrc: { lyric: '' } }
         : { code: 200 };
@@ -76,6 +77,7 @@ beforeEach(async () => {
   requests = [];
   handles = [];
   feedback = [];
+  fmTracks = [track(6), track(7)];
   configureRequest({
     getSettings: () => ({}),
     getCookie: () => null,
@@ -262,3 +264,32 @@ test('an independently rejected audio download has a background exit without del
   });
   expect(await failed).toBe(error);
 });
+
+test.each([
+  ['playPersonalFM', '/song/detail'],
+  ['playPersonalFM', '/song/url'],
+  ['next', '/song/detail'],
+  ['next', '/song/url'],
+])(
+  'FM %s stops after %s HTTP selection failure without starting another FM load',
+  async (operation, endpoint) => {
+    expect((await player.playTracks([1])).status).toBe('completed');
+    const old = handles[0];
+    fmTracks = [track(6)];
+    failure = endpoint;
+    const result = await (operation === 'next'
+      ? player.next({ personalFM: true })
+      : player.playPersonalFM());
+    expect(result.status).toBe('failed');
+    expect(player.state).toMatchObject({
+      personalFMLoading: false,
+      personalFMNextLoading: false,
+      playing: false,
+      sourceInfo: null,
+    });
+    expect(old.disposed).toBe(true);
+    expect(feedback).toHaveLength(1);
+    await player.lyrics.retry();
+    expect(requests.filter(path => path === '/personal_fm')).toHaveLength(1);
+  }
+);

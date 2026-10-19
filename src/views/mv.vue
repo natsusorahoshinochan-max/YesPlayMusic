@@ -45,7 +45,7 @@
 <script>
 import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 import { mvDetail, mvUrl, simiMv } from '@/api/mv';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 import locale from '@/locale';
 import '@/assets/css/plyr.css';
 import Plyr from 'plyr';
@@ -81,6 +81,14 @@ export default {
       simiMvs: [],
     };
   },
+  created() {
+    this.readProgress = createSearchProgress();
+  },
+  beforeDestroy() {
+    this.readVersion++;
+    this.readProgress.dispose();
+    this.player?.destroy();
+  },
   mounted() {
     let videoOptions = {
       settings: ['quality'],
@@ -104,32 +112,56 @@ export default {
     videoPlaying() {
       return this.player ? this.player.playing : false;
     },
-    getData(id) {
-      mvDetail(id).then(data => {
-        this.mv = data;
-        let requests = data.data.brs.map(br => {
-          return mvUrl({ id, r: br.br });
-        });
-        Promise.all(requests).then(results => {
-          let sources = results.map(result => {
-            return {
-              src: result.data.url.replace(/^http:/, 'https:'),
-              type: 'video/mp4',
-              size: result.data.r,
+    async getData(id) {
+      const version = (this.readVersion = (this.readVersion || 0) + 1);
+      const current = () => version === this.readVersion;
+      const failed = error => {
+        if (current()) this.showToast(error.message || 'MV 读取失败');
+      };
+      this.readProgress.update(true);
+      try {
+        await Promise.all([
+          (async () => {
+            const data = await mvDetail(id);
+            if (
+              !Array.isArray(data?.data?.brs) ||
+              !data.data.brs.length ||
+              typeof data.data.cover !== 'string'
+            )
+              throw new Error('MV 详情读取失败');
+            if (!current()) return;
+            const settled = await Promise.allSettled(
+              data.data.brs.map(br => mvUrl({ id, r: br.br }))
+            );
+            const sources = settled.map(item => {
+              if (item.status === 'rejected') throw item.reason;
+              const result = item.value;
+              if (typeof result?.data?.url !== 'string' || !result.data.url)
+                throw new Error('MV 地址读取失败');
+              return {
+                src: result.data.url.replace(/^http:/, 'https:'),
+                type: 'video/mp4',
+                size: result.data.r,
+              };
+            });
+            if (!current()) return;
+            this.player.source = {
+              type: 'video',
+              title: data.data.name,
+              sources,
+              poster: data.data.cover.replace(/^http:/, 'https:'),
             };
-          });
-          this.player.source = {
-            type: 'video',
-            title: this.mv.data.name,
-            sources: sources,
-            poster: this.mv.data.cover.replace(/^http:/, 'https:'),
-          };
-          NProgress.done();
-        });
-      });
-      simiMv(id).then(data => {
-        this.simiMvs = data.mvs;
-      });
+            this.mv = data;
+          })().catch(failed),
+          (async () => {
+            const data = await simiMv(id);
+            if (!Array.isArray(data?.mvs)) throw new Error('相似 MV 读取失败');
+            if (current()) this.simiMvs = data.mvs;
+          })().catch(failed),
+        ]);
+      } finally {
+        if (current()) this.readProgress.update(false);
+      }
     },
     async likeMV() {
       try {

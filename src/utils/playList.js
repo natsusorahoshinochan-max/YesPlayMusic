@@ -38,7 +38,12 @@ export async function getRecommendPlayList(limit, removePrivateRecommand) {
       dailyRecommendPlaylist(),
       recommendPlaylist({ limit }),
     ]);
-    let recommend = playlists[0].recommend ?? [];
+    if (
+      !Array.isArray(playlists[0]?.recommend) ||
+      !Array.isArray(playlists[1]?.result)
+    )
+      throw new Error('推荐歌单读取失败');
+    let recommend = playlists[0].recommend;
     if (recommend.length) {
       if (removePrivateRecommand) recommend = recommend.slice(1);
       await replaceRecommendResult(recommend);
@@ -46,6 +51,7 @@ export async function getRecommendPlayList(limit, removePrivateRecommand) {
     return recommend.concat(playlists[1].result).slice(0, limit);
   } else {
     const response = await recommendPlaylist({ limit });
+    if (!Array.isArray(response?.result)) throw new Error('推荐歌单读取失败');
     return response.result;
   }
 }

@@ -190,7 +190,7 @@ import {
 } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
 import locale from '@/locale';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
@@ -263,6 +263,17 @@ export default {
       };
     },
   },
+  created() {
+    this.readProgress = createSearchProgress();
+  },
+  beforeDestroy() {
+    this.readVersion++;
+    this.readProgress.dispose();
+  },
+  deactivated() {
+    this.readVersion++;
+    this.readProgress.dispose();
+  },
   activated() {
     if (this.artist?.id?.toString() !== this.$route.params.id) {
       this.loadData(this.$route.params.id);
@@ -272,38 +283,73 @@ export default {
   },
   methods: {
     ...mapActions(['showToast']),
-    loadData(id, next = undefined) {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
-      this.show = false;
+    async loadData(id, next) {
+      const version = (this.readVersion = (this.readVersion || 0) + 1);
+      const current = () => version === this.readVersion;
+      const failed = error => {
+        if (current()) this.showToast(error.message || '艺人读取失败');
+      };
+      this.readProgress.update(true);
       this.$parent.$refs.main.scrollTo({ top: 0 });
-      getArtist(id).then(data => {
-        this.artist = data.artist;
-        this.setPopularTracks(data.hotSongs);
-        if (next !== undefined) next();
-        NProgress.done();
-        this.show = true;
-      });
-      getArtistAlbum({ id: id, limit: 200 }).then(data => {
-        this.albumsData = data.hotAlbums;
-        this.latestRelease = data.hotAlbums[0];
-      });
-      artistMv({ id }).then(data => {
-        this.mvs = data.mvs;
-        this.hasMoreMV = data.hasMore;
-      });
-      if (this.$store.getters['session/hasAccount']) {
-        similarArtists(id).then(data => {
-          this.similarArtists = data.artists;
-        });
+      try {
+        await Promise.all([
+          (async () => {
+            const data = await getArtist(id);
+            if (!data?.artist || !Array.isArray(data.hotSongs))
+              throw new Error('艺人详情读取失败');
+            if (!current()) return;
+            this.artist = data.artist;
+            this.popularTracks = data.hotSongs;
+            this.show = true;
+            await this.setPopularTracks(data.hotSongs, current);
+          })().catch(failed),
+          getArtistAlbum({ id, limit: 200 })
+            .then(data => {
+              if (!Array.isArray(data?.hotAlbums))
+                throw new Error('艺人专辑读取失败');
+              if (!current()) return;
+              this.albumsData = data.hotAlbums;
+              this.latestRelease = data.hotAlbums[0] || {
+                picUrl: '',
+                publishTime: 0,
+                id: 0,
+                name: '',
+                type: '',
+                size: '',
+              };
+            })
+            .catch(failed),
+          artistMv({ id })
+            .then(data => {
+              if (!Array.isArray(data?.mvs))
+                throw new Error('艺人 MV 读取失败');
+              if (!current()) return;
+              this.mvs = data.mvs;
+              this.hasMoreMV = data.hasMore;
+            })
+            .catch(failed),
+          this.$store.getters['session/hasAccount']
+            ? similarArtists(id)
+                .then(data => {
+                  if (!Array.isArray(data?.artists))
+                    throw new Error('相似艺人读取失败');
+                  if (current()) this.similarArtists = data.artists;
+                })
+                .catch(failed)
+            : Promise.resolve(),
+        ]);
+      } finally {
+        if (current()) this.readProgress.update(false);
+        next?.();
       }
     },
-    setPopularTracks(hotSongs) {
-      const trackIDs = hotSongs.map(t => t.id);
-      getTrackDetail(trackIDs.join(',')).then(data => {
-        this.popularTracks = data.songs;
-      });
+    async setPopularTracks(hotSongs, current = () => true) {
+      if (!hotSongs.length) {
+        if (current()) this.popularTracks = [];
+        return;
+      }
+      const data = await getTrackDetail(hotSongs.map(t => t.id).join(','));
+      if (current()) this.popularTracks = data.songs;
     },
     goToAlbum(id) {
       this.$router.push({
