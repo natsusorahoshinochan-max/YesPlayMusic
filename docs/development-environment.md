@@ -68,7 +68,7 @@ curl --fail http://127.0.0.1:3000/login/status
 
 自动测试工具保留 Jest 29、jsdom、Vue 2 SFC 转换与 Vue Test Utils。Jest、babel-jest 与 jsdom 测试环境的 Node 范围为 `^14.15.0 || ^16.10.0 || >=18`；本项目使用 Node 16.20.2。
 
-过时测试位于 `tests/obsolete/`，Jest 与 ESLint 均排除此目录。有效测试通过真实 Vuex actions/getters、启动与页面集成验证 spec #8 的设置、持久化、音乐库写入与详情行为。当前有效验收为 19 个套件、160 项测试通过，具体组织见 [测试说明](../tests/README.md)。
+过时测试位于 `tests/obsolete/`，Jest 与 ESLint 均排除此目录。有效测试通过真实 Vuex actions/getters、启动与页面集成验证 spec #8 的设置、持久化、音乐库写入与详情行为。`yarn test --listTests` 查看有效套件，`yarn test` 报告套件与测试数量；具体组织见 [测试说明](../tests/README.md)。
 
 Browserslist 固定为 4.24.0、node-releases 固定为 2.0.18，满足测试工具的依赖范围并保持 Node 16 可安装。
 

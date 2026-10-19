@@ -5,6 +5,7 @@ import { mount } from '@vue/test-utils';
 import Playlist from '@/views/playlist.vue';
 import createLibrary from '@/store/modules/library';
 import createPlaylistDetail from '@/store/modules/playlistDetail';
+import createSession from '@/store/modules/session';
 import { initializeLocale } from '@/locale';
 Vue.use(Vuex);
 Vue.filter('resizeImage', value => value);
@@ -18,7 +19,7 @@ const track = id => ({
   al: { name: 'Album', picUrl: '' },
   ar: [{ name: 'Artist' }],
 });
-function setup(account = true) {
+function setup(loginMode = 'account', credential = 'credential') {
   const api = {
     getPlaylistDetail: jest.fn(id =>
       Promise.resolve({
@@ -50,7 +51,6 @@ function setup(account = true) {
   };
   const store = new Vuex.Store({
     state: { player: {} },
-    getters: { 'session/hasAccount': () => account },
     actions: {
       showToast({ commit }, message) {
         commit('toast', message);
@@ -62,6 +62,10 @@ function setup(account = true) {
       },
     },
     modules: {
+      session: createSession(
+        { loginMode },
+        { credentials: { get: () => credential } }
+      ),
       library: createLibrary(
         { user: { userId: 3 }, likedSongPlaylistID: 99 },
         { api }
@@ -124,24 +128,31 @@ test('playlist opens store detail, confirms removal, shows feedback and continue
   expect(store.getters['playlistDetail/current']).toBeNull();
 });
 
-test('playlist reacts to target changes and lets library return account-required feedback', async () => {
-  const { wrapper, store, api, route } = setup(false);
-  await flush();
-  route.params.id = 30;
-  await flush();
-  expect(store.getters['playlistDetail/current'].playlist.id).toBe(30);
-  await wrapper.find('.song').trigger('contextmenu');
-  jest.spyOn(window, 'confirm').mockReturnValue(true);
-  const remove = wrapper
-    .findAll('.item')
-    .wrappers.find(item => item.text() === '从歌单中删除');
-  await remove.trigger('click');
-  await flush();
-  expect(api.addOrRemoveTrackFromPlaylist).not.toHaveBeenCalled();
-  expect(store.state.message).toBe('此操作需要登录网易云帐号');
-  expect(wrapper.findAll('.song')).toHaveLength(101);
-  wrapper.destroy();
-});
+test.each([
+  ['guest', null, null],
+  ['public library identity', 'username', 'credential'],
+  ['account snapshot without credentials', 'account', null],
+])(
+  'playlist lets library deny %s while browsing target changes',
+  async (_, loginMode, credential) => {
+    const { wrapper, store, api, route } = setup(loginMode, credential);
+    await flush();
+    route.params.id = 30;
+    await flush();
+    expect(store.getters['playlistDetail/current'].playlist.id).toBe(30);
+    await wrapper.find('.song').trigger('contextmenu');
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const remove = wrapper
+      .findAll('.item')
+      .wrappers.find(item => item.text() === '从歌单中删除');
+    await remove.trigger('click');
+    await flush();
+    expect(api.addOrRemoveTrackFromPlaylist).not.toHaveBeenCalled();
+    expect(store.state.message).toBe('此操作需要登录网易云帐号');
+    expect(wrapper.findAll('.song')).toHaveLength(101);
+    wrapper.destroy();
+  }
+);
 
 test('playlist favorite applies confirmed state and feedback even when synchronization fails', async () => {
   const { wrapper, store, api } = setup();

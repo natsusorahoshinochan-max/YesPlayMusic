@@ -179,8 +179,8 @@ Electron adapter 分开协调设置镜像与具体平台效果：
 | 位置 | 当前职责 |
 | --- | --- |
 | `src/store/modules/preferences.js` | 设置读取、完整 actions、内部状态修改与录制平台状态 |
-| `src/store/initLocalStorage.js` | 默认值、已有迁移与配置补齐 |
-| `src/store/persistence.js` | 恢复持久化状态、比较持久化投影并写回对应存储 |
+| `src/store/initLocalStorage.js` | 设置与数据的默认值 |
+| `src/store/persistence.js` | 恢复持久化状态、已有版本迁移、缺失配置与快捷键补齐、语言推导，比较持久化投影并写回对应存储 |
 | `src/application/` | 设置效果的依赖接线、实际 adapter 和启动装配 |
 | `src/utils/appearance.js` | 共同外观应用函数与系统主题响应 |
 | `src/electron/ipcMain.js` 及相关桌面实现 | 设置镜像与具体平台效果的分别处理，复用桌面应用函数 |
