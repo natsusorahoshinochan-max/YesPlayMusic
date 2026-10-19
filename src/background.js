@@ -162,9 +162,10 @@ class Background {
       this.window.webContents
         .executeJavaScript('window.yesplaymusic.player')
         .then(result => {
+          const progress = result == null ? undefined : result.progress;
           res.send({
-            currentTrack: result?.currentTrack,
-            progress: result?.progress ?? 0,
+            currentTrack: result == null ? undefined : result.currentTrack,
+            progress: progress == null ? 0 : progress,
           });
         });
     });
