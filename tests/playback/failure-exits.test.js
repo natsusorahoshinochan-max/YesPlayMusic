@@ -6,7 +6,8 @@ import { configureMusicData } from '@/application/musicData';
 import { getTrackCache } from '@/utils/db';
 import { configureRequest } from '@/utils/request';
 import { createPlaybackReporting } from '@/application/playbackReporting';
-import { scrobble } from '@/api/track';
+import { scrobble, getMP3 } from '@/api/track';
+import { createAudioResources } from '@/playback/audioResources';
 import { EventEmitter } from 'events';
 import { createPlaybackPlatform } from '@/application/playbackPlatform';
 
@@ -227,4 +228,37 @@ test('real lyric HTTP failure publishes empty raw lyrics, then acknowledged meta
     platform.dispose();
   }
   expect(ipc.listenerCount('saveLyricFinished')).toBe(0);
+});
+
+test('an independently rejected audio download has a background exit without delaying the playable descriptor', async () => {
+  const error = new Error('download rejected');
+  const settings = () => ({
+    musicQuality: 128000,
+    automaticallyCacheSongs: true,
+    cacheLimit: false,
+  });
+  configureMusicData({
+    getSettings: settings,
+    getIdentity: () => ({ hasAccount: true }),
+    isElectron: true,
+    download: async () => {
+      throw error;
+    },
+  });
+  let finish;
+  const failed = new Promise(resolve => {
+    finish = resolve;
+  });
+  const resources = createAudioResources({
+    cache: getTrackCache(),
+    getMP3,
+    settings,
+    hasAccount: () => true,
+    onBackgroundError: finish,
+  });
+  expect(await resources.resolve(track(20))).toMatchObject({
+    kind: 'url',
+    url: 'https://audio.test/song',
+  });
+  expect(await failed).toBe(error);
 });
