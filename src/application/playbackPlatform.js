@@ -72,7 +72,9 @@ export function createPlaybackPlatform({
     }
   };
   browserWindow.addEventListener('keydown', keydown);
-  listen('play', () => playback.toggle());
+  listen('play', () => playback.play());
+  listen('pause', () => playback.pause());
+  listen('toggle', () => playback.toggle());
   listen('next', () => playback.next());
   listen('previous', () => playback.previous());
   listen('increaseVolume', () =>
@@ -82,6 +84,8 @@ export function createPlaybackPlatform({
     playback.setVolume(Math.max(0, playback.state.volume - 0.1))
   );
   listen('like', () => toggleFavorite(playback.state.currentTrackID));
+  listen('setRepeatMode', (_, mode) => playback.setRepeatMode(mode));
+  listen('setShuffle', (_, enabled) => playback.setShuffle(enabled));
   listen('repeat', () => playback.cycleRepeat());
   listen('shuffle', () => playback.toggleShuffle());
   listen('setPosition', (_, position) => playback.seek(position));

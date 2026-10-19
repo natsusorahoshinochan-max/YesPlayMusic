@@ -17,7 +17,7 @@ export function createTouchBar(window) {
 
   const playButton = new TouchBarButton({
     click: () => {
-      renderer.send('play');
+      renderer.send('toggle');
     },
     icon: getNativeIcon('play.png'),
   });
