@@ -87,3 +87,62 @@ test('设置保存异常由页面提示并消费拒绝', async () => {
   expect(notices).toEqual(['disk unavailable']);
   wrapper.destroy();
 });
+
+test('代理编辑只更新页面完整草稿，更新与关闭提交后才改变已保存配置', async () => {
+  process.env.IS_ELECTRON = true;
+  window.require = () => ({ ipcRenderer: { send: jest.fn() } });
+  navigator.mediaDevices = { enumerateDevices: () => Promise.resolve([]) };
+  const values = {
+    settings: JSON.stringify({
+      proxyConfig: {
+        protocol: 'HTTP',
+        server: 'old',
+        port: 80,
+        extension: { token: 42 },
+      },
+    }),
+  };
+  const storage = {
+    getItem: key => values[key] ?? null,
+    setItem: (key, value) => {
+      values[key] = value;
+    },
+  };
+  const applyProxy = jest.fn();
+  const store = createStore({ storage, preferences: { applyProxy } });
+  const localVue = createLocalVue();
+  localVue.use(Vuex);
+  const wrapper = shallowMount(Settings, {
+    localVue,
+    store,
+    mocks: { $t: key => key },
+    stubs: ['router-link', 'svg-icon'],
+  });
+  const form = wrapper.find('#proxy-form');
+  await form.findAll('input').at(0).setValue('new');
+  await form.find('input[type="number"]').setValue('8080');
+  expect(store.getters['preferences/settings'].proxyConfig.server).toBe('old');
+  expect(JSON.parse(values.settings).proxyConfig.server).toBe('old');
+  expect(applyProxy).not.toHaveBeenCalled();
+  await form.find('button').trigger('click');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(JSON.parse(values.settings).proxyConfig).toMatchObject({
+    server: 'new',
+    port: 8080,
+    extension: { token: 42 },
+  });
+  await wrapper
+    .findAll('select')
+    .wrappers.find(select => select.find('option[value="noProxy"]').exists())
+    .setValue('noProxy');
+  expect(store.getters['preferences/settings'].proxyConfig.protocol).toBe(
+    'HTTP'
+  );
+  await form.find('button').trigger('click');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(applyProxy).toHaveBeenLastCalledWith(
+    expect.objectContaining({ protocol: 'noProxy' })
+  );
+  wrapper.destroy();
+  delete process.env.IS_ELECTRON;
+});
