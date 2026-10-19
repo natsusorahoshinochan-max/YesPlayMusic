@@ -48,7 +48,7 @@ function createMenuTemplate(win, store, windowOperations) {
       label: '暂停',
       icon: createMenuIcon('pause', iconTheme),
       click: () => {
-        win.webContents.send('play');
+        win.webContents.send('pause');
       },
       id: 'pause',
       visible: false,

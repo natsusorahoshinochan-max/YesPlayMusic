@@ -658,16 +658,29 @@ export function createPlayback({
         return result;
       });
     },
+    setRepeatMode(mode) {
+      if (
+        state.isPersonalFM ||
+        !['off', 'on', 'one'].includes(mode) ||
+        state.repeatMode === mode
+      )
+        return;
+      state.repeatMode = mode;
+      publish();
+    },
     cycleRepeat() {
-      if (state.isPersonalFM) return;
-      state.repeatMode = { off: 'on', on: 'one', one: 'off' }[state.repeatMode];
+      playback.setRepeatMode(
+        { off: 'on', on: 'one', one: 'off' }[state.repeatMode]
+      );
+    },
+    setShuffle(enabled) {
+      if (state.isPersonalFM || state.shuffle === Boolean(enabled)) return;
+      state.shuffle = Boolean(enabled);
+      if (state.shuffle) shuffleQueue(list.length ? index : null);
       publish();
     },
     toggleShuffle() {
-      if (state.isPersonalFM) return;
-      state.shuffle = !state.shuffle;
-      if (state.shuffle) shuffleQueue(list.length ? index : null);
-      publish();
+      playback.setShuffle(!state.shuffle);
     },
     setReversed(value) {
       if (state.isPersonalFM) return;
