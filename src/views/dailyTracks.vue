@@ -1,32 +1,36 @@
 <template>
-  <div v-show="show">
-    <div class="special-playlist">
-      <div class="title gradient"> 每日歌曲推荐 </div>
-      <div class="subtitle">根据你的音乐口味生成 · 每天6:00更新</div>
-      <div class="buttons">
-        <ButtonTwoTone
-          class="play-button"
-          icon-class="play"
-          color="grey"
-          @click.native="playDailyTracks()"
-        >
-          {{ $t('common.play') }}
-        </ButtonTwoTone>
-      </div>
+  <div>
+    <div v-if="status === 'error'" class="load-error">
+      每日推荐加载失败
+      <button class="retry" @click="loadDailyTracks">重试</button>
     </div>
+    <div v-show="show">
+      <div class="special-playlist">
+        <div class="title gradient"> 每日歌曲推荐 </div>
+        <div class="subtitle">根据你的音乐口味生成 · 每天6:00更新</div>
+        <div class="buttons">
+          <ButtonTwoTone
+            class="play-button"
+            icon-class="play"
+            color="grey"
+            @click.native="playDailyTracks()"
+          >
+            {{ $t('common.play') }}
+          </ButtonTwoTone>
+        </div>
+      </div>
 
-    <TrackList
-      :tracks="dailyTracks"
-      type="playlist"
-      @activate="playDailyTracks($event.track.id)"
-    />
+      <TrackList
+        :tracks="dailyTracks"
+        type="playlist"
+        @activate="playDailyTracks($event.track.id)"
+      />
+    </div>
   </div>
 </template>
 
 <script>
-import { mapMutations, mapState, mapGetters } from 'vuex';
-import NProgress from 'nprogress';
-import { dailyRecommendTracks } from '@/api/playlist';
+import { mapState, mapActions } from 'vuex';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 import TrackList from '@/components/TrackList.vue';
@@ -37,45 +41,24 @@ export default {
     ButtonTwoTone,
     TrackList,
   },
-  data() {
-    return {
-      show: false,
-    };
-  },
   computed: {
-    ...mapGetters({
-      user: 'library/user',
-      likedSongPlaylistID: 'library/likedSongPlaylistID',
+    ...mapState('dailyRecommendations', {
+      dailyTracks: 'tracks',
+      status: 'status',
     }),
-    ...mapState(['player', 'dailyTracks']),
+    show() {
+      return this.status === 'loaded';
+    },
   },
   created() {
-    if (this.dailyTracks.length === 0) {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
-      this.loadDailyTracks();
-    } else {
-      this.show = true;
-    }
+    this.loadDailyTracks();
     this.$parent.$refs.main.scrollTo(0, 0);
   },
   methods: {
-    ...mapMutations(['updateDailyTracks']),
-    loadDailyTracks() {
-      dailyRecommendTracks().then(result => {
-        this.updateDailyTracks(result.data.dailySongs);
-        NProgress.done();
-        this.show = true;
-      });
-    },
-    playDailyTracks(startTrackId = this.dailyTracks[0]?.id) {
-      let trackIDs = this.dailyTracks.map(t => t.id);
-      return this.$store.state.player.playTracks(trackIDs, {
-        source: { type: 'url', id: '/daily/songs' },
-        startTrackId,
-      });
-    },
+    ...mapActions('dailyRecommendations', {
+      loadDailyTracks: 'load',
+      playDailyTracks: 'play',
+    }),
   },
 };
 </script>

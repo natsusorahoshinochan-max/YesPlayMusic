@@ -19,8 +19,7 @@
 
 <script>
 import locale from '@/locale';
-import { mapMutations, mapState, mapActions } from 'vuex';
-import { dailyRecommendTracks } from '@/api/playlist';
+import { mapState, mapActions } from 'vuex';
 import sample from 'lodash/sample';
 
 const defaultCovers = [
@@ -35,7 +34,7 @@ export default {
     return { useAnimation: false };
   },
   computed: {
-    ...mapState(['dailyTracks']),
+    ...mapState('dailyRecommendations', { dailyTracks: 'tracks' }),
     coverUrl() {
       return `${
         this.dailyTracks[0]?.al.picUrl || sample(defaultCovers)
@@ -43,19 +42,11 @@ export default {
     },
   },
   created() {
-    if (this.dailyTracks.length === 0) this.loadDailyTracks();
+    this.loadDailyTracks();
   },
   methods: {
     ...mapActions(['showToast']),
-    ...mapMutations(['updateDailyTracks']),
-    loadDailyTracks() {
-      if (!this.$store.getters['session/hasAccount']) return;
-      dailyRecommendTracks()
-        .then(result => {
-          this.updateDailyTracks(result.data.dailySongs);
-        })
-        .catch(() => {});
-    },
+    ...mapActions('dailyRecommendations', { loadDailyTracks: 'load' }),
     goToDailyTracks() {
       this.$router.push({ name: 'dailySongs' });
     },
@@ -64,11 +55,7 @@ export default {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
-      let trackIDs = this.dailyTracks.map(t => t.id);
-      return this.$store.state.player.playTracks(trackIDs, {
-        source: { type: 'url', id: '/daily/songs' },
-        startTrackId: this.dailyTracks[0]?.id,
-      });
+      return this.$store.dispatch('dailyRecommendations/play');
     },
   },
 };

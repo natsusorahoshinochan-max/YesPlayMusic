@@ -230,6 +230,11 @@
         </div>
       </div>
       <div class="right-side">
+        <button
+          v-if="lyrics.status === 'failed'"
+          @click="playback.lyrics.retry()"
+          >重试歌词</button
+        >
         <transition name="slide-fade">
           <div
             v-show="!noLyric"
@@ -310,17 +315,12 @@ import { mapState, mapMutations, mapGetters } from 'vuex';
 import VueSlider from 'vue-slider-component';
 import ContextMenu from '@/components/ContextMenu.vue';
 import { formatTrackTime } from '@/utils/common';
-import { getLyric, getCloudLyric } from '@/api/track';
-import { lyricParser, copyLyric, parseLyric } from '@/utils/lyrics';
+import { copyLyric } from '@/utils/lyrics';
 import ButtonIcon from '@/components/ButtonIcon.vue';
 import * as Vibrant from 'node-vibrant/dist/vibrant.worker.min.js';
 import Color from 'color';
 import { hasListSource, getListSourcePath } from '@/utils/playList';
 import locale from '@/locale';
-
-const electron =
-  process.env.IS_ELECTRON === true ? window.require('electron') : null;
-const ipcRenderer = electron?.ipcRenderer || null;
 
 export default {
   name: 'Lyrics',
@@ -331,12 +331,7 @@ export default {
   },
   data() {
     return {
-      lyricsInterval: null,
-      lyric: [],
-      tlyric: [],
-      romalyric: [],
       lyricType: 'translation', // or 'romaPronunciation'
-      highlightLyricIndex: -1,
       minimize: true,
       background: '',
       date: this.formatTime(new Date()),
@@ -392,67 +387,26 @@ export default {
         ? this.lyricWithTranslation
         : this.lyricWithRomaPronunciation;
     },
+    lyrics() {
+      return this.playback.lyrics.state;
+    },
+    lyric() {
+      return this.lyrics.lyric;
+    },
+    tlyric() {
+      return this.lyrics.tlyric;
+    },
+    romalyric() {
+      return this.lyrics.romalyric;
+    },
+    highlightLyricIndex() {
+      return this.lyrics.currentIndex;
+    },
     lyricWithTranslation() {
-      let ret = [];
-      // 空内容的去除
-      const lyricFiltered = this.lyric.filter(({ content }) =>
-        Boolean(content)
-      );
-      // content统一转换数组形式
-      if (lyricFiltered.length) {
-        lyricFiltered.forEach(l => {
-          const { rawTime, time, content } = l;
-          const lyricItem = { time, content, contents: [content] };
-          const sameTimeTLyric = this.tlyric.find(
-            ({ rawTime: tLyricRawTime }) => tLyricRawTime === rawTime
-          );
-          if (sameTimeTLyric) {
-            const { content: tLyricContent } = sameTimeTLyric;
-            if (content) {
-              lyricItem.contents.push(tLyricContent);
-            }
-          }
-          ret.push(lyricItem);
-        });
-      } else {
-        ret = lyricFiltered.map(({ time, content }) => ({
-          time,
-          content,
-          contents: [content],
-        }));
-      }
-      return ret;
+      return this.lyrics.translation;
     },
     lyricWithRomaPronunciation() {
-      let ret = [];
-      // 空内容的去除
-      const lyricFiltered = this.lyric.filter(({ content }) =>
-        Boolean(content)
-      );
-      // content统一转换数组形式
-      if (lyricFiltered.length) {
-        lyricFiltered.forEach(l => {
-          const { rawTime, time, content } = l;
-          const lyricItem = { time, content, contents: [content] };
-          const sameTimeRomaLyric = this.romalyric.find(
-            ({ rawTime: tLyricRawTime }) => tLyricRawTime === rawTime
-          );
-          if (sameTimeRomaLyric) {
-            const { content: romaLyricContent } = sameTimeRomaLyric;
-            if (content) {
-              lyricItem.contents.push(romaLyricContent);
-            }
-          }
-          ret.push(lyricItem);
-        });
-      } else {
-        ret = lyricFiltered.map(({ time, content }) => ({
-          time,
-          content,
-          contents: [content],
-        }));
-      }
-      return ret;
+      return this.lyrics.romanization;
     },
     lyricFontSize() {
       return {
@@ -477,19 +431,25 @@ export default {
     },
   },
   watch: {
+    highlightLyricIndex(index) {
+      if (this.showLyrics)
+        this.$nextTick(() => {
+          document
+            .getElementById(`line${index}`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    },
     currentTrackID() {
-      this.getLyric();
       this.getCoverColor();
     },
     showLyrics(show) {
       if (show) {
-        this.setLyricsInterval();
+        this.releaseLyricsClock?.();
+        this.releaseLyricsClock = this.playback.lyrics.consume();
         this.$store.commit('enableScrolling', false);
       } else {
-        // 在 Electron 环境下，即使不显示歌词页面，也保持定时器运行以更新 Touch Bar
-        if (process.env.IS_ELECTRON !== true) {
-          clearInterval(this.lyricsInterval);
-        }
+        this.releaseLyricsClock?.();
+        this.releaseLyricsClock = null;
         this.$store.commit('enableScrolling', true);
         // Fullscreen is requested on documentElement, so it makes the whole
         // window fullscreen. Since the only way to leave fullscreen from the
@@ -500,31 +460,30 @@ export default {
     },
   },
   created() {
-    this.getLyric();
     this.getCoverColor();
     this.initDate();
-    // 在 Electron 环境下立即启动歌词定时器，以便 Touch Bar 可以显示歌词
-    if (process.env.IS_ELECTRON === true) {
-      this.setLyricsInterval();
-    }
-    document.addEventListener('keydown', e => {
+    if (this.showLyrics)
+      this.releaseLyricsClock = this.playback.lyrics.consume();
+    this.onKeydown = e => {
       if (e.key === 'F11') {
         e.preventDefault();
         this.fullscreen();
       }
-    });
-    document.addEventListener('fullscreenchange', () => {
+    };
+    this.onFullscreenChange = () => {
       this.isFullscreen = !!document.fullscreenElement;
-    });
+    };
+    document.addEventListener('keydown', this.onKeydown);
+    document.addEventListener('fullscreenchange', this.onFullscreenChange);
   },
   beforeDestroy: function () {
+    document.removeEventListener('keydown', this.onKeydown);
+    document.removeEventListener('fullscreenchange', this.onFullscreenChange);
     if (this.timer) {
       clearInterval(this.timer);
     }
+    this.releaseLyricsClock?.();
     this.exitFullscreen();
-  },
-  destroyed() {
-    clearInterval(this.lyricsInterval);
   },
   methods: {
     ...mapMutations(['toggleLyrics', 'updateModal']),
@@ -588,69 +547,6 @@ export default {
     playNextTrack() {
       return this.playback.next();
     },
-    getLyric() {
-      if (!this.currentTrack.id) return;
-      if (
-        this.currentTrack.pc !== null &&
-        this.currentTrack.cd === null &&
-        this.$store.getters['library/user']?.userId
-      ) {
-        //云盘未设置关联的歌曲获取其内置歌词
-        return getCloudLyric(
-          this.currentTrack.id,
-          this.$store.getters['library/user']?.userId
-        ).then(data => {
-          this.tlyric = [];
-          this.romalyric = [];
-          this.lyric = data?.lrc?.length > 0 ? parseLyric(data.lrc) : [];
-          this.lyricType = 'translation';
-          return true;
-        });
-      }
-      return getLyric(this.currentTrack.id).then(data => {
-        if (!data?.lrc?.lyric) {
-          this.lyric = [];
-          this.tlyric = [];
-          this.romalyric = [];
-          return false;
-        } else {
-          let { lyric, tlyric, romalyric } = lyricParser(data);
-          lyric = lyric.filter(
-            l => !/^作(词|曲)\s*(:|：)\s*无$/.exec(l.content)
-          );
-          let includeAM =
-            lyric.length <= 10 &&
-            lyric.map(l => l.content).includes('纯音乐，请欣赏');
-          if (includeAM) {
-            let reg = /^作(词|曲)\s*(:|：)\s*/;
-            let author = this.currentTrack?.ar[0]?.name;
-            lyric = lyric.filter(l => {
-              let regExpArr = l.content.match(reg);
-              return (
-                !regExpArr || l.content.replace(regExpArr[0], '') !== author
-              );
-            });
-          }
-          if (lyric.length === 1 && includeAM) {
-            this.lyric = [];
-            this.tlyric = [];
-            this.romalyric = [];
-            return false;
-          } else {
-            this.lyric = lyric;
-            this.tlyric = tlyric;
-            this.romalyric = romalyric;
-            if (tlyric.length * romalyric.length > 0) {
-              this.lyricType = 'translation';
-            } else {
-              this.lyricType =
-                lyric.length > 0 ? 'translation' : 'romaPronunciation';
-            }
-            return true;
-          }
-        }
-      });
-    },
     switchLyricType() {
       this.lyricType =
         this.lyricType === 'translation' ? 'romaPronunciation' : 'translation';
@@ -687,41 +583,6 @@ export default {
           copyLyric(this.rightClickLyric.contents.join(' '));
         }
       }
-    },
-    setLyricsInterval() {
-      this.lyricsInterval = setInterval(() => {
-        const progress = this.playback.position() ?? 0;
-        let oldHighlightLyricIndex = this.highlightLyricIndex;
-        this.highlightLyricIndex = this.lyric.findIndex((l, index) => {
-          const nextLyric = this.lyric[index + 1];
-          return (
-            progress >= l.time && (nextLyric ? progress < nextLyric.time : true)
-          );
-        });
-        if (oldHighlightLyricIndex !== this.highlightLyricIndex) {
-          // 只在显示歌词页面时才滚动
-          if (this.showLyrics) {
-            const el = document.getElementById(
-              `line${this.highlightLyricIndex}`
-            );
-            if (el)
-              el.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center',
-              });
-          }
-
-          // 发送当前歌词到主进程（用于 Touch Bar 显示）
-          if (ipcRenderer && this.highlightLyricIndex >= 0) {
-            const currentLyricLine = this.lyricToShow[this.highlightLyricIndex];
-            if (currentLyricLine && currentLyricLine.contents) {
-              // 只发送第一行歌词（原文），避免显示过长
-              const lyricText = currentLyricLine.contents[0] || '';
-              ipcRenderer.send('updateLyric', { lyric: lyricText });
-            }
-          }
-        }
-      }, 50);
     },
     moveToFMTrash() {
       return this.playback.discardFMTrack();

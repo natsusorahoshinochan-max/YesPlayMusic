@@ -22,7 +22,6 @@ export default function createState() {
         afterCreateAddTrackID: 0,
       },
     },
-    dailyTracks: [],
     player: null,
   };
 }

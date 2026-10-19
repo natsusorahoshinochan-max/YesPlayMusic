@@ -1,4 +1,4 @@
-import { isCreateMpris, isCreateTray } from '@/utils/platform';
+import { isCreateMpris, isCreateTray, isMac } from '@/utils/platform';
 
 export function createPlaybackPlatform({
   playback,
@@ -12,7 +12,11 @@ export function createPlaybackPlatform({
   settings = () => ({}),
   toggleFavorite = () => {},
   onTitle = () => {},
-  getLyric = async () => ({}),
+  lyrics,
+  setTimeout: schedule = setTimeout,
+  clearTimeout: cancel = clearTimeout,
+  lyricsWriteTimeout = 5000,
+  createTouchBar = isMac,
   createTray = isCreateTray,
   createMpris = isCreateMpris,
 } = {}) {
@@ -24,6 +28,16 @@ export function createPlaybackPlatform({
   let metadataKey;
   let metadataGeneration = 0;
   let pendingLyrics;
+  function cancelLyricsWrite() {
+    if (pendingLyrics) cancel(pendingLyrics.timeout);
+    pendingLyrics = undefined;
+  }
+  function finishLyricsWrite(requestId) {
+    if (!pendingLyrics || requestId !== pendingLyrics.generation) return;
+    const { metadata, generation } = pendingLyrics;
+    cancelLyricsWrite();
+    if (generation === metadataGeneration) send('metadata', metadata);
+  }
   browserWindow.yesplaymusic = browserWindow.yesplaymusic || {};
   const publicExport = browserWindow.yesplaymusic;
   const send = (channel, payload) => {
@@ -132,42 +146,54 @@ export function createPlaybackPlatform({
     if (session && MediaMetadata)
       session.metadata = new MediaMetadata(metadata);
     const generation = ++metadataGeneration;
-    pendingLyrics = undefined;
+    cancelLyricsWrite();
     if (!createMpris || !ipc) return;
     if (!settings().enableOsdlyricsSupport) {
       send('metadata', metadata);
       return;
     }
-    Promise.resolve()
-      .then(() => getLyric(track.id))
-      .then(result => {
-        if (disposed || generation !== metadataGeneration) return;
-        if (!result?.lrc?.lyric) {
-          send('metadata', metadata);
-          return;
-        }
-        pendingLyrics = { metadata, generation };
-        send('sendLyrics', {
-          track,
-          lyrics: result.lrc.lyric,
-          requestId: generation,
-        });
-      })
-      .catch(() => {
-        if (!disposed && generation === metadataGeneration)
-          send('metadata', metadata);
-      });
-  }
-  listen('saveLyricFinished', (_, requestId) => {
+    const content = lyrics?.state;
     if (
-      !pendingLyrics ||
-      (requestId !== undefined && requestId !== pendingLyrics.generation)
+      !content ||
+      content.trackId !== track.id ||
+      content.status === 'loading' ||
+      content.status === 'idle'
     )
       return;
-    const { metadata, generation } = pendingLyrics;
-    pendingLyrics = undefined;
-    if (generation === metadataGeneration) send('metadata', metadata);
+    pendingLyrics = {
+      metadata,
+      generation,
+      timeout: schedule(
+        () => finishLyricsWrite(generation),
+        lyricsWriteTimeout
+      ),
+    };
+    send('sendLyrics', { track, lyrics: content.raw, requestId: generation });
+  }
+  let lyricRevision;
+  let currentLine;
+  const releaseClock = ipc && createTouchBar ? lyrics?.consume() : undefined;
+  const unsubscribeLyrics = lyrics?.subscribe(content => {
+    if (createTouchBar && content.currentLine !== currentLine) {
+      currentLine = content.currentLine;
+      send('updateLyric', { lyric: currentLine });
+    }
+    const revision = `${content.generation}:${content.status}`;
+    if (revision === lyricRevision) return;
+    lyricRevision = revision;
+    metadataGeneration++;
+    cancelLyricsWrite();
+    metadataKey = undefined;
+    if (lastState?.sourceInfo && content.trackId === lastState.currentTrackID) {
+      metadataKey = JSON.stringify([
+        lastState.currentTrack,
+        content.generation,
+        content.status,
+      ]);
+      publishMetadata(lastState.currentTrack, lastState);
+    }
   });
+  listen('saveLyricFinished', (_, requestId) => finishLyricsWrite(requestId));
   return {
     publish(state, liked = false) {
       if (disposed) return;
@@ -209,12 +235,20 @@ export function createPlaybackPlatform({
         send('switchRepeatMode', state.repeatMode);
       if (createMpris && (!previous || previous.shuffle !== state.shuffle))
         send('switchShuffle', state.shuffle);
-      if (state.currentTrack?.id) {
-        const key = JSON.stringify(state.currentTrack);
+      if (state.currentTrack?.id && state.sourceInfo) {
+        const key = JSON.stringify([
+          state.currentTrack,
+          lyrics?.state.generation,
+          lyrics?.state.status,
+        ]);
         if (key !== metadataKey) {
           metadataKey = key;
           publishMetadata(state.currentTrack, state);
         }
+      } else {
+        metadataKey = undefined;
+        metadataGeneration++;
+        cancelLyricsWrite();
       }
       updatePosition(state.progress);
     },
@@ -236,8 +270,10 @@ export function createPlaybackPlatform({
       if (disposed) return;
       disposed = true;
       metadataGeneration++;
+      unsubscribeLyrics?.();
+      releaseClock?.();
       browserWindow.removeEventListener('keydown', keydown);
-      pendingLyrics = undefined;
+      cancelLyricsWrite();
       if (publicExport.player === publishedSnapshot) delete publicExport.player;
       listeners.forEach(([channel, handler]) =>
         ipc.removeListener(channel, handler)

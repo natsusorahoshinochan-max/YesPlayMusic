@@ -71,12 +71,13 @@ export function getTrackDetail(ids, { isCurrent } = {}) {
  * 说明 : 调用此接口 , 传入音乐 id 可获得对应音乐的歌词 ( 不需要登录 )
  * @param {number} id - 音乐 id
  */
-export function getLyric(id) {
+export function getLyric(id, { isCurrent } = {}) {
   return readMetadata({
     readCache: () => getLyricFromCache(id),
     fetchLatest: async () => {
       const result = await request({
         url: '/lyric',
+        isCurrent,
         method: 'get',
         params: { id },
       });
@@ -91,12 +92,14 @@ export function getLyric(id) {
  * @param {number} songId - 音乐 id
  * @param {number} userId - 用户 id
  */
-export function getCloudLyric(songId, userId) {
+export function getCloudLyric(songId, userId, { isCurrent } = {}) {
+  const cacheKey = `cloud:${userId}:${songId}`;
   return readMetadata({
-    readCache: () => getLyricFromCache(songId),
+    readCache: () => getLyricFromCache(cacheKey),
     fetchLatest: async () => {
       const result = await request({
         url: '/api',
+        isCurrent,
         method: 'get',
         params: {
           uri: '/api/cloud/lyric/get',
@@ -104,7 +107,7 @@ export function getCloudLyric(songId, userId) {
           crypto: 'eapi',
         },
       });
-      await cacheLyric(songId, result);
+      await cacheLyric(cacheKey, result);
       return result;
     },
   });

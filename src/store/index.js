@@ -1,4 +1,6 @@
 import Vue from 'vue';
+import createDailyRecommendations from './modules/dailyRecommendations';
+import { dailyRecommendTracks } from '@/api/playlist';
 import Vuex from 'vuex';
 import { initializePlayerStorage } from '@/application/playerStorage';
 import createState from './state';
@@ -41,6 +43,10 @@ export function createStore({
     actions: { ...rootActions, ...actions },
     plugins,
     modules: {
+      dailyRecommendations: createDailyRecommendations({
+        read: dailyRecommendTracks,
+        getPlayback: () => createdStore.state.player,
+      }),
       lastfm: createLastfm({
         storage: lastfmStorage,
         authGetSession,
@@ -52,6 +58,7 @@ export function createStore({
         ...session,
         credentials,
         identityChanged() {
+          createdStore.dispatch('dailyRecommendations/identityChanged');
           createdStore.state.player?.lyrics?.identityChanged();
           identityListeners.forEach(changed => changed());
         },
