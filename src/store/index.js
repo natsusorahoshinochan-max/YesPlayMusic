@@ -7,6 +7,7 @@ import rootActions from './actions';
 import { createPersistence } from './persistence';
 import createSession from './modules/session';
 import createLibrary from './modules/library';
+import createPlaylistDetail from './modules/playlistDetail';
 import createPreferences from './modules/preferences';
 import { getSendSettingsPlugin } from './plugins/sendSettings';
 
@@ -20,6 +21,7 @@ export function createStore({
   session = {},
   library = {},
   preferences = {},
+  playlistDetail = {},
   actions = {},
 } = {}) {
   initializePlayerStorage(storage);
@@ -37,6 +39,10 @@ export function createStore({
         credentials,
       }),
       library: createLibrary(persistence.snapshot.library, library),
+      playlistDetail: createPlaylistDetail({
+        api: library.api,
+        ...playlistDetail,
+      }),
       preferences: createPreferences(persistence.snapshot.preferences, {
         ...preferences,
         persist: async () => {
