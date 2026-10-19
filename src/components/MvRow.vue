@@ -31,6 +31,7 @@ export default {
   name: 'CoverVideo',
   props: {
     mvs: Array,
+    autoplay: { type: Boolean, default: undefined },
     subtitle: {
       type: String,
       default: 'artist',
@@ -44,10 +45,9 @@ export default {
   },
   methods: {
     goToMv(id) {
-      let query = {};
-      if (this.$parent.player !== undefined) {
-        query = { autoplay: this.$parent.player.playing };
-      }
+      const query = {
+        autoplay: this.autoplay ?? this.$store.state.player.state.playing,
+      };
       this.$router.push({ path: '/mv/' + id, query });
     },
     getUrl(mv) {

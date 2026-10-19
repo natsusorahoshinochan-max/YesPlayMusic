@@ -109,7 +109,7 @@
                   >
                     <svg-icon
                       :icon-class="
-                        player.isCurrentTrackLiked ? 'heart-solid' : 'heart'
+                        isCurrentTrackLiked ? 'heart-solid' : 'heart'
                       "
                     />
                   </button-icon>
@@ -129,7 +129,7 @@
               <span>{{ formatTrackTime(player.progress) || '0:00' }}</span>
               <div class="slider">
                 <vue-slider
-                  v-model="player.progress"
+                  v-model="progress"
                   :min="0"
                   :max="player.currentTrackDuration"
                   :interval="1"
@@ -346,16 +346,33 @@ export default {
   },
   computed: {
     ...mapGetters({ settings: 'preferences/settings' }),
-    ...mapState(['player', 'showLyrics']),
+    ...mapState(['showLyrics']),
+    ...mapState({ playback: 'player' }),
+    player() {
+      return this.playback.state;
+    },
     currentTrack() {
       return this.player.currentTrack;
+    },
+    isCurrentTrackLiked() {
+      return this.$store.getters['library/collections'].songs.includes(
+        this.player.currentTrackID
+      );
+    },
+    progress: {
+      get() {
+        return this.player.progress;
+      },
+      set(value) {
+        this.playback.seek(value);
+      },
     },
     volume: {
       get() {
         return this.player.volume;
       },
       set(value) {
-        this.player.volume = value;
+        this.playback.setVolume(value);
       },
     },
     imageUrl() {
@@ -560,17 +577,13 @@ export default {
       });
     },
     playPrevTrack() {
-      this.player.playPrevTrack();
+      return this.playback.previous();
     },
     playOrPause() {
-      this.player.playOrPause();
+      return this.playback.toggle();
     },
     playNextTrack() {
-      if (this.player.isPersonalFM) {
-        this.player.playNextFMTrack();
-      } else {
-        this.player.playNextTrack();
-      }
+      return this.playback.next();
     },
     getLyric() {
       if (!this.currentTrack.id) return;
@@ -651,10 +664,10 @@ export default {
         }
       });
       if (window.getSelection().toString().length === 0 && !jumpFlag) {
-        this.player.seek(value);
+        this.playback.seek(value);
       }
       if (startPlay === true) {
-        this.player.play();
+        this.playback.play();
       }
     },
     openLyricMenu(e, lyric, idx) {
@@ -674,7 +687,7 @@ export default {
     },
     setLyricsInterval() {
       this.lyricsInterval = setInterval(() => {
-        const progress = this.player.seek(null, false) ?? 0;
+        const progress = this.playback.position() ?? 0;
         let oldHighlightLyricIndex = this.highlightLyricIndex;
         this.highlightLyricIndex = this.lyric.findIndex((l, index) => {
           const nextLyric = this.lyric[index + 1];
@@ -708,13 +721,13 @@ export default {
       }, 50);
     },
     moveToFMTrash() {
-      this.player.moveToFMTrash();
+      this.playback.moveToFMTrash();
     },
     switchRepeatMode() {
-      this.player.switchRepeatMode();
+      this.playback.switchRepeatMode();
     },
     switchShuffle() {
-      this.player.switchShuffle();
+      this.playback.switchShuffle();
     },
     getCoverColor() {
       if (this.settings.lyricsBackground !== true) return;
@@ -735,7 +748,7 @@ export default {
       return getListSourcePath();
     },
     mute() {
-      this.player.mute();
+      return this.playback.toggleMute();
     },
   },
 };

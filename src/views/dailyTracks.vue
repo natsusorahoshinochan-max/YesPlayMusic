@@ -71,12 +71,10 @@ export default {
     },
     playDailyTracks() {
       let trackIDs = this.dailyTracks.map(t => t.id);
-      this.$store.state.player.replacePlaylist(
-        trackIDs,
-        '/daily/songs',
-        'url',
-        this.dailyTracks[0].id
-      );
+      return this.$store.state.player.playTracks(trackIDs, {
+        source: { type: 'url', id: '/daily/songs' },
+        startTrackId: this.dailyTracks[0]?.id,
+      });
     },
   },
 };
