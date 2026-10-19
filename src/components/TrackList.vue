@@ -206,8 +206,10 @@ export default {
         // do nothing
       } else if (this.dbclickTrackFunc === 'playTrackOnListByID') {
         this.player.playTrackOnListByID(trackID);
-      } else if (this.dbclickTrackFunc === 'playPlaylistByID') {
-        this.player.playPlaylistByID(this.id, trackID);
+      } else if (this.dbclickTrackFunc === 'playPlaylist') {
+        return this.player.playPlaylist(this.id, { startTrackId: trackID });
+      } else if (this.dbclickTrackFunc === 'playArtist') {
+        return this.player.playArtist(this.id, { startTrackId: trackID });
       } else if (this.dbclickTrackFunc === 'playAList') {
         let trackIDs = this.tracks.map(t => t.id || t.songId);
         return this.player.playTracks(trackIDs, {
@@ -230,9 +232,9 @@ export default {
     },
     playThisListDefault(trackID) {
       if (this.type === 'playlist') {
-        this.player.playPlaylistByID(this.id, trackID);
+        return this.player.playPlaylist(this.id, { startTrackId: trackID });
       } else if (this.type === 'album') {
-        this.player.playAlbumByID(this.id, trackID);
+        return this.player.playAlbum(this.id, { startTrackId: trackID });
       } else if (this.type === 'tracklist') {
         let trackIDs = this.tracks.map(t => t.id);
         return this.player.playTracks(trackIDs, {

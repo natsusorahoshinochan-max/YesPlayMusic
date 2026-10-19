@@ -49,7 +49,7 @@
           {{ playlist.description }}
         </div>
         <div class="buttons">
-          <ButtonTwoTone icon-class="play" @click.native="playPlaylistByID()">
+          <ButtonTwoTone icon-class="play" @click.native="playPlaylist()">
             {{ $t('common.play') }}
           </ButtonTwoTone>
           <ButtonTwoTone
@@ -109,7 +109,7 @@
           class="play-button"
           icon-class="play"
           color="grey"
-          @click.native="playPlaylistByID()"
+          @click.native="playPlaylist()"
         >
           {{ $t('common.play') }}
         </ButtonTwoTone>
@@ -219,7 +219,7 @@
 </template>
 
 <script>
-import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
+import { mapActions, mapState, mapGetters } from 'vuex';
 import NProgress from 'nprogress';
 import nativeAlert from '@/utils/nativeAlert';
 import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
@@ -419,16 +419,11 @@ export default {
     NProgress.done();
   },
   methods: {
-    ...mapMutations(['appendTrackToPlayerList']),
-    ...mapActions(['playFirstTrackOnList', 'playTrackOnListByID', 'showToast']),
-    playPlaylistByID(trackID = 'first') {
-      let trackIDs = this.playlist.trackIds.map(t => t.id);
-      this.$store.state.player.replacePlaylist(
-        trackIDs,
-        this.playlist.id,
-        'playlist',
-        trackID
-      );
+    ...mapActions(['showToast']),
+    playPlaylist(startTrackId) {
+      return this.$store.state.player.playPlaylist(this.playlist.id, {
+        startTrackId,
+      });
     },
     async likePlaylist(toast = false) {
       const favorite = !this.playlist.subscribed;

@@ -75,11 +75,11 @@ export default {
     play() {
       const player = this.$store.state.player;
       const playActions = {
-        album: player.playAlbumByID,
-        playlist: player.playPlaylistByID,
-        artist: player.playArtistByID,
+        album: player.playAlbum,
+        playlist: player.playPlaylist,
+        artist: player.playArtist,
       };
-      playActions[this.type].bind(player)(this.id);
+      return playActions[this.type](this.id);
     },
     goTo() {
       this.$router.push({ name: this.type, params: { id: this.id } });

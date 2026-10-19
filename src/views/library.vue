@@ -37,7 +37,7 @@
           :tracks="liked.songsWithDetails"
           :column-number="3"
           type="tracklist"
-          dbclick-track-func="playPlaylistByID"
+          dbclick-track-func="playPlaylist"
         />
       </div>
     </div>
@@ -332,17 +332,14 @@ export default {
         .finally(() => NProgress.done());
     },
     playLikedSongs() {
-      this.$store.state.player.playPlaylistByID(
-        this.liked.playlists[0].id,
-        'first',
-        true
-      );
+      return this.$store.state.player.playPlaylist(this.liked.playlists[0].id, {
+        fresh: true,
+      });
     },
     playIntelligenceList() {
-      this.$store.state.player.playIntelligenceListById(
+      return this.$store.state.player.playIntelligencePlaylist(
         this.liked.playlists[0].id,
-        'first',
-        true
+        { fresh: true }
       );
     },
     updateCurrentTab(tab) {
