@@ -3,7 +3,11 @@ import axios from 'axios';
 import { configureMusicData } from '@/application/musicData';
 import { shallowMount } from '@vue/test-utils';
 import Callback from '@/views/lastfmCallback.vue';
-jest.mock('axios', () => jest.fn());
+import { createLastfmOptions } from '@/application/lastfm';
+const transport = jest.fn();
+beforeEach(() => {
+  axios.defaults.adapter = transport;
+});
 import { createStore } from '@/store';
 
 function storageWith(session) {
@@ -17,7 +21,7 @@ function storageWith(session) {
 
 test('each renderer restores its independent authorization and complete operations save and disconnect it', async () => {
   const storage = storageWith({ key: 'saved', name: 'Listener', future: 7 });
-  const store = createStore({ storage });
+  const store = createStore({ storage, lastfm: createLastfmOptions(storage) });
   const other = createStore({ storage: storageWith() });
   expect(store.getters['lastfm/authorization']).toEqual({
     key: 'saved',
@@ -33,9 +37,9 @@ test('each renderer restores its independent authorization and complete operatio
 test('callback exchanges its token through the authorization owner and preserves the saved representation', async () => {
   history.replaceState({}, '', '/lastfm/callback?token=callback-token');
   const authorization = { key: 'new-session', name: 'Listener', subscriber: 1 };
-  axios.mockResolvedValue({ data: { session: authorization } });
+  transport.mockResolvedValue({ data: { session: authorization } });
   const storage = storageWith();
-  const store = createStore({ storage });
+  const store = createStore({ storage, lastfm: createLastfmOptions(storage) });
   const callback = shallowMount(Callback, {
     mocks: { $store: store },
     stubs: ['svg-icon'],
@@ -44,7 +48,7 @@ test('callback exchanges its token through the authorization owner and preserves
   expect(callback.text()).toContain('已成功连接到 Last.fm');
   expect(store.getters['lastfm/authorization']).toEqual(authorization);
   expect(JSON.parse(storage.getItem('lastfm'))).toEqual(authorization);
-  expect(axios.mock.calls[0][0].params.token).toBe('callback-token');
+  expect(transport.mock.calls[0][0].params.token).toBe('callback-token');
   callback.destroy();
   history.replaceState({}, '', '/');
 });
@@ -53,7 +57,7 @@ test('authorization exchange adopts the saved callback result once and releases 
   jest.useFakeTimers();
   const opened = jest.spyOn(window, 'open').mockImplementation(() => ({}));
   const storage = storageWith();
-  const first = createStore({ storage });
+  const first = createStore({ storage, lastfm: createLastfmOptions(storage) });
   await first.dispatch('lastfm/connect');
   expect(opened).toHaveBeenCalledTimes(1);
   expect(jest.getTimerCount()).toBe(1);
@@ -85,7 +89,7 @@ test('effective playback events sign with captured owner credentials despite div
   } = require('@/application/playbackReporting');
   const { trackScrobble, trackUpdateNowPlaying } = require('@/api/lastfm');
   const storage = storageWith({ key: 'owner-session' });
-  const store = createStore({ storage });
+  const store = createStore({ storage, lastfm: createLastfmOptions(storage) });
   // Another window changes disk without participating in this renderer's exchange.
   localStorage.setItem('lastfm', JSON.stringify({ key: 'disk-session' }));
   const neteaseReports = [];
@@ -132,9 +136,9 @@ test('effective playback events sign with captured owner credentials despite div
     setInterval: () => 0,
     clearInterval() {},
   });
-  axios.mockResolvedValue({ data: {} });
+  transport.mockResolvedValue({ data: {} });
   await playback.playTracks([1, 2]);
-  expect(axios.mock.calls[0][0].params).toMatchObject({
+  expect(transport.mock.calls[0][0].params).toMatchObject({
     method: 'track.updateNowPlaying',
     sk: 'owner-session',
     api_sig: 'ce7ff95272a6276fc85cc8616811d499',
@@ -142,7 +146,7 @@ test('effective playback events sign with captured owner credentials despite div
   playback.seek(120);
   handles[0].events.onEnd();
   for (let turn = 0; turn < 20; turn += 1) await Promise.resolve();
-  const scrobbles = axios.mock.calls
+  const scrobbles = transport.mock.calls
     .map(([config]) => config.params)
     .filter(params => params.method === 'track.scrobble');
   expect(scrobbles).toHaveLength(1);
@@ -153,10 +157,10 @@ test('effective playback events sign with captured owner credentials despite div
   });
   expect(neteaseReports).toHaveLength(1);
   await store.dispatch('lastfm/disconnect');
-  const sent = axios.mock.calls.length;
+  const sent = transport.mock.calls.length;
   playback.pause();
   playback.play();
-  expect(axios).toHaveBeenCalledTimes(sent);
+  expect(transport).toHaveBeenCalledTimes(sent);
   playback.dispose();
 });
 
@@ -165,7 +169,7 @@ test('settings connects and disconnects through complete operations and releases
   jest.spyOn(window, 'open').mockImplementation(() => ({}));
   const Settings = require('@/views/settings.vue').default;
   const storage = storageWith();
-  const store = createStore({ storage });
+  const store = createStore({ storage, lastfm: createLastfmOptions(storage) });
   configureMusicData({
     getSettings: () => store.getters['preferences/settings'],
     getIdentity: () => ({ hasAccount: false }),

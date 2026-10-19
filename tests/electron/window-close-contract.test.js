@@ -11,13 +11,16 @@ jest.mock('electron', () => ({
 jest.mock('@unblockneteasemusic/rust-napi', () => ({ Executor: class {} }));
 jest.mock('discord-rich-presence', () => () => ({ updatePresence() {} }));
 
-function setup(platform = 'darwin', option = 'ask') {
+function setup(platform = 'darwin', option = 'ask', waitForPreference = false) {
   ipcMain.removeAllListeners();
   ipcMain.handle = jest.fn();
   const app = new EventEmitter();
   const win = new EventEmitter();
   win.hide = jest.fn();
-  win.webContents = { session: {}, send: jest.fn() };
+  win.webContents = new EventEmitter();
+  win.webContents.session = {};
+  win.webContents.send = jest.fn();
+  const onError = jest.fn();
   const dialog = { showMessageBox: jest.fn() };
   const store = { get: () => option };
   const operations = createWindowOperations({
@@ -27,8 +30,10 @@ function setup(platform = 'darwin', option = 'ask') {
     getWindow: () => win,
     getCloseOption: () => store.get('settings.closeAppOption'),
     rememberCloseOption: value =>
-      win.webContents.send('rememberCloseAppOption', value),
-    onError: jest.fn(),
+      waitForPreference
+        ? rememberCloseOption(win, value)
+        : win.webContents.send('rememberCloseAppOption', value),
+    onError,
   });
   app.quit = jest.fn(() => {
     app.emit('before-quit');
@@ -44,7 +49,7 @@ function setup(platform = 'darwin', option = 'ask') {
     else ipcMain.emit('close', event);
     return event;
   };
-  return { app, win, dialog, close, operations };
+  return { app, win, dialog, close, operations, onError };
 }
 
 test.each(['native', 'titlebar'])(
@@ -208,4 +213,167 @@ test('remembered exit waits for the renderer complete preference operation and s
   expect(app.quit).toHaveBeenCalledTimes(1);
   disconnect();
   delete window.require;
+});
+
+const settlePreference = async () => {
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve();
+};
+
+test.each(['crash', 'navigation', 'timeout', 'destroyed'])(
+  'remembered close releases its inquiry after %s and a later close can retry',
+  async loss => {
+    jest.useFakeTimers();
+    try {
+      const { win, dialog, operations, onError } = setup('win32', 'ask', true);
+      dialog.showMessageBox.mockResolvedValue({
+        response: 0,
+        checkboxChecked: true,
+      });
+      const first = operations.close();
+      await settlePreference();
+      expect(ipcMain.listenerCount('rememberCloseAppOptionFinished')).toBe(1);
+      if (loss === 'destroyed') win.webContents.emit('destroyed');
+      if (loss === 'crash')
+        win.webContents.emit('render-process-gone', {}, { reason: 'crashed' });
+      if (loss === 'navigation')
+        win.webContents.emit(
+          'did-start-navigation',
+          {},
+          'https://app.test',
+          false,
+          true
+        );
+      if (loss === 'timeout') jest.advanceTimersByTime(5000);
+      await settlePreference();
+      expect(onError).toHaveBeenCalledTimes(1);
+      await first;
+      expect(ipcMain.listenerCount('rememberCloseAppOptionFinished')).toBe(0);
+      expect(win.webContents.eventNames()).toEqual([]);
+      expect(jest.getTimerCount()).toBe(0);
+      expect(win.hide).not.toHaveBeenCalled();
+      const retry = operations.close();
+      await settlePreference();
+      expect(dialog.showMessageBox).toHaveBeenCalledTimes(2);
+      ipcMain.emit(
+        'rememberCloseAppOptionFinished',
+        {
+          sender: win.webContents,
+        },
+        undefined,
+        win.webContents.send.mock.calls[1][2]
+      );
+      await retry;
+      expect(win.hide).toHaveBeenCalledTimes(1);
+      expect(ipcMain.listenerCount('rememberCloseAppOptionFinished')).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  }
+);
+
+test('remembered close ignores foreign acknowledgements and surviving navigations, and persistence rejection permits retry', async () => {
+  jest.useFakeTimers();
+  try {
+    const { win, app, dialog, operations, onError } = setup(
+      'linux',
+      'ask',
+      true
+    );
+    dialog.showMessageBox.mockResolvedValue({
+      response: 0,
+      checkboxChecked: true,
+    });
+    const first = operations.close();
+    await settlePreference();
+    ipcMain.emit(
+      'rememberCloseAppOptionFinished',
+      {
+        sender: new EventEmitter(),
+      },
+      undefined,
+      win.webContents.send.mock.calls[0][2]
+    );
+    win.webContents.emit(
+      'did-start-navigation',
+      {},
+      'https://frame.test',
+      false,
+      false
+    );
+    win.webContents.emit(
+      'did-start-navigation',
+      {},
+      'https://app.test/#next',
+      true,
+      true
+    );
+    await settlePreference();
+    expect(win.hide).not.toHaveBeenCalled();
+    expect(app.quit).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(ipcMain.listenerCount('rememberCloseAppOptionFinished')).toBe(1);
+    ipcMain.emit(
+      'rememberCloseAppOptionFinished',
+      { sender: win.webContents },
+      'Storage unavailable',
+      win.webContents.send.mock.calls[0][2]
+    );
+    await first;
+    expect(onError.mock.calls[0][0].message).toBe('Storage unavailable');
+    expect(win.webContents.eventNames()).toEqual([]);
+    expect(jest.getTimerCount()).toBe(0);
+    const retry = operations.close();
+    await settlePreference();
+    ipcMain.emit(
+      'rememberCloseAppOptionFinished',
+      { sender: win.webContents },
+      undefined,
+      win.webContents.send.mock.calls[1][2]
+    );
+    await retry;
+    expect(win.hide).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+    expect(win.webContents.eventNames()).toEqual([]);
+    expect(ipcMain.listenerCount('rememberCloseAppOptionFinished')).toBe(0);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('a delayed acknowledgement from a timed-out save cannot finish a later close inquiry', async () => {
+  jest.useFakeTimers();
+  try {
+    const { win, dialog, operations } = setup('linux', 'ask', true);
+    dialog.showMessageBox.mockResolvedValue({
+      response: 0,
+      checkboxChecked: true,
+    });
+    const first = operations.close();
+    await settlePreference();
+    const firstId = win.webContents.send.mock.calls[0][2];
+    jest.advanceTimersByTime(5000);
+    await first;
+    const retry = operations.close();
+    await settlePreference();
+    const retryId = win.webContents.send.mock.calls[1][2];
+    ipcMain.emit(
+      'rememberCloseAppOptionFinished',
+      { sender: win.webContents },
+      undefined,
+      firstId
+    );
+    await settlePreference();
+    expect(win.hide).not.toHaveBeenCalled();
+    ipcMain.emit(
+      'rememberCloseAppOptionFinished',
+      { sender: win.webContents },
+      undefined,
+      retryId
+    );
+    await retry;
+    expect(win.hide).toHaveBeenCalledTimes(1);
+  } finally {
+    jest.useRealTimers();
+  }
 });

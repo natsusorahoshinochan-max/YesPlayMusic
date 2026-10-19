@@ -4,6 +4,8 @@ import App from './App.vue';
 import router from './router';
 import store, { createStore } from './store';
 import * as auth from '@/api/auth';
+import { dailyRecommendTracks } from '@/api/playlist';
+import { createLastfmOptions } from '@/application/lastfm';
 import nativeAlert from '@/utils/nativeAlert';
 import { createCredentials } from '@/application/credentials';
 import { createRequestEnvironment } from '@/application/requestEnvironment';
@@ -55,6 +57,8 @@ startApplication({
   createStore() {
     const store = createStore({
       credentials,
+      dailyRecommendations: { read: dailyRecommendTracks },
+      lastfm: createLastfmOptions(localStorage),
       session: {
         auth,
         ...createSessionEffects({

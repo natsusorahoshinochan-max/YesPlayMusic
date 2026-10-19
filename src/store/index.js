@@ -1,6 +1,5 @@
 import Vue from 'vue';
 import createDailyRecommendations from './modules/dailyRecommendations';
-import { dailyRecommendTracks } from '@/api/playlist';
 import Vuex from 'vuex';
 import { initializePlayerStorage } from '@/application/playerStorage';
 import createState from './state';
@@ -12,9 +11,7 @@ import createLibrary from './modules/library';
 import createPlaylistDetail from './modules/playlistDetail';
 import createPreferences from './modules/preferences';
 import createLastfm from './modules/lastfm';
-import { auth, authGetSession } from '@/api/lastfm';
 import { createLastfmStorage } from '@/application/lastfmStorage';
-import { createLastfmExchange } from '@/application/lastfmExchange';
 import { getSendSettingsPlugin } from './plugins/sendSettings';
 
 Vue.use(Vuex);
@@ -28,6 +25,7 @@ export function createStore({
   library = {},
   preferences = {},
   lastfm = {},
+  dailyRecommendations = {},
   playlistDetail = {},
   actions = {},
 } = {}) {
@@ -44,14 +42,12 @@ export function createStore({
     plugins,
     modules: {
       dailyRecommendations: createDailyRecommendations({
-        read: dailyRecommendTracks,
+        ...dailyRecommendations,
         getPlayback: () => createdStore.state.player,
       }),
       lastfm: createLastfm({
         storage: lastfmStorage,
-        authGetSession,
-        auth,
-        exchange: createLastfmExchange({ storage: lastfmStorage }),
+        exchange: { start() {}, stop() {} },
         ...lastfm,
       }),
       session: createSession(persistence.snapshot.session, {

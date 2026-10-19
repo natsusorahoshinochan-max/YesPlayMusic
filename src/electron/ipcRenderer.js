@@ -43,17 +43,18 @@ export function ipcRenderer(vueInstance) {
     self.$refs.player.goToNextTracksPage();
   });
 
-  listen('rememberCloseAppOption', async (event, value) => {
+  listen('rememberCloseAppOption', async (event, value, requestId) => {
     try {
       await store.dispatch('preferences/setPreference', {
         key: 'closeAppOption',
         value,
       });
-      ipcRenderer.send('rememberCloseAppOptionFinished');
+      ipcRenderer.send('rememberCloseAppOptionFinished', undefined, requestId);
     } catch (error) {
       ipcRenderer.send(
         'rememberCloseAppOptionFinished',
-        error.message || '设置保存失败'
+        error.message || '设置保存失败',
+        requestId
       );
       store.dispatch('showToast', error.message || '设置保存失败');
     }

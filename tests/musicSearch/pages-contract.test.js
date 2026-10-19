@@ -90,3 +90,70 @@ test('real page integration owns independent queries, follows route changes, and
   overview.destroy();
   category.destroy();
 });
+
+test.each(
+  [Search, SearchType].flatMap(component =>
+    ['success', 'failure', 'dispose'].map(outcome => [
+      component.name,
+      outcome,
+      component,
+    ])
+  )
+)('%s progress finishes after %s', async (_name, outcome, component) => {
+  jest.useFakeTimers();
+  const progress = require('nprogress');
+  const start = jest.spyOn(progress, 'start').mockImplementation(() => {});
+  const done = jest.spyOn(progress, 'done').mockImplementation(() => {});
+  const pending = [];
+  request.defaults.adapter = () =>
+    new Promise((resolve, reject) => {
+      pending.push({ resolve, reject });
+    });
+  const store = createStore({
+    storage: { getItem: () => null, setItem() {} },
+    language: 'en',
+  });
+  configureMusicData({
+    getSettings: () => ({ cacheLimit: false }),
+    getIdentity: () => ({ hasAccount: false }),
+  });
+  configureRequest({
+    getSettings: () => ({}),
+    getCookie: () => null,
+    onSessionInvalid() {},
+    environment: { baseURL: '', configure: config => config },
+  });
+  const page = shallowMount(component, {
+    store,
+    i18n: initializeLocale('en'),
+    mocks: { $route: { params: { keywords: 'progress', type: 'artists' } } },
+    stubs: { 'router-link': true, 'svg-icon': true },
+  });
+  const settle = async () => {
+    for (let turn = 0; turn < 30; turn += 1) await Promise.resolve();
+    await Vue.nextTick();
+  };
+  try {
+    await settle();
+    expect(start).not.toHaveBeenCalled();
+    if (outcome === 'success') {
+      jest.advanceTimersByTime(1000);
+      expect(start).toHaveBeenCalledTimes(1);
+      pending.forEach(({ resolve }) =>
+        resolve({ data: { result: { artists: [] } }, status: 200, headers: {} })
+      );
+    } else if (outcome === 'failure') {
+      pending.forEach(({ reject }) => reject(new Error('Search unavailable')));
+    } else {
+      page.destroy();
+    }
+    await settle();
+    expect(done).toHaveBeenCalled();
+    const starts = start.mock.calls.length;
+    jest.advanceTimersByTime(2000);
+    expect(start).toHaveBeenCalledTimes(starts);
+  } finally {
+    page.destroy();
+    jest.useRealTimers();
+  }
+});
