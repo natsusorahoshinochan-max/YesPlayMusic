@@ -1,5 +1,5 @@
 <template>
-  <div v-show="show" class="playlist">
+  <div v-if="playlist" class="playlist">
     <div
       v-if="specialPlaylistInfo === undefined && !isLikeSongsPage"
       class="playlist-info"
@@ -221,8 +221,6 @@
 <script>
 import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
 import NProgress from 'nprogress';
-import { getPlaylistDetail } from '@/api/playlist';
-import { getTrackDetail } from '@/api/track';
 import nativeAlert from '@/utils/nativeAlert';
 import locale from '@/locale';
 
@@ -341,20 +339,7 @@ export default {
   },
   data() {
     return {
-      show: false,
-      playlist: {
-        id: 0,
-        coverImgUrl: '',
-        creator: {
-          userId: '',
-        },
-        trackIds: [],
-      },
       showFullDescription: false,
-      tracks: [],
-      loadingMore: false,
-      hasMore: false,
-      lastLoadedTrackIndex: 9,
       displaySearchInPlaylist: false, // 是否显示搜索框
       searchKeyWords: '', // 搜索使用的关键字
       inputSearchKeyWords: '', // 搜索框中正在输入的关键字
@@ -365,20 +350,38 @@ export default {
   },
   computed: {
     ...mapGetters({
+      current: 'playlistDetail/current',
       user: 'library/user',
       likedSongPlaylistID: 'library/likedSongPlaylistID',
     }),
     ...mapState(['player']),
+    playlist() {
+      return this.current?.playlist || null;
+    },
+    tracks() {
+      return this.current?.tracks || [];
+    },
+    loadingMore() {
+      return this.current?.loadingMore || false;
+    },
+    hasMore() {
+      return this.current?.hasMore || false;
+    },
+    targetPlaylistId() {
+      return this.isLikeSongsPage
+        ? this.likedSongPlaylistID
+        : this.$route.params.id;
+    },
     isLikeSongsPage() {
       return this.$route.name === 'likedSongs';
     },
     specialPlaylistInfo() {
-      return specialPlaylist[this.playlist.id];
+      return specialPlaylist[this.playlist?.id];
     },
     isUserOwnPlaylist() {
       return (
-        this.playlist.creator.userId === this.user.userId &&
-        this.playlist.id !== this.likedSongPlaylistID
+        this.playlist?.creator.userId === this.user.userId &&
+        this.playlist?.id !== this.likedSongPlaylistID
       );
     },
     filteredTracks() {
@@ -402,15 +405,18 @@ export default {
       );
     },
   },
-  created() {
-    if (this.$route.name === 'likedSongs') {
-      this.loadData(this.likedSongPlaylistID);
-    } else {
-      this.loadData(this.$route.params.id);
-    }
-    setTimeout(() => {
-      if (!this.show) NProgress.start();
-    }, 1000);
+  watch: {
+    targetPlaylistId: {
+      immediate: true,
+      handler(id) {
+        this.loadData(id);
+      },
+    },
+  },
+  beforeDestroy() {
+    clearTimeout(this.debounceTimeout);
+    this.$store.dispatch('playlistDetail/close');
+    NProgress.done();
   },
   methods: {
     ...mapMutations(['appendTrackToPlayerList']),
@@ -436,56 +442,37 @@ export default {
         })
         .then(data => {
           if (data.code === 200) {
-            this.playlist.subscribed = !this.playlist.subscribed;
+            this.$store.dispatch('playlistDetail/applyLibraryChange', {
+              type: 'favorite',
+              playlistId: this.playlist.id,
+              favorite: !this.playlist.subscribed,
+            });
             if (toast === true)
               this.showToast(
                 this.playlist.subscribed ? '已保存到音乐库' : '已从音乐库删除'
               );
           }
-          getPlaylistDetail(this.id, true).then(data => {
-            this.playlist = data.playlist;
-          });
         });
     },
-    loadData(id, next = undefined) {
-      this.id = id;
-      getPlaylistDetail(this.id, true)
-        .then(data => {
-          this.playlist = data.playlist;
-          this.tracks = data.playlist.tracks;
-          NProgress.done();
-          if (next !== undefined) next();
-          this.show = true;
-          this.lastLoadedTrackIndex = data.playlist.tracks.length - 1;
-          return data;
-        })
-        .then(() => {
-          if (this.playlist.trackCount > this.tracks.length) {
-            this.loadingMore = true;
-            this.loadMore();
-          }
-        });
+    async loadData(id) {
+      this.searchKeyWords = '';
+      this.inputSearchKeyWords = '';
+      if (!id) return this.$store.dispatch('playlistDetail/close');
+      NProgress.start();
+      try {
+        await this.$store.dispatch('playlistDetail/open', id);
+      } catch (error) {
+        this.showToast('歌单加载失败');
+      } finally {
+        NProgress.done();
+      }
     },
-    loadMore(loadNum = 100) {
-      let trackIDs = this.playlist.trackIds.filter((t, index) => {
-        if (
-          index > this.lastLoadedTrackIndex &&
-          index <= this.lastLoadedTrackIndex + loadNum
-        ) {
-          return t;
-        }
-      });
-      trackIDs = trackIDs.map(t => t.id);
-      getTrackDetail(trackIDs.join(',')).then(data => {
-        this.tracks.push(...data.songs);
-        this.lastLoadedTrackIndex += trackIDs.length;
-        this.loadingMore = false;
-        if (this.lastLoadedTrackIndex + 1 === this.playlist.trackIds.length) {
-          this.hasMore = false;
-        } else {
-          this.hasMore = true;
-        }
-      });
+    async loadMore(count = 100) {
+      try {
+        await this.$store.dispatch('playlistDetail/loadMore', { count });
+      } catch (error) {
+        this.showToast('歌单加载失败');
+      }
     },
     openMenu(e) {
       this.$refs.playlistMenu.openMenu(e);
@@ -522,13 +509,6 @@ export default {
         this.searchInputWidth = '172px';
         this.loadMore(500);
       }
-    },
-    removeTrack(trackID) {
-      if (!this.$store.getters['session/hasAccount']) {
-        this.showToast(locale.t('toast.needToLogin'));
-        return;
-      }
-      this.tracks = this.tracks.filter(t => t.id !== trackID);
     },
     inputDebounce() {
       if (this.debounceTimeout) clearTimeout(this.debounceTimeout);

@@ -1,3 +1,10 @@
+import {
+  accountRequired,
+  changeResult,
+  performLibraryWrite,
+  synchronize,
+} from '../libraryChange';
+
 export default function createLibrary(
   snapshot,
   { api = {}, notifyLikedSongsChanged = () => {} } = {}
@@ -13,6 +20,8 @@ export default function createLibrary(
       limit: 2000,
       timestamp: Date.now(),
     });
+    if (!Array.isArray(result?.playlist))
+      throw new Error('Playlist collection unavailable');
     if (result.playlist) {
       setCollection(context, 'playlists', result.playlist);
       context.commit('setLikedSongPlaylistID', result.playlist[0]?.id || 0);
@@ -22,6 +31,8 @@ export default function createLibrary(
   async function loadPreview(context) {
     const id = context.state.likedSongPlaylistID;
     const result = id ? await api.getPlaylistDetail(id, true) : null;
+    if (id && !Array.isArray(result?.playlist?.trackIds))
+      throw new Error('Liked songs preview unavailable');
     const ids = result?.playlist?.trackIds?.map(track => track.id) || [];
     if (!context.rootGetters['session/hasAccount']) {
       setCollection(context, 'songs', ids);
@@ -29,12 +40,15 @@ export default function createLibrary(
     const tracks = ids.length
       ? (await api.getTrackDetail(ids.slice(0, 12).join(','))).songs
       : [];
-    setCollection(context, 'songsWithDetails', tracks || []);
+    if (!Array.isArray(tracks))
+      throw new Error('Liked songs preview tracks unavailable');
+    setCollection(context, 'songsWithDetails', tracks);
     context.commit('setPreviewReady');
   }
 
   async function loadSongs(context) {
     const result = await api.userLikedSongsIDs(context.state.user.userId);
+    if (!Array.isArray(result?.ids)) throw new Error('Liked songs unavailable');
     if (result.ids) setCollection(context, 'songs', result.ids);
   }
 
@@ -176,6 +190,49 @@ export default function createLibrary(
         const result = await api.subscribePlaylist({ id, t: favorite ? 1 : 2 });
         if (result.code === 200) await loadPlaylists(context);
         return result;
+      },
+      async removePlaylistTracks(context, { playlistId, trackIds }) {
+        if (!context.rootGetters['session/hasAccount'])
+          return changeResult(accountRequired);
+        const outcome = await performLibraryWrite(() =>
+          api.addOrRemoveTrackFromPlaylist({
+            op: 'del',
+            pid: playlistId,
+            tracks: trackIds.join(','),
+          })
+        );
+        if (outcome.status !== 'succeeded') return changeResult(outcome);
+        const attempts = [
+          () =>
+            context.dispatch(
+              'playlistDetail/applyLibraryChange',
+              { type: 'tracks-removed', playlistId, trackIds },
+              { root: true }
+            ),
+          () => loadPlaylists(context),
+        ];
+        if (Number(playlistId) === Number(context.state.likedSongPlaylistID)) {
+          const removed = new Set(trackIds);
+          attempts.push(
+            () =>
+              setCollection(
+                context,
+                'songs',
+                context.state.collections.songs.filter(id => !removed.has(id))
+              ),
+            () =>
+              setCollection(
+                context,
+                'songsWithDetails',
+                context.state.collections.songsWithDetails.filter(
+                  track => !removed.has(track.id)
+                )
+              ),
+            () => loadSongs(context),
+            () => loadPreview(context)
+          );
+        }
+        return changeResult(outcome, await synchronize(attempts));
       },
       async changePlaylistTracks(context, params) {
         if (!requireAccount(context)) return;
