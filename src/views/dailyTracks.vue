@@ -18,7 +18,7 @@
     <TrackList
       :tracks="dailyTracks"
       type="playlist"
-      dbclick-track-func="dailyTracks"
+      @activate="playDailyTracks($event.track.id)"
     />
   </div>
 </template>
@@ -69,11 +69,11 @@ export default {
         this.show = true;
       });
     },
-    playDailyTracks() {
+    playDailyTracks(startTrackId = this.dailyTracks[0]?.id) {
       let trackIDs = this.dailyTracks.map(t => t.id);
       return this.$store.state.player.playTracks(trackIDs, {
         source: { type: 'url', id: '/daily/songs' },
-        startTrackId: this.dailyTracks[0]?.id,
+        startTrackId,
       });
     },
   },

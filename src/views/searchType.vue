@@ -18,11 +18,7 @@
       />
     </div>
     <div v-if="type === 'tracks'">
-      <TrackList
-        :tracks="result"
-        type="playlist"
-        dbclick-track-func="playAList"
-      />
+      <TrackList :tracks="result" type="playlist" @activate="playSearchTrack" />
     </div>
     <div v-if="type === 'musicVideos'">
       <MvRow :mvs="result" />
@@ -83,6 +79,15 @@ export default {
     this.fetchData();
   },
   methods: {
+    playSearchTrack({ track }) {
+      return this.$store.state.player.playTracks(
+        this.result.map(t => t.id),
+        {
+          source: { type: 'url', id: `/search/${this.keywords}/tracks` },
+          startTrackId: track.id,
+        }
+      );
+    },
     fetchData() {
       const typeTable = {
         musicVideos: 1004,

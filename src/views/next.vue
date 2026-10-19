@@ -1,11 +1,7 @@
 <template>
   <div class="next-tracks">
     <h1>{{ $t('next.nowPlaying') }}</h1>
-    <TrackList
-      :tracks="[currentTrack]"
-      type="playlist"
-      dbclick-track-func="none"
-    />
+    <TrackList :tracks="[currentTrack]" type="playlist" />
     <h1 v-show="nextRows.length > 0"
       >插队播放
       <button @click="player.clearNext()">清除队列</button>
@@ -13,21 +9,19 @@
     <TrackList
       v-show="nextRows.length > 0"
       :tracks="nextRows.map(row => row.track)"
-      :queue-entries="nextRows"
+      :row-identities="nextRows"
       type="playlist"
       :highlight-playing-track="false"
-      dbclick-track-func="playQueuedTrack"
-      item-key="id+index"
       :extra-context-menu-item="['removeTrackFromQueue']"
+      @activate="playQueueEntry"
     />
     <h1>{{ $t('next.nextUp') }}</h1>
     <TrackList
       :tracks="mainRows.map(row => row.track)"
-      :queue-entries="mainRows"
-      item-key="id+index"
+      :row-identities="mainRows"
       type="playlist"
       :highlight-playing-track="false"
-      dbclick-track-func="playQueuedTrack"
+      @activate="playQueueEntry"
     />
   </div>
 </template>
@@ -85,6 +79,9 @@ export default {
     this.$parent.$refs.scrollbar.restorePosition();
   },
   methods: {
+    playQueueEntry({ track, identity }) {
+      return this.player.playQueuedTrack(track.id, identity);
+    },
     async loadTracks() {
       const loaded = new Set(this.tracks.map(track => track.id));
       const ids = [

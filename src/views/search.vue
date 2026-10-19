@@ -42,7 +42,11 @@
           $t('home.seeMore')
         }}</router-link></div
       >
-      <TrackList :tracks="tracks" type="tracklist" />
+      <TrackList
+        :tracks="tracks"
+        type="tracklist"
+        @activate="playSearchTrack"
+      />
     </div>
 
     <div v-show="musicVideos.length > 0" class="music-videos">
@@ -137,6 +141,15 @@ export default {
   },
   methods: {
     ...mapActions(['showToast']),
+    playSearchTrack({ track }) {
+      return this.$store.state.player.playTracks(
+        this.tracks.map(t => t.id),
+        {
+          source: { type: 'url', id: `/search/${this.keywords}` },
+          startTrackId: track.id,
+        }
+      );
+    },
     playTrackInSearchResult(id) {
       return this.$store.state.player.enqueueNext(id, { playNow: true });
     },

@@ -63,11 +63,18 @@
     <div :style="listStyles">
       <TrackListItem
         v-for="(track, index) in tracks"
-        :key="itemKey === 'id' ? track.id : `${track.id}${index}`"
+        :key="index"
         :track-prop="track"
         :track-no="index + 1"
+        :type="type"
+        :album-artist="albumObject.artist.name"
+        :is-liked="liked.songs.includes(track.id)"
+        :menu-open="rightClickedTrackIndex === index"
+        :menu-active="rightClickedTrackIndex >= 0"
+        :identity="rowIdentities[index] || index"
+        :row-index="index"
         :highlight-playing-track="highlightPlayingTrack"
-        @dblclick.native="playThisList(track.id || track.songId, index)"
+        @activate="$emit('activate', $event)"
         @click.right.native="openMenu($event, track, index)"
       />
     </div>
@@ -99,18 +106,14 @@ export default {
         return [];
       },
     },
-    queueEntries: { type: Array, default: () => [] },
+    rowIdentities: { type: Array, default: () => [] },
     type: {
       type: String,
       default: 'tracklist',
     }, // tracklist | album | playlist | cloudDisk
-    id: {
+    playlistId: {
       type: Number,
       default: 0,
-    },
-    dbclickTrackFunc: {
-      type: String,
-      default: 'default',
     },
     albumObject: {
       type: Object,
@@ -139,10 +142,6 @@ export default {
     highlightPlayingTrack: {
       type: Boolean,
       default: true,
-    },
-    itemKey: {
-      type: String,
-      default: 'id',
     },
   },
   data() {
@@ -200,53 +199,6 @@ export default {
       };
       this.rightClickedTrackIndex = -1;
     },
-    playThisList(trackID, rowIndex) {
-      if (this.dbclickTrackFunc === 'default') {
-        this.playThisListDefault(trackID);
-      } else if (this.dbclickTrackFunc === 'none') {
-        // do nothing
-      } else if (this.dbclickTrackFunc === 'playQueuedTrack') {
-        return this.player.playQueuedTrack(
-          trackID,
-          this.queueEntries[rowIndex]
-        );
-      } else if (this.dbclickTrackFunc === 'playPlaylist') {
-        return this.player.playPlaylist(this.id, { startTrackId: trackID });
-      } else if (this.dbclickTrackFunc === 'playArtist') {
-        return this.player.playArtist(this.id, { startTrackId: trackID });
-      } else if (this.dbclickTrackFunc === 'playAList') {
-        let trackIDs = this.tracks.map(t => t.id || t.songId);
-        return this.player.playTracks(trackIDs, {
-          source: { type: 'artist', id: this.id },
-          startTrackId: trackID,
-        });
-      } else if (this.dbclickTrackFunc === 'dailyTracks') {
-        let trackIDs = this.tracks.map(t => t.id);
-        return this.player.playTracks(trackIDs, {
-          source: { type: 'url', id: '/daily/songs' },
-          startTrackId: trackID,
-        });
-      } else if (this.dbclickTrackFunc === 'playCloudDisk') {
-        let trackIDs = this.tracks.map(t => t.id || t.songId);
-        return this.player.playTracks(trackIDs, {
-          source: { type: 'cloudDisk', id: this.id },
-          startTrackId: trackID,
-        });
-      }
-    },
-    playThisListDefault(trackID) {
-      if (this.type === 'playlist') {
-        return this.player.playPlaylist(this.id, { startTrackId: trackID });
-      } else if (this.type === 'album') {
-        return this.player.playAlbum(this.id, { startTrackId: trackID });
-      } else if (this.type === 'tracklist') {
-        let trackIDs = this.tracks.map(t => t.id);
-        return this.player.playTracks(trackIDs, {
-          source: { type: 'artist', id: this.id },
-          startTrackId: trackID,
-        });
-      }
-    },
     play() {
       return this.player.enqueueNext(this.rightClickedTrack.id, {
         playNow: true,
@@ -282,7 +234,7 @@ export default {
       const result = await this.$store.dispatch(
         'library/removePlaylistTracks',
         {
-          playlistId: this.id,
+          playlistId: this.playlistId,
           trackIds: [this.rightClickedTrack.id],
         }
       );
@@ -304,7 +256,7 @@ export default {
         });
     },
     removeTrackFromQueue() {
-      const entry = this.queueEntries[this.rightClickedTrackIndex];
+      const entry = this.rowIdentities[this.rightClickedTrackIndex];
       if (entry?.group === 'next') this.player.removeNext(entry.index);
     },
     async removeTrackFromCloudDisk() {

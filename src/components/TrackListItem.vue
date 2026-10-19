@@ -4,9 +4,17 @@
     :class="trackClass"
     :style="trackStyle"
     :title="showUnavailableSongInGreyStyle ? track.reason : ''"
+    @dblclick="activate"
     @mouseover="hover = true"
     @mouseleave="hover = false"
   >
+    <button
+      v-if="!showOrderNumber"
+      v-show="focus && playable && !isPlaying"
+      class="play-track"
+      @click.stop="activate"
+      ><svg-icon icon-class="play"
+    /></button>
     <img
       v-if="!isAlbum"
       :src="imgUrl"
@@ -15,7 +23,11 @@
       @click="goToAlbum"
     />
     <div v-if="showOrderNumber" class="no">
-      <button v-show="focus && playable && !isPlaying" @click="playTrack">
+      <button
+        v-show="focus && playable && !isPlaying"
+        class="play-track"
+        @click.stop="activate"
+      >
         <svg-icon
           icon-class="play"
           style="height: 14px; width: 14px"
@@ -39,7 +51,7 @@
           <span v-if="isAlbum" class="featured">
             <ArtistsInLine
               :artists="track.ar"
-              :exclude="$parent.albumObject.artist.name"
+              :exclude="albumArtist"
               prefix="-"
           /></span>
           <span
@@ -98,8 +110,15 @@ export default {
   components: { ArtistsInLine, ExplicitSymbol },
 
   props: {
-    trackProp: Object,
-    trackNo: Number,
+    trackProp: { type: Object, required: true },
+    trackNo: { type: Number, required: true },
+    type: { type: String, default: 'tracklist' },
+    albumArtist: { type: String, default: '' },
+    isLiked: Boolean,
+    menuOpen: Boolean,
+    menuActive: Boolean,
+    identity: { type: [Object, Number, String], default: null },
+    rowIndex: { type: Number, required: true },
     highlightPlayingTrack: {
       type: Boolean,
       default: true,
@@ -153,9 +172,6 @@ export default {
         return tn === undefined ? this.track.alia[0] : tn;
       }
     },
-    type() {
-      return this.$parent.type;
-    },
     isAlbum() {
       return this.type === 'album';
     },
@@ -169,11 +185,11 @@ export default {
     isPlaylist() {
       return this.type === 'playlist';
     },
-    isLiked() {
-      return this.$parent.liked.songs.includes(this.track?.id);
-    },
     isPlaying() {
-      return this.$store.state.player.state.currentTrackID === this.track?.id;
+      return (
+        this.highlightPlayingTrack &&
+        this.$store.state.player.state.currentTrackID === this.track?.id
+      );
     },
     trackClass() {
       let trackClass = [this.type];
@@ -184,14 +200,8 @@ export default {
       if (this.focus) trackClass.push('focus');
       return trackClass;
     },
-    isMenuOpened() {
-      return this.$parent.rightClickedTrack.id === this.track.id ? true : false;
-    },
     focus() {
-      return (
-        (this.hover && this.$parent.rightClickedTrack.id === 0) ||
-        this.isMenuOpened
-      );
+      return (this.hover && !this.menuActive) || this.menuOpen;
     },
     showUnavailableSongInGreyStyle() {
       return process.env.IS_ELECTRON
@@ -217,8 +227,12 @@ export default {
       if (this.track.al.id === 0) return;
       this.$router.push({ path: '/album/' + this.track.al.id });
     },
-    playTrack() {
-      this.$parent.playThisList(this.track.id);
+    activate() {
+      this.$emit('activate', {
+        track: this.trackProp,
+        index: this.rowIndex,
+        identity: this.identity,
+      });
     },
     likeThisSong() {
       return toggleTrackFavoriteWithFeedback(this.$store, this.track.id);
