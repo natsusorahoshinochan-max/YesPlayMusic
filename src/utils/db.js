@@ -106,10 +106,12 @@ export function cacheLyric(id, lyrics) {
 }
 
 export function getLyricFromCache(id) {
-  return db.lyric.get(Number(id)).then(result => {
-    if (!result) return undefined;
-    return result.lyrics;
-  });
+  return db.lyric
+    .get(typeof id === 'string' && id.startsWith('cloud:') ? id : Number(id))
+    .then(result => {
+      if (!result) return undefined;
+      return result.lyrics;
+    });
 }
 
 export function cacheAlbum(id, album) {

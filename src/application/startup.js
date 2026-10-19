@@ -13,6 +13,8 @@ export async function startApplication({
   const store = createStore();
   const getSettings = () => store.getters['preferences/settings'];
   const getIdentity = () => ({
+    userId: store.getters['library/user']?.userId,
+    loginMode: store.state.session?.loginMode,
     hasAccount: store.getters['session/hasAccount'],
     vipType: store.getters['library/user'].vipType,
   });
