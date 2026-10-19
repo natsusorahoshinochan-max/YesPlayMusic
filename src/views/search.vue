@@ -85,140 +85,74 @@
 </template>
 
 <script>
-import { mapActions } from 'vuex';
-import { getTrackDetail } from '@/api/track';
-import { search } from '@/api/others';
+import { createMusicSearch } from '@/application/musicSearch';
 import NProgress from 'nprogress';
-
 import TrackList from '@/components/TrackList.vue';
 import MvRow from '@/components/MvRow.vue';
 import CoverRow from '@/components/CoverRow.vue';
 
 export default {
   name: 'Search',
-  components: {
-    TrackList,
-    MvRow,
-    CoverRow,
-  },
+  components: { TrackList, MvRow, CoverRow },
   data() {
-    return {
-      show: false,
-      tracks: [],
-      artists: [],
-      albums: [],
-      playlists: [],
-      musicVideos: [],
-    };
+    return { query: createMusicSearch(this.$store), progressTimer: null };
   },
   computed: {
     keywords() {
       return this.$route.params.keywords ?? '';
     },
+    show() {
+      return this.query.state.loaded;
+    },
+    tracks() {
+      return this.query.state.results.tracks;
+    },
+    artists() {
+      return this.query.state.results.artists;
+    },
+    albums() {
+      return this.query.state.results.albums;
+    },
+    playlists() {
+      return this.query.state.results.playlists;
+    },
+    musicVideos() {
+      return this.query.state.results.musicVideos;
+    },
     haveResult() {
-      return (
-        this.tracks.length +
-          this.artists.length +
-          this.albums.length +
-          this.playlists.length +
-          this.musicVideos.length >
-        0
+      return Object.values(this.query.state.results).some(
+        items => items.length > 0
       );
     },
   },
   watch: {
-    keywords: function (newKeywords) {
-      if (newKeywords.length === 0) return;
+    keywords() {
       this.getData();
+    },
+    'query.state.loading'(loading) {
+      clearTimeout(this.progressTimer);
+      if (loading)
+        this.progressTimer = setTimeout(() => NProgress.start(), 1000);
+      else NProgress.done();
     },
   },
   created() {
     this.getData();
   },
+  beforeDestroy() {
+    clearTimeout(this.progressTimer);
+    this.query.dispose();
+    NProgress.done();
+  },
   methods: {
-    ...mapActions(['showToast']),
+    getData() {
+      return this.query.replace({
+        keywords: this.keywords,
+        category: 'overview',
+      });
+    },
     playTrackInSearchResult(id) {
       return this.$store.state.player.enqueueNext(id, { playNow: true });
-    },
-    search(type = 'all') {
-      let showToast = this.showToast;
-      const typeTable = {
-        all: 1018,
-        musicVideos: 1004,
-        tracks: 1,
-        albums: 10,
-        artists: 100,
-        playlists: 1000,
-      };
-      return search({
-        keywords: this.keywords,
-        type: typeTable[type],
-        limit: 16,
-      })
-        .then(result => {
-          return { result: result.result, type };
-        })
-        .catch(err => {
-          showToast(err.response.data.msg || err.response.data.message);
-        });
-    },
-    getData() {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
-      this.show = false;
-
-      const requestAll = requests => {
-        const keywords = this.keywords;
-        Promise.all(requests).then(results => {
-          if (keywords != this.keywords) return;
-          results.map(result => {
-            const searchType = result.type;
-            if (result.result === undefined) return;
-            result = result.result;
-            switch (searchType) {
-              case 'all':
-                this.result = result;
-                break;
-              case 'musicVideos':
-                this.musicVideos = result.mvs ?? [];
-                break;
-              case 'artists':
-                this.artists = result.artists ?? [];
-                break;
-              case 'albums':
-                this.albums = result.albums ?? [];
-                break;
-              case 'tracks':
-                this.tracks = result.songs ?? [];
-                this.getTracksDetail();
-                break;
-              case 'playlists':
-                this.playlists = result.playlists ?? [];
-                break;
-            }
-          });
-          NProgress.done();
-          this.show = true;
-        });
-      };
-
-      const requests = [
-        this.search('artists'),
-        this.search('albums'),
-        this.search('tracks'),
-      ];
-      const requests2 = [this.search('musicVideos'), this.search('playlists')];
-
-      requestAll(requests);
-      requestAll(requests2);
-    },
-    getTracksDetail() {
-      const trackIDs = this.tracks.map(t => t.id);
-      if (trackIDs.length === 0) return;
-      getTrackDetail(trackIDs.join(',')).then(result => {
-        this.tracks = result.songs;
-      });
     },
   },
 };

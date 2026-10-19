@@ -40,34 +40,39 @@
 </template>
 
 <script>
-import { getTrackDetail } from '@/api/track';
-import { search } from '@/api/others';
+import { createMusicSearch } from '@/application/musicSearch';
 import locale from '@/locale';
 import { camelCase } from 'change-case';
 import NProgress from 'nprogress';
-
 import TrackList from '@/components/TrackList.vue';
 import MvRow from '@/components/MvRow.vue';
 import CoverRow from '@/components/CoverRow.vue';
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 
 export default {
-  name: 'Search',
-  components: {
-    TrackList,
-    MvRow,
-    CoverRow,
-    ButtonTwoTone,
-  },
+  name: 'SearchType',
+  components: { TrackList, MvRow, CoverRow, ButtonTwoTone },
   data() {
-    return { show: false, result: [], hasMore: true };
+    return { query: createMusicSearch(this.$store), progressTimer: null };
   },
   computed: {
     keywords() {
-      return this.$route.params.keywords;
+      return this.$route.params.keywords ?? '';
     },
     type() {
       return camelCase(this.$route.params.type);
+    },
+    queryIntent() {
+      return { keywords: this.keywords, category: this.type };
+    },
+    show() {
+      return this.query.state.loaded;
+    },
+    result() {
+      return this.query.state.results[this.type] ?? [];
+    },
+    hasMore() {
+      return this.query.state.hasMore && !this.query.state.loading;
     },
     typeNameTable() {
       return {
@@ -79,59 +84,28 @@ export default {
       };
     },
   },
+  watch: {
+    queryIntent() {
+      this.query.replace(this.queryIntent);
+    },
+    'query.state.loading'(loading) {
+      clearTimeout(this.progressTimer);
+      if (loading)
+        this.progressTimer = setTimeout(() => NProgress.start(), 1000);
+      else NProgress.done();
+    },
+  },
   created() {
-    this.fetchData();
+    this.query.replace(this.queryIntent);
+  },
+  beforeDestroy() {
+    clearTimeout(this.progressTimer);
+    this.query.dispose();
+    NProgress.done();
   },
   methods: {
     fetchData() {
-      const typeTable = {
-        musicVideos: 1004,
-        tracks: 1,
-        albums: 10,
-        artists: 100,
-        playlists: 1000,
-      };
-      return search({
-        keywords: this.keywords,
-        type: typeTable[this.type],
-        offset: this.result.length,
-      }).then(result => {
-        result = result.result;
-        this.hasMore = result.hasMore ?? true;
-        switch (this.type) {
-          case 'musicVideos':
-            this.result.push(...result.mvs);
-            if (result.mvCount <= this.result.length) {
-              this.hasMore = false;
-            }
-            break;
-          case 'artists':
-            this.result.push(...result.artists);
-            break;
-          case 'albums':
-            this.result.push(...result.albums);
-            if (result.albumCount <= this.result.length) {
-              this.hasMore = false;
-            }
-            break;
-          case 'tracks':
-            this.result.push(...result.songs);
-            this.getTracksDetail();
-            break;
-          case 'playlists':
-            this.result.push(...result.playlists);
-            break;
-        }
-        NProgress.done();
-        this.show = true;
-      });
-    },
-    getTracksDetail() {
-      const trackIDs = this.result.map(t => t.id);
-      if (trackIDs.length === 0) return;
-      getTrackDetail(trackIDs.join(',')).then(result => {
-        this.result = result.songs;
-      });
+      return this.query.loadNext();
     },
   },
 };
