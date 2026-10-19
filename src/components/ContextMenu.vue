@@ -31,7 +31,7 @@ export default {
   },
   methods: {
     setMenu(top, left) {
-      let heightOffset = this.player.enabled ? 64 : 0;
+      let heightOffset = this.player.state.enabled ? 64 : 0;
       let largestHeight =
         window.innerHeight - this.$refs.menu.offsetHeight - heightOffset;
       let largestWidth = window.innerWidth - this.$refs.menu.offsetWidth - 25;

@@ -29,7 +29,7 @@
     </div>
     <div class="more-video">
       <div class="section-title">{{ $t('mv.moreVideo') }}</div>
-      <MvRow :mvs="simiMvs" />
+      <MvRow :mvs="simiMvs" :autoplay="player ? player.playing : false" />
     </div>
     <ContextMenu ref="mvMenu">
       <div class="item" @click="copyUrl(mv.data.id)">{{
@@ -92,7 +92,7 @@ export default {
     };
     if (this.$route.query.autoplay === 'true') videoOptions.autoplay = true;
     this.player = new Plyr(this.$refs.videoPlayer, videoOptions);
-    this.player.volume = this.$store.state.player.volume;
+    this.player.volume = this.$store.state.player.state.volume;
     this.player.on('playing', () => {
       this.$store.state.player.pause();
     });

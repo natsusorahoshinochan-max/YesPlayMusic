@@ -9,7 +9,7 @@
       @click.stop
     >
       <vue-slider
-        v-model="player.progress"
+        v-model="progress"
         :min="0"
         :max="player.currentTrackDuration"
         :interval="1"
@@ -51,18 +51,16 @@
           <div class="like-button">
             <button-icon
               :title="
-                player.isCurrentTrackLiked
-                  ? $t('player.unlike')
-                  : $t('player.like')
+                isCurrentTrackLiked ? $t('player.unlike') : $t('player.like')
               "
               @click.native="toggleTrackFavorite(player.currentTrack.id)"
             >
               <svg-icon
-                v-show="!player.isCurrentTrackLiked"
+                v-show="!isCurrentTrackLiked"
                 icon-class="heart"
               ></svg-icon>
               <svg-icon
-                v-show="player.isCurrentTrackLiked"
+                v-show="isCurrentTrackLiked"
                 icon-class="heart-solid"
               ></svg-icon>
             </button-icon>
@@ -207,33 +205,42 @@ export default {
       user: 'library/user',
       likedSongPlaylistID: 'library/likedSongPlaylistID',
     }),
-    ...mapState(['player']),
+    ...mapState({ playback: 'player' }),
+    player() {
+      return this.playback.state;
+    },
     currentTrack() {
       return this.player.currentTrack;
+    },
+    isCurrentTrackLiked() {
+      return this.$store.getters['library/collections'].songs.includes(
+        this.player.currentTrackID
+      );
+    },
+    progress: {
+      get() {
+        return this.player.progress;
+      },
+      set(value) {
+        this.playback.seek(value);
+      },
     },
     volume: {
       get() {
         return this.player.volume;
       },
       set(value) {
-        this.player.volume = value;
+        this.playback.setVolume(value);
       },
     },
     playing() {
       return this.player.playing;
     },
     audioSource() {
-      return this.player._howler?._src.includes('kuwo.cn')
+      return this.player.sourceInfo?.from === 'unm:kuwo'
         ? '音源来自酷我音乐'
         : '';
     },
-  },
-  mounted() {
-    this.setupMediaControls();
-    window.addEventListener('keydown', this.handleKeydown);
-  },
-  beforeDestroy() {
-    window.removeEventListener('keydown', this.handleKeydown);
   },
   methods: {
     ...mapMutations(['toggleLyrics']),
@@ -250,17 +257,13 @@ export default {
       this.mouseDownTarget = event.target;
     },
     playPrevTrack() {
-      this.player.playPrevTrack();
+      return this.playback.previous();
     },
     playOrPause() {
-      this.player.playOrPause();
+      return this.playback.toggle();
     },
     playNextTrack() {
-      if (this.player.isPersonalFM) {
-        this.player.playNextFMTrack();
-      } else {
-        this.player.playNextTrack();
-      }
+      return this.playback.next();
     },
     goToNextTracksPage() {
       if (this.player.isPersonalFM) return;
@@ -285,52 +288,19 @@ export default {
       this.$router.push({ path: '/artist/' + id });
     },
     moveToFMTrash() {
-      this.player.moveToFMTrash();
+      this.playback.moveToFMTrash();
     },
     switchRepeatMode() {
-      this.player.switchRepeatMode();
+      this.playback.switchRepeatMode();
     },
     switchShuffle() {
-      this.player.switchShuffle();
+      this.playback.switchShuffle();
     },
     switchReversed() {
-      this.player.switchReversed();
+      this.playback.switchReversed();
     },
     mute() {
-      this.player.mute();
-    },
-
-    setupMediaControls() {
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', () => {
-          this.playOrPause();
-        });
-        navigator.mediaSession.setActionHandler('pause', () => {
-          this.playOrPause();
-        });
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
-          this.playPrevTrack();
-        });
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
-          this.playNextTrack();
-        });
-      }
-    },
-
-    handleKeydown(event) {
-      switch (event.code) {
-        case 'MediaPlayPause':
-          this.playOrPause();
-          break;
-        case 'MediaTrackPrevious':
-          this.playPrevTrack();
-          break;
-        case 'MediaTrackNext':
-          this.playNextTrack();
-          break;
-        default:
-          break;
-      }
+      return this.playback.toggleMute();
     },
   },
 };

@@ -210,13 +210,22 @@ export default {
         this.player.playPlaylistByID(this.id, trackID);
       } else if (this.dbclickTrackFunc === 'playAList') {
         let trackIDs = this.tracks.map(t => t.id || t.songId);
-        this.player.replacePlaylist(trackIDs, this.id, 'artist', trackID);
+        return this.player.playTracks(trackIDs, {
+          source: { type: 'artist', id: this.id },
+          startTrackId: trackID,
+        });
       } else if (this.dbclickTrackFunc === 'dailyTracks') {
         let trackIDs = this.tracks.map(t => t.id);
-        this.player.replacePlaylist(trackIDs, '/daily/songs', 'url', trackID);
+        return this.player.playTracks(trackIDs, {
+          source: { type: 'url', id: '/daily/songs' },
+          startTrackId: trackID,
+        });
       } else if (this.dbclickTrackFunc === 'playCloudDisk') {
         let trackIDs = this.tracks.map(t => t.id || t.songId);
-        this.player.replacePlaylist(trackIDs, this.id, 'cloudDisk', trackID);
+        return this.player.playTracks(trackIDs, {
+          source: { type: 'cloudDisk', id: this.id },
+          startTrackId: trackID,
+        });
       }
     },
     playThisListDefault(trackID) {
@@ -226,7 +235,10 @@ export default {
         this.player.playAlbumByID(this.id, trackID);
       } else if (this.type === 'tracklist') {
         let trackIDs = this.tracks.map(t => t.id);
-        this.player.replacePlaylist(trackIDs, this.id, 'artist', trackID);
+        return this.player.playTracks(trackIDs, {
+          source: { type: 'artist', id: this.id },
+          startTrackId: trackID,
+        });
       }
     },
     play() {

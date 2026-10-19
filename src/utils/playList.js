@@ -8,8 +8,8 @@ import {
 
 export function hasListSource() {
   return (
-    !store.state.player.isPersonalFM &&
-    store.state.player.playlistSource.id !== 0
+    !store.state.player.state.isPersonalFM &&
+    store.state.player.state.playlistSource.id !== 0
   );
 }
 
@@ -19,16 +19,16 @@ export function goToListSource() {
 
 export function getListSourcePath() {
   if (
-    store.state.player.playlistSource.id ===
+    store.state.player.state.playlistSource.id ===
     store.getters['library/likedSongPlaylistID']
   ) {
     return '/library/liked-songs';
-  } else if (store.state.player.playlistSource.type === 'url') {
-    return store.state.player.playlistSource.id;
-  } else if (store.state.player.playlistSource.type === 'cloudDisk') {
+  } else if (store.state.player.state.playlistSource.type === 'url') {
+    return store.state.player.state.playlistSource.id;
+  } else if (store.state.player.state.playlistSource.type === 'cloudDisk') {
     return '/library';
   } else {
-    return `/${store.state.player.playlistSource.type}/${store.state.player.playlistSource.id}`;
+    return `/${store.state.player.state.playlistSource.type}/${store.state.player.state.playlistSource.id}`;
   }
 }
 
