@@ -17,9 +17,10 @@ import { mapTrackPlayableStatus } from '@/utils/common';
  * @param {number=} params.offset
  * @param {number=} params.type
  */
-export function search(params) {
+export function search(params, { isCurrent } = {}) {
   return request({
     url: '/search',
+    isCurrent,
     method: 'get',
     params,
   }).then(data => {

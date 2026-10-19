@@ -36,6 +36,7 @@ export function createStore({
   const lastfmStorage = createLastfmStorage(storage);
   const plugins = [persistence.install];
   if (process.env.IS_ELECTRON === true) plugins.push(getSendSettingsPlugin());
+  const identityListeners = new Set();
   const createdStore = new Vuex.Store({
     state: createState(storage),
     mutations,
@@ -59,6 +60,7 @@ export function createStore({
         identityChanged() {
           createdStore.dispatch('dailyRecommendations/identityChanged');
           createdStore.state.player?.lyrics?.identityChanged();
+          identityListeners.forEach(changed => changed());
         },
       }),
       library: createLibrary(persistence.snapshot.library, library),
@@ -75,6 +77,10 @@ export function createStore({
       }),
     },
   });
+  createdStore.subscribeIdentityChanges = changed => {
+    identityListeners.add(changed);
+    return () => identityListeners.delete(changed);
+  };
   createdStore.dispatch('lastfm/restore');
   store = createdStore;
   return createdStore;

@@ -58,12 +58,19 @@ export function createMusicSearchQuery({
     const position = offset;
     try {
       const config = categories[category];
-      const response = await search({
-        keywords: intent.keywords,
-        type: config.type,
-        offset: position,
-        ...(limit ? { limit } : {}),
-      });
+      const isCurrent = () =>
+        current(job) &&
+        job.identityGeneration === identityGeneration &&
+        job.identity === JSON.stringify(getIdentity());
+      const response = await search(
+        {
+          keywords: intent.keywords,
+          type: config.type,
+          offset: position,
+          ...(limit ? { limit } : {}),
+        },
+        { isCurrent }
+      );
       if (!current(job)) return;
       if (!response?.result)
         throw new Error(response?.msg || response?.message || '搜索失败');
@@ -72,7 +79,8 @@ export function createMusicSearchQuery({
       let items = page;
       if (category === 'tracks' && page.length) {
         const details = await getTrackDetail(
-          page.map(track => track.id).join(',')
+          page.map(track => track.id).join(','),
+          { isCurrent }
         );
         if (!current(job)) return;
         if (!details?.songs) throw new Error('歌曲详情读取失败');

@@ -32,7 +32,7 @@ export function getMP3(id, { quality } = {}) {
  * 说明 : 调用此接口 , 传入音乐 id(支持多个 id, 用 , 隔开), 可获得歌曲详情(注意:歌曲封面现在需要通过专辑内容接口获取)
  * @param {string} ids - 音乐 id, 例如 ids=405998841,33894312
  */
-export function getTrackDetail(ids) {
+export function getTrackDetail(ids, { isCurrent } = {}) {
   const idsInArray = String(ids).split(',');
   const convert = data => ({
     ...data,
@@ -46,6 +46,7 @@ export function getTrackDetail(ids) {
     fetchLatest: async () => {
       const data = await request({
         url: '/song/detail',
+        isCurrent,
         method: 'get',
         params: { ids },
       });
