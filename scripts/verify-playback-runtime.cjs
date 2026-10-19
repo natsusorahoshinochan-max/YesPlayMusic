@@ -34,6 +34,7 @@ async function launch() {
   const binary =
     process.env.YPM_ELECTRON_BINARY ||
     require(path.join(root, 'node_modules/electron'));
+  const launchedAt = Date.now();
   const child = require('child_process').spawn(binary, [__filename], {
     cwd: root,
     stdio: 'inherit',
@@ -54,7 +55,13 @@ async function launch() {
     console.log(
       `Runtime report: ${output}; exit=${code}; signal=${signal || 'none'}`
     );
-    process.exitCode = code === 0 ? 0 : 1;
+    let successfulReport = false;
+    try {
+      const result = JSON.parse(fs.readFileSync(output, 'utf8'));
+      successfulReport =
+        result.status === 'passed' && Date.parse(result.started) >= launchedAt;
+    } catch {}
+    process.exitCode = code === 0 && successfulReport ? 0 : 1;
   });
 }
 
