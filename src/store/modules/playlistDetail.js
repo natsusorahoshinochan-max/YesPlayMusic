@@ -33,16 +33,24 @@ export default function createPlaylistDetail({ api = {} } = {}) {
     }
   }
 
-  async function open(context, id, range) {
+  async function open(context, id, range, retainCurrent = false) {
     const request = ++generation;
+    const current = context.state.current;
+    const retained = retainCurrent ? current : null;
+    const confirmedFavorite =
+      Number(current?.id) === Number(id)
+        ? current.confirmedFavorite
+        : undefined;
     context.commit('replace', {
       id,
       playlist: null,
       tracks: [],
-      loading: true,
-      loadingMore: false,
       hasMore: false,
       traversed: 0,
+      ...(retained || {}),
+      confirmedFavorite,
+      loading: true,
+      loadingMore: false,
     });
     try {
       const result = await api.getPlaylistDetail(id, true);
@@ -53,15 +61,46 @@ export default function createPlaylistDetail({ api = {} } = {}) {
         const index = playlist.trackIds.findIndex(item => item.id === track.id);
         return Math.max(end, index + 1);
       }, 0);
+      const available = new Map(tracks.map(track => [track.id, track]));
       context.commit('patch', {
-        playlist: { ...playlist, tracks: undefined },
-        tracks,
+        playlist: {
+          ...playlist,
+          tracks: undefined,
+          ...(context.state.current.confirmedFavorite === undefined
+            ? {}
+            : {
+                subscribed: context.state.current.confirmedFavorite,
+              }),
+        },
+        tracks: playlist.trackIds
+          .map(track => available.get(track.id))
+          .filter(Boolean),
         traversed: initial,
         hasMore: initial < playlist.trackIds.length,
       });
-      await loadMore(context, {
-        count: range === undefined ? 100 : Math.max(0, range - initial),
-      });
+      try {
+        await loadMore(context, {
+          count: range === undefined ? 100 : Math.max(0, range - initial),
+        });
+      } catch (error) {
+        if (retained?.playlist && request === generation) {
+          const traversed = Math.min(range, playlist.trackIds.length);
+          const confirmedTracks = new Map(
+            [...retained.tracks, ...context.state.current.tracks].map(track => [
+              track.id,
+              track,
+            ])
+          );
+          context.commit('patch', {
+            tracks: playlist.trackIds
+              .map(track => confirmedTracks.get(track.id))
+              .filter(Boolean),
+            traversed,
+            hasMore: traversed < playlist.trackIds.length,
+          });
+        }
+        throw error;
+      }
     } finally {
       if (request === generation) context.commit('patch', { loading: false });
     }
@@ -124,15 +163,22 @@ export default function createPlaylistDetail({ api = {} } = {}) {
         const detail = context.state.current;
         if (!detail || Number(detail.id) !== Number(change.playlistId)) return;
         if (change.type === 'deleted') return context.dispatch('close');
+        if (change.type === 'favorite') {
+          context.commit('patch', {
+            confirmedFavorite: change.favorite,
+            ...(detail.playlist
+              ? {
+                  playlist: { ...detail.playlist, subscribed: change.favorite },
+                }
+              : {}),
+          });
+        }
         if (!detail.playlist) {
-          return open(context, detail.id);
+          return open(context, detail.id, undefined, true);
         }
         if (change.type === 'tracks-removed') {
           context.commit('removeTracks', change.trackIds);
         } else if (change.type === 'favorite') {
-          context.commit('patch', {
-            playlist: { ...detail.playlist, subscribed: change.favorite },
-          });
           const request = generation;
           const result = await api.getPlaylistDetail(detail.id, true);
           if (request === generation && context.state.current === detail) {
@@ -142,12 +188,12 @@ export default function createPlaylistDetail({ api = {} } = {}) {
                 trackIds: detail.playlist.trackIds,
                 trackCount: detail.playlist.trackCount,
                 tracks: undefined,
-                subscribed: change.favorite,
+                subscribed: detail.confirmedFavorite,
               },
             });
           }
         } else if (change.type === 'tracks-added' || change.type === 'reload') {
-          return open(context, detail.id, detail.traversed);
+          return open(context, detail.id, detail.traversed, true);
         }
       },
     },

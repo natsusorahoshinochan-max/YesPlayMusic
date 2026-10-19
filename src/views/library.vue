@@ -214,6 +214,7 @@
 </template>
 
 <script>
+import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 import { mapActions, mapMutations, mapGetters } from 'vuex';
 import { randomNum } from '@/utils/common';
 import { getLyric } from '@/api/track';
@@ -398,8 +399,14 @@ export default {
     selectUploadFiles() {
       this.$refs.cloudDiskUploadInput.click();
     },
-    uploadSongToCloudDisk(e) {
-      this.$store.dispatch('library/uploadCloudTrack', e.target.files[0]);
+    async uploadSongToCloudDisk(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const result = await this.$store.dispatch(
+        'library/uploadCloudTrack',
+        file
+      );
+      showLibraryChangeFeedback(this.$store, result, '已上传到云盘');
     },
   },
 };

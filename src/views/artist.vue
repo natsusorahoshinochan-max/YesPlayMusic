@@ -177,6 +177,7 @@
 </template>
 
 <script>
+import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 import { mapMutations, mapActions, mapState } from 'vuex';
 import {
   getArtist,
@@ -320,19 +321,15 @@ export default {
         trackID
       );
     },
-    followArtist() {
-      if (!this.$store.getters['session/hasAccount']) {
-        this.showToast(locale.t('toast.needToLogin'));
-        return;
-      }
-      this.$store
-        .dispatch('library/setArtistFavorite', {
-          id: this.artist.id,
-          favorite: !this.artist.followed,
-        })
-        .then(data => {
-          if (data.code === 200) this.artist.followed = !this.artist.followed;
-        });
+    async followArtist() {
+      const favorite = !this.artist.followed;
+      const result = await this.$store.dispatch('library/setArtistFavorite', {
+        id: this.artist.id,
+        favorite,
+      });
+      if (result.outcome.status === 'succeeded')
+        this.artist.followed = favorite;
+      showLibraryChangeFeedback(this.$store, result, undefined);
     },
     scrollTo(div, block = 'center') {
       document.getElementById(div).scrollIntoView({

@@ -87,6 +87,7 @@
 </template>
 
 <script>
+import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 import ArtistsInLine from '@/components/ArtistsInLine.vue';
 import ExplicitSymbol from '@/components/ExplicitSymbol.vue';
 import { mapGetters } from 'vuex';
@@ -220,7 +221,7 @@ export default {
       this.$parent.playThisList(this.track.id);
     },
     likeThisSong() {
-      this.$parent.toggleTrackFavorite(this.track.id);
+      return toggleTrackFavoriteWithFeedback(this.$store, this.track.id);
     },
   },
 };

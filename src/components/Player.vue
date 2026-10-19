@@ -181,6 +181,7 @@
 </template>
 
 <script>
+import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 import { mapState, mapMutations, mapActions, mapGetters } from 'vuex';
 import '@/assets/css/slider.css';
 
@@ -237,7 +238,9 @@ export default {
   methods: {
     ...mapMutations(['toggleLyrics']),
     ...mapActions(['showToast']),
-    ...mapActions('library', ['toggleTrackFavorite']),
+    toggleTrackFavorite(id) {
+      return toggleTrackFavoriteWithFeedback(this.$store, id);
+    },
     handleClick(event) {
       if (event.target == this.mouseDownTarget) {
         this.toggleLyrics();

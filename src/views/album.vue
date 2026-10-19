@@ -145,6 +145,7 @@
 </template>
 
 <script>
+import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 import { mapMutations, mapActions, mapState, mapGetters } from 'vuex';
 import { getArtistAlbum } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
@@ -242,28 +243,23 @@ export default {
     playAlbumByID(id, trackID = 'first') {
       this.$store.state.player.playAlbumByID(id, trackID);
     },
-    likeAlbum(toast = false) {
-      if (!this.$store.getters['session/hasAccount']) {
-        this.showToast(locale.t('toast.needToLogin'));
-        return;
-      }
-      this.$store
-        .dispatch('library/setAlbumFavorite', {
-          id: this.album.id,
-          favorite: !this.dynamicDetail.isSub,
-        })
-        .then(data => {
-          if (data.code === 200) {
-            this.dynamicDetail.isSub = !this.dynamicDetail.isSub;
-            if (toast === true)
-              this.showToast(
-                this.dynamicDetail.isSub ? '已保存到音乐库' : '已从音乐库删除'
-              );
-          }
-        })
-        .catch(error => {
-          this.showToast(`${error.response.data.message || error}`);
-        });
+    async likeAlbum(toast = false) {
+      const favorite = !this.dynamicDetail.isSub;
+      const result = await this.$store.dispatch('library/setAlbumFavorite', {
+        id: this.album.id,
+        favorite,
+      });
+      if (result.outcome.status === 'succeeded')
+        this.dynamicDetail.isSub = favorite;
+      showLibraryChangeFeedback(
+        this.$store,
+        result,
+        toast === true
+          ? favorite
+            ? '已保存到音乐库'
+            : '已从音乐库删除'
+          : undefined
+      );
     },
     formatTitle() {
       let splitTitle = splitSoundtrackAlbumTitle(this.album.name);
