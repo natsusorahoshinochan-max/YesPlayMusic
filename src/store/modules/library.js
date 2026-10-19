@@ -108,6 +108,31 @@ export default function createLibrary(
     await loadPreview(context);
   }
 
+  function trackAdditionUpdates(context, playlistId, trackIds) {
+    const attempts = [
+      () => loadPlaylists(context),
+      () =>
+        context.dispatch(
+          'playlistDetail/applyLibraryChange',
+          {
+            type: 'tracks-added',
+            playlistId,
+          },
+          { root: true }
+        ),
+    ];
+    if (Number(playlistId) === Number(context.state.likedSongPlaylistID)) {
+      setCollection(context, 'songs', [
+        ...new Set([...context.state.collections.songs, ...trackIds]),
+      ]);
+      attempts.push(
+        () => loadSongs(context),
+        () => loadPreview(context)
+      );
+    }
+    return attempts;
+  }
+
   async function write(context, request, update) {
     if (!context.rootGetters['session/hasAccount'])
       return changeResult(accountRequired);
@@ -286,39 +311,72 @@ export default function createLibrary(
         }
         return changeResult(outcome, await synchronize(attempts));
       },
-      async changePlaylistTracks(context, params) {
+      async addPlaylistTracks(context, { playlistId, trackIds }) {
         if (!context.rootGetters['session/hasAccount'])
           return changeResult(accountRequired);
-        const result = await api.addOrRemoveTrackFromPlaylist(params);
-        if (result.body?.code === 200) {
-          const affectsLikedSongs =
-            Number(params.pid) === Number(context.state.likedSongPlaylistID);
-          await loadPlaylists(context);
-          if (affectsLikedSongs) {
-            await loadSongs(context);
-            await loadPreview(context);
-          }
-        }
-        return result;
-      },
-      async createPlaylist(context, { name, privacy = false, trackID }) {
-        if (!context.rootGetters['session/hasAccount'])
-          return changeResult(accountRequired);
-        const result = await api.createPlaylist({
-          name,
-          privacy: privacy ? 10 : 0,
-        });
-        if (result.code !== 200) return result;
-        let trackResult;
-        if (trackID) {
-          trackResult = await api.addOrRemoveTrackFromPlaylist({
+        const outcome = await performLibraryWrite(() =>
+          api.addOrRemoveTrackFromPlaylist({
             op: 'add',
-            pid: result.id,
-            tracks: trackID,
+            pid: playlistId,
+            tracks: trackIds.join(','),
+          })
+        );
+        if (outcome.status !== 'succeeded') return changeResult(outcome);
+        return changeResult(
+          outcome,
+          await synchronize(trackAdditionUpdates(context, playlistId, trackIds))
+        );
+      },
+      async createPlaylist(
+        context,
+        { name, private: privatePlaylist = false, trackIds = [] }
+      ) {
+        const requested = trackIds.length > 0;
+        let creation = accountRequired;
+        let response;
+        if (context.rootGetters['session/hasAccount']) {
+          creation = await performLibraryWrite(async () => {
+            response = await api.createPlaylist({
+              name,
+              privacy: privatePlaylist ? 10 : 0,
+            });
+            return response;
           });
         }
-        await loadPlaylists(context);
-        return { ...result, trackResult };
+        let addition = {
+          status: requested ? 'not-attempted' : 'not-requested',
+        };
+        if (creation.status !== 'succeeded') {
+          return { creation, addition, synchronization: 'not-required' };
+        }
+        const body =
+          response?.body?.code !== undefined ? response.body : response;
+        const playlistId = body.id ?? body.playlist?.id;
+        if (playlistId == null) {
+          return {
+            creation: { status: 'unconfirmed' },
+            addition,
+            synchronization: 'not-required',
+          };
+        }
+        creation = { ...creation, playlistId };
+        if (requested && !context.rootGetters['session/hasAccount']) {
+          addition = accountRequired;
+        } else if (requested) {
+          addition = await performLibraryWrite(() =>
+            api.addOrRemoveTrackFromPlaylist({
+              op: 'add',
+              pid: playlistId,
+              tracks: trackIds.join(','),
+            })
+          );
+        }
+        const synchronization = await synchronize(
+          addition.status === 'succeeded'
+            ? trackAdditionUpdates(context, playlistId, trackIds)
+            : [() => loadPlaylists(context)]
+        );
+        return { creation, addition, synchronization };
       },
       setAlbumFavorite(context, { id, favorite }) {
         return write(

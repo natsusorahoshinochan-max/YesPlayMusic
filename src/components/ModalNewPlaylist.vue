@@ -31,6 +31,7 @@
 <script>
 import Modal from '@/components/Modal.vue';
 import locale from '@/locale';
+import { describeLibraryOutcome } from '@/utils/libraryOutcome';
 import { mapMutations, mapState, mapActions } from 'vuex';
 
 export default {
@@ -73,29 +74,35 @@ export default {
       this.privatePlaylist = false;
       this.resetAfterCreateAddTrackID();
     },
-    createPlaylist() {
-      this.$store
-        .dispatch('library/createPlaylist', {
+    async createPlaylist() {
+      try {
+        const trackId = this.modals.newPlaylistModal.afterCreateAddTrackID;
+        const result = await this.$store.dispatch('library/createPlaylist', {
           name: this.title,
-          privacy: this.privatePlaylist,
-          trackID: this.modals.newPlaylistModal.afterCreateAddTrackID,
-        })
-        .then(data => {
-          if (data?.code === 200) {
-            if (data.trackResult) {
-              this.showToast(
-                data.trackResult.body.code === 200
-                  ? locale.t('toast.savedToPlaylist')
-                  : data.trackResult.body.message
-              );
-            }
-            this.close();
-            this.showToast('成功创建歌单');
-            this.$store
-              .dispatch('preferences/setLibraryPlaylistFilter', 'mine')
-              .catch(error => this.showToast(error.message || '设置保存失败'));
-          }
+          private: this.privatePlaylist,
+          trackIds: trackId ? [trackId] : [],
         });
+        if (result.creation.status !== 'succeeded') {
+          this.showToast(describeLibraryOutcome(result.creation));
+          return;
+        }
+        this.close();
+        const feedback = ['成功创建歌单'];
+        if (result.addition.status === 'succeeded') {
+          feedback.push(locale.t('toast.savedToPlaylist'));
+        } else if (result.addition.status !== 'not-requested') {
+          feedback.push(describeLibraryOutcome(result.addition));
+        }
+        if (result.synchronization === 'incomplete') {
+          feedback.push('部分内容更新失败，请稍后刷新');
+        }
+        this.showToast(feedback.join('；'));
+        await this.$store
+          .dispatch('preferences/setLibraryPlaylistFilter', 'mine')
+          .catch(error => this.showToast(error.message || '设置保存失败'));
+      } catch (error) {
+        this.showToast(error.message || '创建歌单失败');
+      }
     },
     resetAfterCreateAddTrackID() {
       this.updateModal({

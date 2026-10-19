@@ -61,9 +61,7 @@ export default function createPlaylistDetail({ api = {} } = {}) {
         const index = playlist.trackIds.findIndex(item => item.id === track.id);
         return Math.max(end, index + 1);
       }, 0);
-      const available = new Map(
-        [...(retained?.tracks || []), ...tracks].map(track => [track.id, track])
-      );
+      const available = new Map(tracks.map(track => [track.id, track]));
       context.commit('patch', {
         playlist: {
           ...playlist,
@@ -87,7 +85,16 @@ export default function createPlaylistDetail({ api = {} } = {}) {
       } catch (error) {
         if (retained?.playlist && request === generation) {
           const traversed = Math.min(range, playlist.trackIds.length);
+          const confirmedTracks = new Map(
+            [...retained.tracks, ...context.state.current.tracks].map(track => [
+              track.id,
+              track,
+            ])
+          );
           context.commit('patch', {
+            tracks: playlist.trackIds
+              .map(track => confirmedTracks.get(track.id))
+              .filter(Boolean),
             traversed,
             hasMore: traversed < playlist.trackIds.length,
           });
