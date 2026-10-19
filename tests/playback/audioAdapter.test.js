@@ -1,4 +1,6 @@
 import { createAudioAdapter } from '@/playback/audioAdapter';
+import { createPlayback } from '@/playback';
+import { createAudioResources } from '@/playback/audioResources';
 
 function boundary({ load, sink } = {}) {
   const actions = [];
@@ -67,6 +69,117 @@ function boundary({ load, sink } = {}) {
   };
 }
 const bytes = { kind: 'bytes', bytes: new Uint8Array([1, 2]).buffer };
+
+test('initial network load failure gets a fresh source and restores the selected position without autoplay', async () => {
+  const { audio, instances, URL, actions } = boundary({
+    load: howl => {
+      if (howl.options.src[0].startsWith('blob:')) howl.emit('loaderror', 1, 2);
+      else howl.emit('load');
+    },
+  });
+  const cache = {
+    getTrackSource: jest
+      .fn()
+      .mockResolvedValueOnce({ source: bytes.bytes })
+      .mockResolvedValue(null),
+  };
+  let finishPrefetch;
+  const prefetched = new Promise(resolve => {
+    finishPrefetch = resolve;
+  });
+  const getMP3 = jest.fn(async id => {
+    if (id === 2) finishPrefetch();
+    return { data: [{ url: `https://fresh/${id}`, freeTrialInfo: null }] };
+  });
+  const feedback = jest.fn();
+  const playback = createPlayback({
+    getTrack: async id => ({ id, dt: 180000 }),
+    resources: createAudioResources({ cache, getMP3, hasAccount: () => true }),
+    audio,
+    onFeedback: feedback,
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+  expect(
+    await playback.restore(
+      { _enabled: true, _list: [1, 2], _currentTrack: { id: 1 } },
+      17
+    )
+  ).toEqual({ status: 'completed' });
+  expect(playback.state.currentTrackID).toBe(1);
+  expect(playback.position()).toBe(17);
+  expect(playback.state.playing).toBe(false);
+  expect(instances.map(h => h.options.src[0])).toEqual([
+    'blob:owned-1',
+    'https://fresh/1',
+  ]);
+  expect(URL.revokeObjectURL.mock.calls).toEqual([['blob:owned-1']]);
+  expect(instances[0].events).toEqual({});
+  expect(actions).toContainEqual(['unload', 'blob:owned-1']);
+  await prefetched;
+  expect(getMP3.mock.calls).toEqual([[1], [2]]);
+  expect(feedback).not.toHaveBeenCalled();
+  playback.dispose();
+});
+
+test('a newer selection owns playback while an initial audio retry rejects late without feedback', async () => {
+  const { audio, instances, URL } = boundary({
+    load: howl => {
+      if (howl.options.src[0].startsWith('blob:')) howl.emit('loaderror', 1, 2);
+      else howl.emit('load');
+    },
+  });
+  let rejectRetry;
+  let retryStarted;
+  const retryRequested = new Promise(resolve => {
+    retryStarted = resolve;
+  });
+  const getMP3 = jest.fn(id => {
+    if (id === 1) {
+      retryStarted();
+      return new Promise((_, reject) => {
+        rejectRetry = reject;
+      });
+    }
+    return Promise.resolve({
+      data: [{ url: 'https://new/2', freeTrialInfo: null }],
+    });
+  });
+  const feedback = jest.fn();
+  const events = [];
+  const playback = createPlayback({
+    getTrack: async id => ({ id, dt: 180000 }),
+    resources: createAudioResources({
+      cache: {
+        getTrackSource: jest
+          .fn()
+          .mockResolvedValueOnce({ source: bytes.bytes })
+          .mockResolvedValue(null),
+      },
+      getMP3,
+      hasAccount: () => true,
+    }),
+    audio,
+    onFeedback: feedback,
+    onPlaybackEvent: event => events.push(event),
+    setInterval: () => 1,
+    clearInterval() {},
+  });
+  const old = playback.playTracks([1]);
+  await retryRequested;
+  expect(await playback.playTracks([2])).toEqual({ status: 'completed' });
+  rejectRetry(new Error('expired retry'));
+  expect(await old).toEqual({ status: 'superseded' });
+  expect(playback.state.currentTrackID).toBe(2);
+  expect(playback.state.playing).toBe(true);
+  expect(
+    events.filter(event => event.type === 'played').map(event => event.track.id)
+  ).toEqual([2]);
+  expect(instances).toHaveLength(2);
+  expect(URL.revokeObjectURL.mock.calls).toEqual([['blob:owned-1']]);
+  expect(feedback).not.toHaveBeenCalled();
+  playback.dispose();
+});
 
 test('prepared bytes own their actual URL and dispose unbinds and unloads before revocation exactly once', async () => {
   const { audio, URL, actions, instances } = boundary();

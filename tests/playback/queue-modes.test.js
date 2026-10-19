@@ -43,6 +43,33 @@ function setup(options = {}) {
   });
   return { playback, handles };
 }
+test.each([
+  { startTrackId: 2, action: 'next', upcoming: [] },
+  {
+    startTrackId: 1,
+    action: 'previous',
+    upcoming: [{ trackId: 2, group: 'main', index: 1 }],
+  },
+])(
+  'repeat-one manual $action respects the queue boundary',
+  async ({ startTrackId, action, upcoming }) => {
+    const { playback: p } = setup();
+    await p.playTracks([1, 2], { startTrackId });
+    p.cycleRepeat();
+    p.cycleRepeat();
+    expect(p.state.repeatMode).toBe('one');
+    expect(p.upcoming(5)).toEqual(upcoming);
+    expect(await p[action]()).toEqual({
+      status: 'unavailable',
+      reason: 'queue-ended',
+    });
+    expect(p.state.currentTrackID).toBe(startTrackId);
+    expect(p.state.playing).toBe(false);
+    p.play();
+    expect(p.state.playing).toBe(true);
+    p.dispose();
+  }
+);
 test('next-list selection consumes the selected occurrence, playNow consumes the existing head and queue edits preserve main position', async () => {
   const { playback: p } = setup();
   await p.playTracks([1, 2, 1, 3]);
