@@ -132,13 +132,17 @@ export default {
       });
     },
     async likeMV() {
-      const favorite = !this.mv.subed;
-      const result = await this.$store.dispatch('library/setMVFavorite', {
-        id: this.mv.data.id,
-        favorite,
-      });
-      if (result.outcome.status === 'succeeded') this.mv.subed = favorite;
-      showLibraryChangeFeedback(this.$store, result, undefined);
+      try {
+        const favorite = !this.mv.subed;
+        const result = await this.$store.dispatch('library/setMVFavorite', {
+          id: this.mv.data.id,
+          favorite,
+        });
+        if (result.outcome.status === 'succeeded') this.mv.subed = favorite;
+        showLibraryChangeFeedback(this.$store, result, undefined);
+      } catch (error) {
+        this.showToast(error.message || '操作失败，请重试');
+      }
     },
     openMenu(e) {
       this.$refs.mvMenu.openMenu(e);

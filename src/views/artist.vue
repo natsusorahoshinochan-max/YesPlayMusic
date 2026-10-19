@@ -320,14 +320,18 @@ export default {
       });
     },
     async followArtist() {
-      const favorite = !this.artist.followed;
-      const result = await this.$store.dispatch('library/setArtistFavorite', {
-        id: this.artist.id,
-        favorite,
-      });
-      if (result.outcome.status === 'succeeded')
-        this.artist.followed = favorite;
-      showLibraryChangeFeedback(this.$store, result, undefined);
+      try {
+        const favorite = !this.artist.followed;
+        const result = await this.$store.dispatch('library/setArtistFavorite', {
+          id: this.artist.id,
+          favorite,
+        });
+        if (result.outcome.status === 'succeeded')
+          this.artist.followed = favorite;
+        showLibraryChangeFeedback(this.$store, result, undefined);
+      } catch (error) {
+        this.showToast(error.message || '操作失败，请重试');
+      }
     },
     scrollTo(div, block = 'center') {
       document.getElementById(div).scrollIntoView({

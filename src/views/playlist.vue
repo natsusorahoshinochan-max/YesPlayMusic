@@ -427,20 +427,27 @@ export default {
       });
     },
     async likePlaylist(toast = false) {
-      const favorite = !this.playlist.subscribed;
-      const result = await this.$store.dispatch('library/setPlaylistFavorite', {
-        id: this.playlist.id,
-        favorite,
-      });
-      showLibraryChangeFeedback(
-        this.$store,
-        result,
-        toast === true
-          ? favorite
-            ? '已保存到音乐库'
-            : '已从音乐库删除'
-          : undefined
-      );
+      try {
+        const favorite = !this.playlist.subscribed;
+        const result = await this.$store.dispatch(
+          'library/setPlaylistFavorite',
+          {
+            id: this.playlist.id,
+            favorite,
+          }
+        );
+        showLibraryChangeFeedback(
+          this.$store,
+          result,
+          toast === true
+            ? favorite
+              ? '已保存到音乐库'
+              : '已从音乐库删除'
+            : undefined
+        );
+      } catch (error) {
+        this.showToast(error.message || '操作失败，请重试');
+      }
     },
     async loadData(id) {
       this.searchKeyWords = '';
@@ -466,11 +473,15 @@ export default {
       this.$refs.playlistMenu.openMenu(e);
     },
     async deletePlaylist() {
-      const { id, name } = this.playlist;
-      if (!confirm(`确定要删除歌单 ${name}？`)) return;
-      const result = await this.$store.dispatch('library/deletePlaylist', id);
-      showLibraryChangeFeedback(this.$store, result, `已删除歌单 ${name}`);
-      if (result.outcome.status === 'succeeded') this.$router.go(-1);
+      try {
+        const { id, name } = this.playlist;
+        if (!confirm(`确定要删除歌单 ${name}？`)) return;
+        const result = await this.$store.dispatch('library/deletePlaylist', id);
+        showLibraryChangeFeedback(this.$store, result, `已删除歌单 ${name}`);
+        if (result.outcome.status === 'succeeded') this.$router.go(-1);
+      } catch (error) {
+        this.showToast(error.message || '操作失败，请重试');
+      }
     },
     editPlaylist() {
       nativeAlert('此功能开发中');

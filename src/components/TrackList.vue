@@ -230,19 +230,24 @@ export default {
       });
     },
     async removeTrackFromPlaylist() {
-      if (!confirm(`确定要从歌单删除 ${this.rightClickedTrack.name}？`)) return;
-      const result = await this.$store.dispatch(
-        'library/removePlaylistTracks',
-        {
-          playlistId: this.playlistId,
-          trackIds: [this.rightClickedTrack.id],
-        }
-      );
-      this.showToast(
-        result.outcome.status === 'succeeded'
-          ? locale.t('toast.removedFromPlaylist')
-          : describeLibraryOutcome(result.outcome)
-      );
+      try {
+        if (!confirm(`确定要从歌单删除 ${this.rightClickedTrack.name}？`))
+          return;
+        const result = await this.$store.dispatch(
+          'library/removePlaylistTracks',
+          {
+            playlistId: this.playlistId,
+            trackIds: [this.rightClickedTrack.id],
+          }
+        );
+        this.showToast(
+          result.outcome.status === 'succeeded'
+            ? locale.t('toast.removedFromPlaylist')
+            : describeLibraryOutcome(result.outcome)
+        );
+      } catch (error) {
+        this.showToast(error.message || '操作失败，请重试');
+      }
     },
     copyLink() {
       this.$copyText(
@@ -260,13 +265,17 @@ export default {
       if (entry?.group === 'next') this.player.removeNext(entry.index);
     },
     async removeTrackFromCloudDisk() {
-      if (!confirm(`确定要从云盘删除 ${this.rightClickedTrack.songName}？`))
-        return;
-      const result = await this.$store.dispatch(
-        'library/deleteCloudTrack',
-        this.rightClickedTrack.songId
-      );
-      showLibraryChangeFeedback(this.$store, result, '已将此歌曲从云盘删除');
+      try {
+        if (!confirm(`确定要从云盘删除 ${this.rightClickedTrack.songName}？`))
+          return;
+        const result = await this.$store.dispatch(
+          'library/deleteCloudTrack',
+          this.rightClickedTrack.songId
+        );
+        showLibraryChangeFeedback(this.$store, result, '已将此歌曲从云盘删除');
+      } catch (error) {
+        this.showToast(error.message || '操作失败，请重试');
+      }
     },
   },
 };
