@@ -29,7 +29,7 @@
     </div>
     <div class="more-video">
       <div class="section-title">{{ $t('mv.moreVideo') }}</div>
-      <MvRow :mvs="simiMvs" :autoplay="player ? player.playing : false" />
+      <MvRow :mvs="simiMvs" :get-autoplay="videoPlaying" />
     </div>
     <ContextMenu ref="mvMenu">
       <div class="item" @click="copyUrl(mv.data.id)">{{
@@ -101,6 +101,9 @@ export default {
   },
   methods: {
     ...mapActions(['showToast']),
+    videoPlaying() {
+      return this.player ? this.player.playing : false;
+    },
     getData(id) {
       mvDetail(id).then(data => {
         this.mv = data;
