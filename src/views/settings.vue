@@ -810,7 +810,6 @@
 
 <script>
 import { mapState, mapActions, mapGetters } from 'vuex';
-import { auth as lastfmAuth } from '@/api/lastfm';
 import { bytesToSize } from '@/utils/common';
 import { getTrackCache } from '@/utils/db';
 import pkg from '../../package.json';
@@ -849,10 +848,11 @@ export default {
   computed: {
     ...mapGetters({
       settings: 'preferences/settings',
+      lastfm: 'lastfm/authorization',
       user: 'library/user',
       likedSongPlaylistID: 'library/likedSongPlaylistID',
     }),
-    ...mapState(['player', 'lastfm']),
+    ...mapState(['player']),
     isElectron() {
       return process.env.IS_ELECTRON;
     },
@@ -1310,9 +1310,11 @@ export default {
     if (process.env.IS_ELECTRON) this.getAllOutputDevices();
   },
   deactivated() {
+    this.$store.dispatch('lastfm/stopConnecting');
     this.exitRecordShortcut();
   },
   beforeDestroy() {
+    this.$store.dispatch('lastfm/stopConnecting');
     this.exitRecordShortcut();
   },
   methods: {
@@ -1368,18 +1370,10 @@ export default {
         .then(() => this.countDBSize());
     },
     lastfmConnect() {
-      lastfmAuth();
-      let lastfmChecker = setInterval(() => {
-        const session = localStorage.getItem('lastfm');
-        if (session) {
-          this.$store.commit('updateLastfm', JSON.parse(session));
-          clearInterval(lastfmChecker);
-        }
-      }, 1000);
+      return this.$store.dispatch('lastfm/connect');
     },
     lastfmDisconnect() {
-      localStorage.removeItem('lastfm');
-      this.$store.commit('updateLastfm', {});
+      return this.$store.dispatch('lastfm/disconnect');
     },
     sendProxyConfig() {
       return this.submitPreference(

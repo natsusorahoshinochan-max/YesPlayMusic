@@ -1,7 +1,7 @@
 import dbus from 'dbus-next';
-import { ipcMain, app } from 'electron';
+import { ipcMain } from 'electron';
 
-export function createMpris(window) {
+export function createMpris(window, windowOperations) {
   const Player = require('mpris-service');
   const renderer = window.webContents;
 
@@ -15,7 +15,7 @@ export function createMpris(window) {
   player.on('playpause', () => renderer.send('toggle'));
   player.on('play', () => renderer.send('play'));
   player.on('pause', () => renderer.send('pause'));
-  player.on('quit', () => app.exit());
+  player.on('quit', () => windowOperations.quit());
   player.on('position', args =>
     renderer.send('setPosition', args.position / 1000 / 1000)
   );

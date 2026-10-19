@@ -1,4 +1,4 @@
-export default function createState(storage) {
+export default function createState() {
   return {
     showLyrics: false,
     enableScrolling: true,
@@ -23,7 +23,6 @@ export default function createState(storage) {
       },
     },
     dailyTracks: [],
-    lastfm: JSON.parse(storage.getItem('lastfm')) || {},
     player: null,
   };
 }

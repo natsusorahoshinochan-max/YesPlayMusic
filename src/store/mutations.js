@@ -17,9 +17,6 @@ export default {
   updateDailyTracks(state, dailyTracks) {
     state.dailyTracks = dailyTracks;
   },
-  updateLastfm(state, session) {
-    state.lastfm = session;
-  },
   enableScrolling(state, status = null) {
     state.enableScrolling = status ? status : !state.enableScrolling;
   },

@@ -9,6 +9,10 @@ import createSession from './modules/session';
 import createLibrary from './modules/library';
 import createPlaylistDetail from './modules/playlistDetail';
 import createPreferences from './modules/preferences';
+import createLastfm from './modules/lastfm';
+import { auth, authGetSession } from '@/api/lastfm';
+import { createLastfmStorage } from '@/application/lastfmStorage';
+import { createLastfmExchange } from '@/application/lastfmExchange';
 import { getSendSettingsPlugin } from './plugins/sendSettings';
 
 Vue.use(Vuex);
@@ -21,11 +25,13 @@ export function createStore({
   session = {},
   library = {},
   preferences = {},
+  lastfm = {},
   playlistDetail = {},
   actions = {},
 } = {}) {
   initializePlayerStorage(storage);
   const persistence = createPersistence(storage, language);
+  const lastfmStorage = createLastfmStorage(storage);
   const plugins = [persistence.install];
   if (process.env.IS_ELECTRON === true) plugins.push(getSendSettingsPlugin());
   const createdStore = new Vuex.Store({
@@ -34,6 +40,13 @@ export function createStore({
     actions: { ...rootActions, ...actions },
     plugins,
     modules: {
+      lastfm: createLastfm({
+        storage: lastfmStorage,
+        authGetSession,
+        auth,
+        exchange: createLastfmExchange({ storage: lastfmStorage }),
+        ...lastfm,
+      }),
       session: createSession(persistence.snapshot.session, {
         ...session,
         credentials,
@@ -52,6 +65,7 @@ export function createStore({
       }),
     },
   });
+  createdStore.dispatch('lastfm/restore');
   store = createdStore;
   return createdStore;
 }
