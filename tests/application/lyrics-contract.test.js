@@ -17,6 +17,7 @@ function setup(options = {}, playerOptions = {}) {
       'preferences/settings': {},
       'library/user': {},
       'session/hasAccount': false,
+      'lastfm/authorization': {},
     },
     dispatch: jest.fn(),
     subscribe: () => () => {},
@@ -134,12 +135,14 @@ async function realApplication(
       token = null;
     },
   };
-  request.defaults.adapter = async config => ({
-    config,
-    status: 200,
-    data: await read(config),
-    headers: {},
-  });
+  request.defaults.adapter = async config => {
+    try {
+      return { config, status: 200, data: await read(config), headers: {} };
+    } catch (error) {
+      error.config = config;
+      throw error;
+    }
+  };
   const api = {
     userAccount: async () => ({ code: 200, profile: await profile(account) }),
     userPlaylist: async () => ({ playlist: [] }),
