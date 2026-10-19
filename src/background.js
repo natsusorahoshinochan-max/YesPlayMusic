@@ -163,10 +163,8 @@ class Background {
         .executeJavaScript('window.yesplaymusic.player')
         .then(result => {
           res.send({
-            currentTrack: result._isPersonalFM
-              ? result._personalFMTrack
-              : result._currentTrack,
-            progress: result._progress,
+            currentTrack: result?.currentTrack,
+            progress: result?.progress ?? 0,
           });
         });
     });

@@ -77,17 +77,25 @@ export default {
     },
   },
   created() {
-    if (this.isElectron) ipcRenderer(this);
+    if (this.isElectron) this.disposeIpcRenderer = ipcRenderer(this);
     window.addEventListener('keydown', this.handleKeydown);
     this.fetchData();
+  },
+  beforeDestroy() {
+    window.removeEventListener('keydown', this.handleKeydown);
+    this.disposeIpcRenderer?.();
   },
   methods: {
     handleKeydown(e) {
       if (e.code === 'Space') {
-        if (e.target.tagName === 'INPUT') return false;
+        if (
+          ['INPUT', 'TEXTAREA'].includes(e.target.tagName) ||
+          e.target.isContentEditable
+        )
+          return false;
         if (this.$route.name === 'mv') return false;
         e.preventDefault();
-        this.player.playOrPause();
+        this.player.toggle();
       }
     },
     fetchData() {

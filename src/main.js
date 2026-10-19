@@ -66,17 +66,15 @@ startApplication({
         getLocale: () => i18n,
         getPlayer: () => store.state.player,
       }),
-      library: {
-        api: libraryApi,
-        notifyLikedSongsChanged: () =>
-          store.state.player?.sendSelfToIpcMain?.(),
-      },
-    });
-    store.dispatch('session/restore');
-    initializeTrackCache().catch(error => {
-      console.debug('[audio cache] initialization failed', error);
+      library: { api: libraryApi },
     });
     return store;
+  },
+  async initializeDependencies(store) {
+    await store.dispatch('session/restore');
+    await initializeTrackCache().catch(error => {
+      console.debug('[audio cache] initialization failed', error);
+    });
   },
   initializeLocale,
   initializeAppearance,
@@ -91,6 +89,9 @@ startApplication({
       i18n,
       store,
       router,
+      beforeDestroy() {
+        store.state.player.dispose();
+      },
       render: h => h(App),
     }).$mount('#app');
   },

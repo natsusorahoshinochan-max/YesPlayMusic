@@ -62,9 +62,9 @@ export function createPlayback({
     sourceInfo: null,
   };
   const holder = observe({ snapshot: freeze(clone(state)) });
-  const safe = (receiver, value) => {
+  const safe = (receiver, ...values) => {
     try {
-      const returned = receiver(value);
+      const returned = receiver(...values);
       if (returned && typeof returned.catch === 'function') {
         returned.catch(error => console.debug('[playback receiver]', error));
       }
@@ -355,7 +355,7 @@ export function createPlayback({
   }
   async function loadFM(context) {
     state.personalFMLoading = true;
-    publish(false);
+    publish();
     try {
       for (let attempt = 0; attempt < 6; attempt++) {
         const tracks = await personalFM.load();
@@ -371,7 +371,7 @@ export function createPlayback({
     } finally {
       if (valid(context)) {
         state.personalFMLoading = false;
-        publish(false);
+        publish();
       }
     }
     return null;
@@ -379,7 +379,7 @@ export function createPlayback({
   async function loadFMNext(context) {
     const request = ++fmRequest;
     state.personalFMNextLoading = true;
-    publish(false);
+    publish();
     try {
       const tracks = await personalFM.load();
       if (!valid(context) || request !== fmRequest) return;
@@ -397,7 +397,7 @@ export function createPlayback({
     } finally {
       if (valid(context) && request === fmRequest) {
         state.personalFMNextLoading = false;
-        publish(false);
+        publish();
       }
     }
   }
@@ -549,7 +549,7 @@ export function createPlayback({
       current.handle.seek(Math.max(0, seconds));
       state.progress = current.handle.position();
       publish(false);
-      safe(onProgress, state.progress);
+      safe(onProgress, state.progress, { seeked: true });
     },
     position() {
       return current ? current.handle.position() : 0;
@@ -689,7 +689,8 @@ export function createPlayback({
     restore(archive, position = 0, { preparePersonalFM = false } = {}) {
       const saved = clone(archive);
       return runSelection(context => {
-        context.installQueue(saved._list || [], saved._playlistSource, null);
+        list = saved._list || [];
+        state.playlistSource = clone(saved._playlistSource || {});
         index = saved._current || 0;
         state.repeatMode = saved._repeatMode || 'off';
         state.shuffle = Boolean(saved._shuffle);

@@ -105,14 +105,18 @@ export async function createDbus(window) {
 
   const osdInterface = osdService.getInterface('org.osdlyrics.Lyrics');
 
-  ipcMain.on('sendLyrics', async (e, { track, lyrics }) => {
+  ipcMain.on('sendLyrics', async (e, { track, lyrics, requestId }) => {
     const metadata = {
       title: new Variant('s', track.name),
       artist: new Variant('s', track.ar.map(ar => ar.name).join(', ')),
     };
 
-    await osdInterface.SetLyricContent(metadata, Buffer.from(lyrics));
-
-    window.webContents.send('saveLyricFinished');
+    try {
+      await osdInterface.SetLyricContent(metadata, Buffer.from(lyrics));
+    } catch (error) {
+      console.debug('[OSD lyrics] write failed', error);
+    } finally {
+      window.webContents.send('saveLyricFinished', requestId);
+    }
   });
 }

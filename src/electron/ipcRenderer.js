@@ -1,8 +1,6 @@
 import store from '@/store';
-import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 
 export function ipcRenderer(vueInstance) {
-  const player = store.state.player;
   const self = vueInstance;
   // 添加专有的类名
   document.body.setAttribute('data-electron', 'yes');
@@ -14,74 +12,38 @@ export function ipcRenderer(vueInstance) {
   const electron = window.require('electron');
   const ipcRenderer = electron.ipcRenderer;
 
+  const listeners = [];
+  function listen(channel, handler) {
+    ipcRenderer.on(channel, handler);
+    listeners.push([channel, handler]);
+  }
+
   // listens to the main process 'changeRouteTo' event and changes the route from
   // inside this Vue instance, according to what path the main process requires.
   // responds to Menu click() events at the main process and changes the route accordingly.
 
-  ipcRenderer.on('changeRouteTo', (event, path) => {
+  listen('changeRouteTo', (event, path) => {
     self.$router.push(path);
     if (store.state.showLyrics) {
       store.commit('toggleLyrics');
     }
   });
 
-  ipcRenderer.on('search', () => {
+  listen('search', () => {
     // 触发数据响应
     self.$refs.navbar.$refs.searchInput.focus();
     self.$refs.navbar.inputFocus = true;
   });
 
-  ipcRenderer.on('play', () => {
-    player.playOrPause();
-  });
-
-  ipcRenderer.on('next', () => {
-    if (player.isPersonalFM) {
-      player.playNextFMTrack();
-    } else {
-      player.playNextTrack();
-    }
-  });
-
-  ipcRenderer.on('previous', () => {
-    player.playPrevTrack();
-  });
-
-  ipcRenderer.on('increaseVolume', () => {
-    if (player.volume + 0.1 >= 1) {
-      return (player.volume = 1);
-    }
-    player.volume += 0.1;
-  });
-
-  ipcRenderer.on('decreaseVolume', () => {
-    if (player.volume - 0.1 <= 0) {
-      return (player.volume = 0);
-    }
-    player.volume -= 0.1;
-  });
-
-  ipcRenderer.on('like', () => {
-    return toggleTrackFavoriteWithFeedback(store, player.currentTrack.id);
-  });
-
-  ipcRenderer.on('repeat', () => {
-    player.switchRepeatMode();
-  });
-
-  ipcRenderer.on('shuffle', () => {
-    player.switchShuffle();
-  });
-
-  ipcRenderer.on('routerGo', (event, where) => {
+  listen('routerGo', (event, where) => {
     self.$refs.navbar.go(where);
   });
 
-  ipcRenderer.on('nextUp', () => {
+  listen('nextUp', () => {
     self.$refs.player.goToNextTracksPage();
   });
 
-  ipcRenderer.on('rememberCloseAppOption', (event, value) => {
+  listen('rememberCloseAppOption', (event, value) => {
     store
       .dispatch('preferences/setPreference', {
         key: 'closeAppOption',
@@ -92,7 +54,9 @@ export function ipcRenderer(vueInstance) {
       );
   });
 
-  ipcRenderer.on('setPosition', (event, position) => {
-    player._howler.seek(position);
-  });
+  return () => {
+    listeners.forEach(([channel, handler]) =>
+      ipcRenderer.removeListener(channel, handler)
+    );
+  };
 }
