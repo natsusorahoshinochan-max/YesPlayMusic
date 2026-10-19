@@ -354,6 +354,9 @@ export default {
     currentTrack() {
       return this.player.currentTrack;
     },
+    currentTrackID() {
+      return this.player.currentTrackID;
+    },
     isCurrentTrackLiked() {
       return this.$store.getters['library/collections'].songs.includes(
         this.player.currentTrackID
@@ -474,7 +477,7 @@ export default {
     },
   },
   watch: {
-    currentTrack() {
+    currentTrackID() {
       this.getLyric();
       this.getCoverColor();
     },
