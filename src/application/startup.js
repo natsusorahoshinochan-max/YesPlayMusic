@@ -18,7 +18,7 @@ export async function startApplication({
     onSessionInvalid,
     environment: requestEnvironment,
   });
-  store.state.player = createPlayer();
+  store.state.player = createPlayer({ store });
   await store.dispatch('preferences/applyRestored');
   initializeAppearance(getSettings);
   return mount({ store, i18n });

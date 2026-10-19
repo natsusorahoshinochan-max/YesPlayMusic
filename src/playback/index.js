@@ -28,6 +28,7 @@ export function createPlayback({
   let operationId = 0;
   let instanceId = 0;
   let current = null;
+  const preparations = new Set();
   let list = [];
   let index = 0;
   let nextList = [];
@@ -60,9 +61,9 @@ export function createPlayback({
       console.debug('[playback receiver]', error);
     }
   };
-  function publish() {
+  function publish(semantic = true) {
     holder.snapshot = freeze(clone(state));
-    safe(onStateChange, holder.snapshot);
+    if (semantic) safe(onStateChange, holder.snapshot);
   }
   const valid = context => !disposed && context.id === operationId;
   function feedback(context, result) {
@@ -125,6 +126,8 @@ export function createPlayback({
       const targetIndex = index + direction;
       if (targetIndex < 0 || targetIndex >= list.length) {
         if (current) current.handle.pause();
+        state.playing = false;
+        publish();
         return outcome('unavailable', 'queue-ended');
       }
       index = targetIndex;
@@ -147,12 +150,15 @@ export function createPlayback({
     if (!valid(context)) return outcome('superseded');
     visited.add(id);
     let prepared;
+    let preparation;
     try {
       const track = await getTrack(id);
       if (!valid(context)) return outcome('superseded');
       if (!track || track.id == null) throw new Error('invalid-track');
       state.currentTrack = clone(track);
       state.currentTrackID = track.id;
+      state.progress = position;
+      state.sourceInfo = null;
       state.enabled = true;
       state.durationSeconds = Math.floor((track.dt || 0) / 1000);
       state.currentTrackDuration = Math.max(
@@ -204,7 +210,10 @@ export function createPlayback({
           void handleError(context, instance, value);
         }
       };
+      preparation = new AbortController();
+      preparations.add(preparation);
       prepared = await audio.prepare(resource, {
+        signal: preparation.signal,
         volume: state.volume,
         autoplay: false,
         position,
@@ -213,6 +222,7 @@ export function createPlayback({
         onEnd: () => event('end'),
         onError: error => event('error', error),
       });
+      preparations.delete(preparation);
       if (!valid(context)) {
         prepared.dispose();
         return outcome('superseded');
@@ -249,9 +259,18 @@ export function createPlayback({
       }
       return valid(context) ? outcome('completed') : outcome('superseded');
     } catch (error) {
+      preparations.delete(preparation);
       if (prepared && (!current || current.handle !== prepared))
         prepared.dispose();
       if (!valid(context)) return outcome('superseded');
+      if (error.code === 3 || error.code === 4) {
+        const reason = error.code === 4 ? 'unsupported-format' : 'audio-decode';
+        if (error.code === 4) feedback(context, outcome('unavailable', reason));
+        await advance(context, direction, visited);
+        return valid(context)
+          ? outcome('unavailable', reason)
+          : outcome('superseded');
+      }
       return feedback(context, outcome('failed', error));
     }
   }
@@ -269,8 +288,11 @@ export function createPlayback({
     });
   }
   function runSelection(work) {
+    operationId++;
+    preparations.forEach(controller => controller.abort());
+    preparations.clear();
     const context = {
-      id: ++operationId,
+      id: operationId,
       isCurrent: () => valid(context),
       installQueue(ids, source = {}, startTrackId) {
         if (!valid(context)) return;
@@ -294,9 +316,9 @@ export function createPlayback({
       );
   }
   const timer = schedule(() => {
-    if (!current || disposed) return;
+    if (!current || disposed || current.operationId !== operationId) return;
     state.progress = current.handle.position();
-    publish();
+    publish(false);
     safe(onProgress, state.progress);
   }, 1000);
   const playback = {
@@ -333,9 +355,17 @@ export function createPlayback({
       });
     },
     next() {
+      if (!nextList.length && index + 1 >= list.length) {
+        playback.pause();
+        return Promise.resolve(outcome('unavailable', 'queue-ended'));
+      }
       return runSelection(context => advance(context));
     },
     previous() {
+      if (index <= 0) {
+        playback.pause();
+        return Promise.resolve(outcome('unavailable', 'queue-ended'));
+      }
       return runSelection(context => advance(context, -1));
     },
     play() {
@@ -351,7 +381,7 @@ export function createPlayback({
       if (!current || !Number.isFinite(seconds)) return;
       current.handle.seek(Math.max(0, seconds));
       state.progress = current.handle.position();
-      publish();
+      publish(false);
       safe(onProgress, state.progress);
     },
     position() {
@@ -417,6 +447,8 @@ export function createPlayback({
       if (disposed) return;
       disposed = true;
       operationId++;
+      preparations.forEach(controller => controller.abort());
+      preparations.clear();
       unschedule(timer);
       release(current);
       current = null;
