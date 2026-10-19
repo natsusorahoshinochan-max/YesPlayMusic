@@ -4,6 +4,7 @@
     :class="trackClass"
     :style="trackStyle"
     :title="showUnavailableSongInGreyStyle ? track.reason : ''"
+    @click.stop
     @dblclick="activate"
     @mouseover="hover = true"
     @mouseleave="hover = false"
@@ -11,7 +12,8 @@
     <button
       v-if="!showOrderNumber"
       v-show="focus && playable && !isPlaying"
-      class="play-track"
+      class="play-track cover-play"
+      :aria-label="$t('common.play')"
       @click.stop="activate"
       ><svg-icon icon-class="play"
     /></button>
@@ -265,10 +267,21 @@ button {
 
 .track {
   display: flex;
+  position: relative;
   align-items: center;
   padding: 8px;
   border-radius: 12px;
   user-select: none;
+
+  .cover-play {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    width: 46px;
+    height: 46px;
+    z-index: 1;
+    background: var(--color-secondary-bg);
+  }
 
   .no {
     display: flex;
@@ -415,6 +428,10 @@ button {
 }
 
 .track.tracklist {
+  .cover-play {
+    width: 36px;
+    height: 36px;
+  }
   img {
     height: 36px;
     width: 36px;
