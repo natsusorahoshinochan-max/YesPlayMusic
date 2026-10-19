@@ -359,7 +359,11 @@ class Background {
         this.windowOperations
       );
 
-      await restoreProxy(this.window.webContents.session, this.store);
+      try {
+        await restoreProxy(this.window.webContents.session, this.store);
+      } catch (error) {
+        log(`failed to restore proxy: ${error.message}`);
+      }
 
       // check for updates
       this.checkForUpdates();
