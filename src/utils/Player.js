@@ -418,7 +418,9 @@ export default class {
         if (result.data[0].freeTrialInfo !== null) return null; // 跳过只能试听的歌曲
         const source = result.data[0].url.replace(/^http:/, 'https:');
         if (store.getters['preferences/settings'].automaticallyCacheSongs) {
-          cacheTrackSource(track, source, result.data[0].br);
+          cacheTrackSource(track, source, result.data[0].br).catch(error => {
+            console.debug('[audio cache] background write failed', error);
+          });
         }
         return source;
       });
@@ -489,7 +491,14 @@ export default class {
         retrieveSongInfo.source === 'bilibili'
           ? `data:application/octet-stream;base64,${retrieveSongInfo.url}`
           : retrieveSongInfo.url;
-      cacheTrackSource(track, url, 128000, `unm:${retrieveSongInfo.source}`);
+      cacheTrackSource(
+        track,
+        url,
+        128000,
+        `unm:${retrieveSongInfo.source}`
+      ).catch(error =>
+        console.debug('[audio cache] background write failed', error)
+      );
     }
 
     if (!retrieveSongInfo) {

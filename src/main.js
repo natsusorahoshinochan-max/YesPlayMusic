@@ -73,7 +73,9 @@ startApplication({
       },
     });
     store.dispatch('session/restore');
-    initializeTrackCache();
+    initializeTrackCache().catch(error => {
+      console.debug('[audio cache] initialization failed', error);
+    });
     return store;
   },
   initializeLocale,
