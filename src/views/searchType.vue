@@ -39,7 +39,7 @@
 import { createMusicSearch } from '@/application/musicSearch';
 import locale from '@/locale';
 import { camelCase } from 'change-case';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 import TrackList from '@/components/TrackList.vue';
 import MvRow from '@/components/MvRow.vue';
 import CoverRow from '@/components/CoverRow.vue';
@@ -49,7 +49,10 @@ export default {
   name: 'SearchType',
   components: { TrackList, MvRow, CoverRow, ButtonTwoTone },
   data() {
-    return { query: createMusicSearch(this.$store), progressTimer: null };
+    return {
+      query: createMusicSearch(this.$store),
+      progress: createSearchProgress(),
+    };
   },
   computed: {
     keywords() {
@@ -85,19 +88,15 @@ export default {
       this.query.replace(this.queryIntent);
     },
     'query.state.loading'(loading) {
-      clearTimeout(this.progressTimer);
-      if (loading)
-        this.progressTimer = setTimeout(() => NProgress.start(), 1000);
-      else NProgress.done();
+      this.progress.update(loading);
     },
   },
   created() {
     this.query.replace(this.queryIntent);
   },
   beforeDestroy() {
-    clearTimeout(this.progressTimer);
     this.query.dispose();
-    NProgress.done();
+    this.progress.dispose();
   },
   methods: {
     playSearchTrack({ track }) {

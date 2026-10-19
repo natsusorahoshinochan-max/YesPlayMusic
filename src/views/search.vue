@@ -90,7 +90,7 @@
 
 <script>
 import { createMusicSearch } from '@/application/musicSearch';
-import NProgress from 'nprogress';
+import { createSearchProgress } from '@/utils/searchProgress';
 import TrackList from '@/components/TrackList.vue';
 import MvRow from '@/components/MvRow.vue';
 import CoverRow from '@/components/CoverRow.vue';
@@ -99,7 +99,10 @@ export default {
   name: 'Search',
   components: { TrackList, MvRow, CoverRow },
   data() {
-    return { query: createMusicSearch(this.$store), progressTimer: null };
+    return {
+      query: createMusicSearch(this.$store),
+      progress: createSearchProgress(),
+    };
   },
   computed: {
     keywords() {
@@ -134,19 +137,15 @@ export default {
       this.getData();
     },
     'query.state.loading'(loading) {
-      clearTimeout(this.progressTimer);
-      if (loading)
-        this.progressTimer = setTimeout(() => NProgress.start(), 1000);
-      else NProgress.done();
+      this.progress.update(loading);
     },
   },
   created() {
     this.getData();
   },
   beforeDestroy() {
-    clearTimeout(this.progressTimer);
     this.query.dispose();
-    NProgress.done();
+    this.progress.dispose();
   },
   methods: {
     playSearchTrack({ track }) {

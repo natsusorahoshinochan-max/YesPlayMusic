@@ -71,29 +71,44 @@ function parseSourceStringToList(executor, sourceString) {
     });
 }
 
+let closePreferenceRequest = 0;
+
 // The renderer acknowledges the existing complete preferences operation before
 // the main process continues with an exit selected in the close dialog.
 export function rememberCloseOption(win, value) {
   return new Promise((resolve, reject) => {
     const contents = win.webContents;
+    const requestId = ++closePreferenceRequest;
     const cleanup = () => {
       ipcMain.removeListener('rememberCloseAppOptionFinished', finished);
-      contents.removeListener('destroyed', destroyed);
+      contents.removeListener('destroyed', contextLost);
+      contents.removeListener('render-process-gone', contextLost);
+      contents.removeListener('did-start-navigation', navigating);
+      clearTimeout(timeout);
     };
-    const destroyed = () => {
+    const contextLost = () => {
       cleanup();
-      reject(new Error('Window closed before saving close preference'));
+      reject(new Error('Renderer unavailable before saving close preference'));
     };
-    const finished = (event, error) => {
-      if (event.sender !== contents) return;
+    const navigating = (_event, _url, isInPlace, isMainFrame) => {
+      if (isMainFrame && !isInPlace) contextLost();
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out saving close preference'));
+    }, 5000);
+    const finished = (event, error, completedRequestId) => {
+      if (event.sender !== contents || completedRequestId !== requestId) return;
       cleanup();
       if (error) reject(new Error(error));
       else resolve();
     };
     ipcMain.on('rememberCloseAppOptionFinished', finished);
-    contents.once('destroyed', destroyed);
+    contents.once('destroyed', contextLost);
+    contents.once('render-process-gone', contextLost);
+    contents.on('did-start-navigation', navigating);
     try {
-      contents.send('rememberCloseAppOption', value);
+      contents.send('rememberCloseAppOption', value, requestId);
     } catch (error) {
       cleanup();
       reject(error);

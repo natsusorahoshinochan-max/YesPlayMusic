@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils';
 import Card from '@/components/DailyTracksCard.vue';
 import Page from '@/views/dailyTracks.vue';
 import { createStore } from '@/store';
+import { dailyRecommendTracks } from '@/api/playlist';
 import { createPlayback } from '@/playback';
 import request, { configureRequest } from '@/utils/request';
 import { configureMetadataReads } from '@/api/readingContext';
@@ -38,6 +39,7 @@ function setup({
   ]);
   let credential = 'A';
   const store = createStore({
+    dailyRecommendations: { read: dailyRecommendTracks },
     storage: {
       getItem: key => values.get(key) ?? null,
       setItem: (key, value) => values.set(key, value),
