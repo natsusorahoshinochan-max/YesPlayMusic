@@ -896,7 +896,7 @@ export default class {
     if (this._howler?._sounds.length <= 0 || !this._howler?._sounds[0]._node) {
       return;
     }
-    this._howler?._sounds[0]._node.setSinkId(
+    return this._howler?._sounds[0]._node.setSinkId(
       store.getters['preferences/settings'].outputDevice
     );
   }

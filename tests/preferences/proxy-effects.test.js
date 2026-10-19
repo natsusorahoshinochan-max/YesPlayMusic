@@ -13,7 +13,7 @@ test('桌面代理提交返回平台异步结果，拒绝沿公开 action 返回
     },
     preferences: createPreferenceEffects({
       getLocale: () => ({}),
-      ipcRenderer: { invoke },
+      ipcRenderer: { invoke, send: jest.fn() },
     }),
   });
   window.matchMedia = () => ({ matches: false });

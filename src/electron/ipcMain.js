@@ -1,9 +1,6 @@
-import { app, dialog, globalShortcut, ipcMain } from 'electron';
+import { app, dialog, ipcMain } from 'electron';
 import UNM from '@unblockneteasemusic/rust-napi';
-import { registerGlobalShortcut } from '@/electron/globalShortcut';
-import cloneDeep from 'lodash/cloneDeep';
-import shortcuts from '@/utils/shortcuts';
-import { createMenu } from './menu';
+import { applyDesktopShortcuts, applyTrayIconTheme } from './preferences';
 import { registerProxy } from './proxy';
 import { isCreateTray, isMac } from '@/utils/platform';
 
@@ -228,12 +225,6 @@ export function initIpcMain(win, store, trayEventEmitter) {
 
   ipcMain.on('settings', (event, options) => {
     store.set('settings', options);
-    if (options.enableGlobalShortcut) {
-      registerGlobalShortcut(win, store);
-    } else {
-      log('unregister global shortcut');
-      globalShortcut.unregisterAll();
-    }
   });
 
   ipcMain.on('playDiscordPresence', (event, track) => {
@@ -263,34 +254,8 @@ export function initIpcMain(win, store, trayEventEmitter) {
 
   registerProxy(ipcMain, win.webContents.session, store);
 
-  ipcMain.on('switchGlobalShortcutStatusTemporary', (e, status) => {
-    log('switchGlobalShortcutStatusTemporary');
-    if (status === 'disable') {
-      globalShortcut.unregisterAll();
-    } else {
-      registerGlobalShortcut(win, store);
-    }
-  });
-
-  ipcMain.on('updateShortcut', (e, { id, type, shortcut }) => {
-    log('updateShortcut');
-    let shortcuts = store.get('settings.shortcuts');
-    let newShortcut = shortcuts.find(s => s.id === id);
-    newShortcut[type] = shortcut;
-    store.set('settings.shortcuts', shortcuts);
-
-    createMenu(win, store);
-    globalShortcut.unregisterAll();
-    registerGlobalShortcut(win, store);
-  });
-
-  ipcMain.on('restoreDefaultShortcuts', () => {
-    log('restoreDefaultShortcuts');
-    store.set('settings.shortcuts', cloneDeep(shortcuts));
-
-    createMenu(win, store);
-    globalShortcut.unregisterAll();
-    registerGlobalShortcut(win, store);
+  ipcMain.on('applyShortcuts', (_, control, updateMenu) => {
+    applyDesktopShortcuts(win, store, control, updateMenu);
   });
 
   if (isCreateTray) {
@@ -304,7 +269,7 @@ export function initIpcMain(win, store, trayEventEmitter) {
       trayEventEmitter.emit('updateLikeState', isLiked);
     });
     ipcMain.on('updateTrayIcon', () => {
-      trayEventEmitter.emit('updateIcon');
+      applyTrayIconTheme(trayEventEmitter);
     });
   }
 }

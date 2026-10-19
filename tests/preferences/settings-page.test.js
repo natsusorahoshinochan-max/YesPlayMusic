@@ -88,6 +88,85 @@ test('设置保存异常由页面提示并消费拒绝', async () => {
   wrapper.destroy();
 });
 
+test('页面捕获按键保存后继续录制，离开页面按当前配置恢复平台', async () => {
+  const applyShortcuts = jest.fn();
+  const values = {};
+  const store = createStore({
+    storage: {
+      getItem: key => values[key] ?? null,
+      setItem: (key, value) => {
+        values[key] = value;
+      },
+    },
+    preferences: { applyShortcuts },
+  });
+  const localVue = createLocalVue();
+  localVue.use(Vuex);
+  const wrapper = shallowMount(Settings, {
+    localVue,
+    store,
+    computed: { isElectron: () => true },
+    mocks: { $t: key => key },
+    stubs: ['router-link', 'svg-icon'],
+  });
+  await wrapper.find('.keyboard-input').trigger('click');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const table = wrapper.find('#shortcut-table');
+  table.element.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      bubbles: true,
+      key: 'Control',
+      code: 'ControlLeft',
+      keyCode: 17,
+    })
+  );
+  table.element.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      bubbles: true,
+      key: 'p',
+      code: 'KeyP',
+      keyCode: 80,
+    })
+  );
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(
+    JSON.parse(values.settings).shortcuts.find(s => s.id === 'play').shortcut
+  ).toBe('Control+P');
+  expect(applyShortcuts).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recording: true }),
+    true
+  );
+  expect(wrapper.vm.shortcutInput.recording).toBe(true);
+  const language = wrapper.findAll('select').at(0);
+  await language.trigger('click');
+  await language.setValue('tr');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(JSON.parse(values.settings).lang).toBe('tr');
+  expect(wrapper.vm.shortcutInput.recording).toBe(true);
+  expect(applyShortcuts).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recording: true }),
+    true
+  );
+  await wrapper.find('.restore-default-shortcut').trigger('click');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(applyShortcuts).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recording: true }),
+    true
+  );
+  await wrapper.find('#enable-enable-global-shortcut').setChecked(false);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(applyShortcuts).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recording: true, enabled: false }),
+    false
+  );
+  wrapper.destroy();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(applyShortcuts).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recording: false, enabled: false }),
+    false
+  );
+});
+
 test('代理编辑只更新页面完整草稿，更新与关闭提交后才改变已保存配置', async () => {
   process.env.IS_ELECTRON = true;
   window.require = () => ({ ipcRenderer: { send: jest.fn() } });
