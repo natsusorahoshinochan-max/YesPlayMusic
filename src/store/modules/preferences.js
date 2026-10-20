@@ -21,7 +21,6 @@ export default function createPreferences(
   const shortcutControl = state => ({
     enabled: state.settings.enableGlobalShortcut !== false,
     recording: state.shortcutRecording !== null,
-    shortcuts: cloneDeep(state.settings.shortcuts),
   });
   return {
     namespaced: true,

@@ -202,8 +202,6 @@ export default {
   computed: {
     ...mapGetters({
       settings: 'preferences/settings',
-      user: 'library/user',
-      likedSongPlaylistID: 'library/likedSongPlaylistID',
     }),
     ...mapState({ playback: 'player' }),
     player() {

@@ -11,8 +11,7 @@ import createLibrary from './modules/library';
 import createPlaylistDetail from './modules/playlistDetail';
 import createPreferences from './modules/preferences';
 import createLastfm from './modules/lastfm';
-import { createLastfmStorage } from '@/application/lastfmStorage';
-import { getSendSettingsPlugin } from './plugins/sendSettings';
+import { createSettingsSender } from './sendSettings';
 
 Vue.use(Vuex);
 let store;
@@ -24,32 +23,27 @@ export function createStore({
   session = {},
   library = {},
   preferences = {},
-  lastfm = {},
+  lastfm,
   dailyRecommendations = {},
   playlistDetail = {},
   actions = {},
 } = {}) {
   initializePlayerStorage(storage);
   const persistence = createPersistence(storage, language);
-  const lastfmStorage = createLastfmStorage(storage);
-  const plugins = [persistence.install];
-  if (process.env.IS_ELECTRON === true) plugins.push(getSendSettingsPlugin());
+  const sendSettings =
+    process.env.IS_ELECTRON === true ? createSettingsSender() : () => {};
   const identityListeners = new Set();
   const createdStore = new Vuex.Store({
     state: createState(storage),
     mutations,
     actions: { ...rootActions, ...actions },
-    plugins,
+    plugins: [persistence.install],
     modules: {
       dailyRecommendations: createDailyRecommendations({
         ...dailyRecommendations,
         getPlayback: () => createdStore.state.player,
       }),
-      lastfm: createLastfm({
-        storage: lastfmStorage,
-        exchange: { start() {}, stop() {} },
-        ...lastfm,
-      }),
+      lastfm: createLastfm(lastfm),
       session: createSession(persistence.snapshot.session, {
         ...session,
         credentials,
@@ -68,7 +62,8 @@ export function createStore({
         ...preferences,
         persist: async () => {
           await persistence.ready;
-          await persistence.save(createdStore.state);
+          const settings = await persistence.save(createdStore.state);
+          sendSettings(settings);
         },
       }),
     },

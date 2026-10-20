@@ -90,7 +90,7 @@ export default function createSession(
       ...snapshot,
       processing: false,
       qr: { url: '', information: '打开网易云音乐APP扫码登录' },
-      hasCredential: Boolean(credentials.get('MUSIC_U')),
+      hasCredential: false,
     }),
     getters: {
       qr: state => state.qr,

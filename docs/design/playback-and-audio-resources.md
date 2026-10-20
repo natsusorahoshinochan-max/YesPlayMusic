@@ -188,7 +188,7 @@ Playback 在明确的状态转换处调用注入的输出函数。输出投影�
 | 桌面状态 | 歌曲资料、实际播放状态、模式、进度和当前歌曲收藏状态发生相应变化时交付 |
 | 应用反馈 | 操作中确定的失败及后续有效音频错误，使用共同的原因表达交付 |
 
-`player` 恢复投影由 `playerStorage.js` 的 allowlist 维护：`_enabled`、`_repeatMode`、`_shuffle`、`_reversed`、`_volume`、`_volumeBeforeMuted`、`_list`、`_current`、`_shuffledList`、`_shuffledCurrent`、`_playlistSource`、`_currentTrack`、`_playNextList`、`_isPersonalFM`、`_personalFMTrack`、`_personalFMNextTrack`。`restoreSaved()` 读取该投影及独立的 `playerCurrentTrackTime`，通过带操作归属的 `restore` 准备暂停音频；冷启动 FM 推荐加载沿用同一归属。音频实例、Blob URL 和任务由运行过程建立。
+Playback 的 `archive()` 与 `restore()` 集中定义恢复字段，存档包含队列、模式、音量、播放来源、当前歌曲与私人 FM 资料。`playerStorage.js` 负责 JSON 存取、成功保存快照去重和旧版本迁移；进度单独保存在 `playerCurrentTrackTime`。`restoreSaved()` 将存档与进度交给带操作归属的 `restore`，准备暂停音频；冷启动 FM 推荐加载沿用同一归属。音频实例、Blob URL 和任务由运行过程建立。
 
 桌面输出覆盖歌曲资料就绪等有用中间状态和音频事件。临时字段更新只影响必要的公开展示。保存与同步在具体状态转换处选择，不挂在所有方法的统一结束回调上。
 
@@ -219,7 +219,7 @@ Playback 在明确的状态转换处调用注入的输出函数。输出投影�
 | `src/api/readingContext.js` | 仅保存元数据转换所需的身份读取函数 |
 | `src/utils/common.js` 的可播放状态映射 | 通过显式身份资料完成进程内计算 |
 | `src/application/player.js` | 构建唯一 Playback，组合存储、上报、平台输出和外部观察者，建立与释放歌词所有者 |
-| `src/application/playerStorage.js` | 读取旧字段并投影持久化数据；比较持久化投影、单独保存采样进度 |
+| `src/application/playerStorage.js` | JSON 存取、版本迁移与成功保存去重；单独保存采样进度 |
 | `src/application/playbackReporting.js` | 消费有效实例事件并连接网易云和 Last.fm 请求 |
 | `src/application/playbackPlatform.js` | 注册及释放媒体、IPC 和键盘控制，生成桌面及浏览器投影 |
 
@@ -251,9 +251,9 @@ Playback 的 `dispose()` 供装配使用，释放自身创建的计时器、音�
 
 ### 上报事件交接
 
-Playback 输出 `played`、`before-replace`、`ended` 事件，包含 `operationId`、`instanceId`、歌曲、该实例的来源、即时位置、完整秒数、自然结束标识及 `recordOnce()`。旧实例在正式交接时输出自己的最终快照；后续过时音频回调由操作与实例双重检查收束。
+Playback 输出 `played`、`before-replace`、`ended` 事件，包含 `operationId`、`instanceId`、歌曲、该实例的来源、有效记录位置、完整秒数及 `recordOnce()`。旧实例在正式交接时输出自己的最终快照；后续过时音频回调由操作与实例双重检查收束。
 
-`recordOnce()` 只能在同步事件交付期间取得该实例的一次记录权。应用装配先交付生产上报接合，再调用可选观察者。上报接合在发请求前取得记录权，请求独立完成；网易云和 Last.fm 共用该记录权。实际产品条件集中在[需求中的听歌记录与正在播放](../requirements/playback-and-audio-resources-refactoring.md#听歌记录与正在播放)。
+Playback 将自然结束的有效记录位置设为完整秒数，其余事件使用即时位置；`recordOnce()` 集中判断最低记录时长，并只能在同步事件交付期间取得该实例的一次记录权。应用装配先交付生产上报接合，再调用可选观察者。上报接合在发请求前取得记录权，请求独立完成；网易云和 Last.fm 共用该记录权。实际产品条件集中在[需求中的听歌记录与正在播放](../requirements/playback-and-audio-resources-refactoring.md#听歌记录与正在播放)。
 
 ## 验证设计
 

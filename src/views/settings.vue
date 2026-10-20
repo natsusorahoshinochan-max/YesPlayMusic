@@ -809,7 +809,7 @@
 </template>
 
 <script>
-import { mapState, mapActions, mapGetters } from 'vuex';
+import { mapActions, mapGetters } from 'vuex';
 import { bytesToSize } from '@/utils/common';
 import { getTrackCache } from '@/utils/db';
 import pkg from '../../package.json';
@@ -850,9 +850,7 @@ export default {
       settings: 'preferences/settings',
       lastfm: 'lastfm/authorization',
       user: 'library/user',
-      likedSongPlaylistID: 'library/likedSongPlaylistID',
     }),
-    ...mapState(['player']),
     isElectron() {
       return process.env.IS_ELECTRON;
     },
@@ -937,7 +935,6 @@ export default {
     },
     appearance: {
       get() {
-        if (this.settings.appearance === undefined) return 'auto';
         return this.settings.appearance;
       },
       set(value) {
@@ -946,7 +943,6 @@ export default {
     },
     themeColor: {
       get() {
-        if (this.settings.themeColor === undefined) return 'default';
         return this.settings.themeColor;
       },
       set(value) {
@@ -973,7 +969,6 @@ export default {
     },
     lyricFontSize: {
       get() {
-        if (this.settings.lyricFontSize === undefined) return 28;
         return this.settings.lyricFontSize;
       },
       set(value) {
@@ -985,11 +980,7 @@ export default {
         const isValidDevice = this.allOutputDevices.find(
           device => device.deviceId === this.settings.outputDevice
         );
-        if (
-          this.settings.outputDevice === undefined ||
-          isValidDevice === undefined
-        )
-          return 'default'; // Default deviceId
+        if (isValidDevice === undefined) return 'default'; // Default deviceId
         return this.settings.outputDevice;
       },
       set(deviceId) {
@@ -998,8 +989,7 @@ export default {
     },
     enableUnblockNeteaseMusic: {
       get() {
-        const value = this.settings.enableUnblockNeteaseMusic;
-        return value !== undefined ? value : true;
+        return this.settings.enableUnblockNeteaseMusic;
       },
       set(value) {
         this.submitPreference('setPreference', {
@@ -1010,7 +1000,6 @@ export default {
     },
     showPlaylistsByAppleMusic: {
       get() {
-        if (this.settings.showPlaylistsByAppleMusic === undefined) return true;
         return this.settings.showPlaylistsByAppleMusic;
       },
       set(value) {
@@ -1022,7 +1011,6 @@ export default {
     },
     nyancatStyle: {
       get() {
-        if (this.settings.nyancatStyle === undefined) return false;
         return this.settings.nyancatStyle;
       },
       set(value) {
@@ -1034,7 +1022,6 @@ export default {
     },
     automaticallyCacheSongs: {
       get() {
-        if (this.settings.automaticallyCacheSongs === undefined) return false;
         return this.settings.automaticallyCacheSongs;
       },
       set(value) {
@@ -1122,7 +1109,6 @@ export default {
     },
     enableReversedMode: {
       get() {
-        if (this.settings.enableReversedMode === undefined) return false;
         return this.settings.enableReversedMode;
       },
       set(value) {

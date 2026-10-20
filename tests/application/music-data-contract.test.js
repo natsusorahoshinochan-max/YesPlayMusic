@@ -7,6 +7,7 @@ import { getTrackDetail, getMP3 } from '@/api/track';
 import { getTrackCache } from '@/utils/db';
 import { createAudioResources } from '@/playback/audioResources';
 import { startApplication } from '@/application/startup';
+import { createLastfmOptions } from '@/application/lastfm';
 
 function fixture(settings = {}) {
   const saved = new Map([
@@ -34,6 +35,7 @@ function fixture(settings = {}) {
   let token = 'test';
   const store = createStore({
     storage,
+    lastfm: createLastfmOptions(storage),
     language: 'en',
     credentials: {
       get: () => token,
@@ -45,6 +47,7 @@ function fixture(settings = {}) {
       },
     },
   });
+  store.dispatch('session/restore');
   return store;
 }
 const readers = store => ({

@@ -107,7 +107,6 @@ export default {
     ...mapGetters({
       settings: 'preferences/settings',
       user: 'library/user',
-      likedSongPlaylistID: 'library/likedSongPlaylistID',
     }),
 
     hasLibraryIdentity() {

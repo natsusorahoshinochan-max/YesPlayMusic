@@ -143,7 +143,7 @@
 
 <script>
 import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
-import { mapActions, mapState, mapGetters } from 'vuex';
+import { mapActions } from 'vuex';
 import { getArtistAlbum } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
 import { getAlbum, albumDynamicDetail } from '@/api/album';
@@ -195,11 +195,6 @@ export default {
     };
   },
   computed: {
-    ...mapGetters({
-      user: 'library/user',
-      likedSongPlaylistID: 'library/likedSongPlaylistID',
-    }),
-    ...mapState(['player']),
     albumTime() {
       let time = 0;
       this.tracks.map(t => (time = time + t.dt));

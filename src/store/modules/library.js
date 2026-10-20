@@ -5,13 +5,9 @@ import {
   synchronize,
 } from '../libraryChange';
 
-export default function createLibrary(
-  snapshot,
-  { api = {}, notifyLikedSongsChanged = () => {} } = {}
-) {
+export default function createLibrary(snapshot, { api = {} } = {}) {
   function setCollection({ commit }, name, data) {
     commit('setCollection', { name, data });
-    if (name === 'songs') notifyLikedSongsChanged();
   }
 
   async function loadPlaylists(context) {
@@ -154,17 +150,13 @@ export default function createLibrary(
   }
 
   function updateFavoriteCollection(context, name, id, favorite) {
-    const collection = context.state.collections[name];
+    if (favorite) return;
     setCollection(
       context,
       name,
-      favorite
-        ? collection.map(item =>
-            Number(item.id) === Number(id)
-              ? { ...item, subscribed: true }
-              : item
-          )
-        : collection.filter(item => Number(item.id || item.vid) !== Number(id))
+      context.state.collections[name].filter(
+        item => Number(item.id || item.vid) !== Number(id)
+      )
     );
   }
 
@@ -268,63 +260,64 @@ export default function createLibrary(
           ]
         );
       },
-      async removePlaylistTracks(context, { playlistId, trackIds }) {
-        if (!context.rootGetters['session/hasAccount'])
-          return changeResult(accountRequired);
-        const outcome = await performLibraryWrite(() =>
-          api.addOrRemoveTrackFromPlaylist({
-            op: 'del',
-            pid: playlistId,
-            tracks: trackIds.join(','),
-          })
-        );
-        if (outcome.status !== 'succeeded') return changeResult(outcome);
-        const attempts = [
+      removePlaylistTracks(context, { playlistId, trackIds }) {
+        return write(
+          context,
           () =>
-            context.dispatch(
-              'playlistDetail/applyLibraryChange',
-              { type: 'tracks-removed', playlistId, trackIds },
-              { root: true }
-            ),
-          () => loadPlaylists(context),
-        ];
-        if (Number(playlistId) === Number(context.state.likedSongPlaylistID)) {
-          const removed = new Set(trackIds);
-          attempts.push(
-            () =>
-              setCollection(
-                context,
-                'songs',
-                context.state.collections.songs.filter(id => !removed.has(id))
-              ),
-            () =>
-              setCollection(
-                context,
-                'songsWithDetails',
-                context.state.collections.songsWithDetails.filter(
-                  track => !removed.has(track.id)
-                )
-              ),
-            () => loadSongs(context),
-            () => loadPreview(context)
-          );
-        }
-        return changeResult(outcome, await synchronize(attempts));
-      },
-      async addPlaylistTracks(context, { playlistId, trackIds }) {
-        if (!context.rootGetters['session/hasAccount'])
-          return changeResult(accountRequired);
-        const outcome = await performLibraryWrite(() =>
-          api.addOrRemoveTrackFromPlaylist({
-            op: 'add',
-            pid: playlistId,
-            tracks: trackIds.join(','),
-          })
+            api.addOrRemoveTrackFromPlaylist({
+              op: 'del',
+              pid: playlistId,
+              tracks: trackIds.join(','),
+            }),
+          () => {
+            const attempts = [
+              () =>
+                context.dispatch(
+                  'playlistDetail/applyLibraryChange',
+                  { type: 'tracks-removed', playlistId, trackIds },
+                  { root: true }
+                ),
+              () => loadPlaylists(context),
+            ];
+            if (
+              Number(playlistId) === Number(context.state.likedSongPlaylistID)
+            ) {
+              const removed = new Set(trackIds);
+              attempts.push(
+                () =>
+                  setCollection(
+                    context,
+                    'songs',
+                    context.state.collections.songs.filter(
+                      id => !removed.has(id)
+                    )
+                  ),
+                () =>
+                  setCollection(
+                    context,
+                    'songsWithDetails',
+                    context.state.collections.songsWithDetails.filter(
+                      track => !removed.has(track.id)
+                    )
+                  ),
+                () => loadSongs(context),
+                () => loadPreview(context)
+              );
+            }
+            return attempts;
+          }
         );
-        if (outcome.status !== 'succeeded') return changeResult(outcome);
-        return changeResult(
-          outcome,
-          await synchronize(trackAdditionUpdates(context, playlistId, trackIds))
+      },
+      addPlaylistTracks(context, { playlistId, trackIds }) {
+        return write(
+          context,
+          () =>
+            api.addOrRemoveTrackFromPlaylist({
+              op: 'add',
+              pid: playlistId,
+              tracks: trackIds.join(','),
+            }),
+          () => trackAdditionUpdates(context, playlistId, trackIds)
         );
       },
       async createPlaylist(

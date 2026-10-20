@@ -32,8 +32,8 @@ export function createPlaybackReporting({
       return;
     }
     if (event.type !== 'before-replace' && event.type !== 'ended') return;
-    const time = Math.floor(event.completed ? durationSeconds : event.position);
-    if (time < 1 || !event.recordOnce()) return;
+    if (!event.recordOnce()) return;
+    const time = Math.floor(event.position);
     submit(neteaseScrobble, { id: track.id, sourceid: event.source.id, time });
     const authorization = getLastfmAuthorization();
     if (

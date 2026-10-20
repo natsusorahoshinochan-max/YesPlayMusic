@@ -71,18 +71,20 @@ export function createPersistence(storage, language = 'en') {
     pending[key] = entry;
     return entry.promise;
   }
+  const saveData = state =>
+    write('data', {
+      ...data,
+      loginMode: state.session.loginMode,
+      lastRefreshCookieDate: state.session.lastRefreshCookieDate,
+      user: state.library.user,
+      likedSongPlaylistID: state.library.likedSongPlaylistID,
+      libraryPlaylistFilter: state.preferences.libraryPlaylistFilter,
+    });
   const save = state =>
     Promise.all([
       write('settings', state.preferences.settings),
-      write('data', {
-        ...data,
-        loginMode: state.session.loginMode,
-        lastRefreshCookieDate: state.session.lastRefreshCookieDate,
-        user: state.library.user,
-        likedSongPlaylistID: state.library.likedSongPlaylistID,
-        libraryPlaylistFilter: state.preferences.libraryPlaylistFilter,
-      }),
-    ]);
+      saveData(state),
+    ]).then(() => saved.settings);
   return {
     snapshot,
     save,
@@ -96,8 +98,15 @@ export function createPersistence(storage, language = 'en') {
       });
       ready.catch(() => {});
       store.subscribe((mutation, state) => {
-        if (/^(preferences|session|library)\//.test(mutation.type))
-          save(state).catch(() => {});
+        if (
+          [
+            'session/setIdentity',
+            'session/setLastRefreshCookieDate',
+            'library/setUser',
+            'library/setLikedSongPlaylistID',
+          ].includes(mutation.type)
+        )
+          Promise.resolve(saveData(state)).catch(() => {});
       });
     },
   };

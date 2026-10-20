@@ -89,13 +89,12 @@ export function createPlayback({
       );
     return result;
   }
-  function emit(instance, type, completed = false) {
+  function emit(instance, type) {
     // The previous instance remains eligible for its final handoff event even
     // when a newer target owns the selection operation.
     if (!instance || !instance.played || instance.released) return;
-    const position = completed
-      ? instance.durationSeconds
-      : instance.handle.position();
+    const position =
+      type === 'ended' ? instance.durationSeconds : instance.handle.position();
     let delivering = true;
     const event = freeze({
       type,
@@ -105,7 +104,6 @@ export function createPlayback({
       source: clone(instance.source),
       position,
       durationSeconds: instance.durationSeconds,
-      completed,
       recordOnce() {
         if (!delivering || instance.recorded || Math.floor(position) < 1)
           return false;
@@ -286,7 +284,7 @@ export function createPlayback({
           publish();
         } else if (type === 'end') {
           state.playing = false;
-          emit(instance, 'ended', true);
+          emit(instance, 'ended');
           publish();
           if (!state.isPersonalFM && state.repeatMode === 'one')
             void select(context, instance.track.id);
@@ -719,7 +717,6 @@ export function createPlayback({
     },
     archive() {
       return clone({
-        _progress: state.progress,
         _enabled: state.enabled,
         _repeatMode: state.repeatMode,
         _shuffle: state.shuffle,

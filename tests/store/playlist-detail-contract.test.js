@@ -17,7 +17,7 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-function fixture({ initialCount = 100, length = 200 } = {}) {
+function fixture({ initialCount = 100, length = 200, account = true } = {}) {
   let ids = sequence(length);
   const api = {
     getPlaylistDetail: jest.fn(async id => ({
@@ -38,7 +38,7 @@ function fixture({ initialCount = 100, length = 200 } = {}) {
     modules: {
       session: {
         namespaced: true,
-        getters: { hasAccount: () => true },
+        getters: { hasAccount: () => account },
       },
       library: createLibrary(
         { user: { userId: 7 }, likedSongPlaylistID: 0 },
@@ -56,6 +56,48 @@ function fixture({ initialCount = 100, length = 200 } = {}) {
     },
   };
 }
+
+test.each(['addPlaylistTracks', 'removePlaylistTracks'])(
+  '%s requires an account before writing or updating details',
+  async action => {
+    const { store, api, current } = fixture({ account: false });
+    await store.dispatch('playlistDetail/open', 10);
+    const ids = current().tracks.map(song => song.id);
+
+    await expect(
+      store.dispatch(`library/${action}`, { playlistId: 10, trackIds: [1] })
+    ).resolves.toEqual({
+      outcome: { status: 'denied', reason: 'account-required' },
+      synchronization: 'not-required',
+    });
+    expect(api.addOrRemoveTrackFromPlaylist).not.toHaveBeenCalled();
+    expect(api.userPlaylist).not.toHaveBeenCalled();
+    expect(current().tracks.map(song => song.id)).toEqual(ids);
+  }
+);
+
+test('confirmed removal updates details even when refreshing the collection fails', async () => {
+  const { store, api, current } = fixture();
+  await store.dispatch('playlistDetail/open', 10);
+  api.userPlaylist.mockRejectedValueOnce(new Error('collection offline'));
+
+  await expect(
+    store.dispatch('library/removePlaylistTracks', {
+      playlistId: 10,
+      trackIds: [1],
+    })
+  ).resolves.toEqual({
+    outcome: { status: 'succeeded' },
+    synchronization: 'incomplete',
+  });
+  expect(api.addOrRemoveTrackFromPlaylist).toHaveBeenCalledWith({
+    op: 'del',
+    pid: 10,
+    tracks: '1',
+  });
+  expect(current().tracks.some(song => song.id === 1)).toBe(false);
+  expect(current().playlist.trackCount).toBe(199);
+});
 
 test('confirmed addition with an incomplete detail refresh keeps the inserted song available to subsequent pagination', async () => {
   const { store, api, current, replaceIds } = fixture();

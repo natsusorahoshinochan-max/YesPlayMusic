@@ -1,5 +1,6 @@
 import { createStore } from '@/store';
 import { startApplication } from '@/application/startup';
+import { createLastfmOptions } from '@/application/lastfm';
 
 function memoryStorage(values = {}) {
   const entries = new Map(
@@ -79,12 +80,14 @@ async function setup({
   };
   const store = createStore({
     storage,
+    lastfm: createLastfmOptions(storage),
     language: 'zh-TW',
     credentials,
     session: { auth, navigate, notify, time },
     library: { api },
     preferences: { ...effects, ...preferences },
   });
+  await store.dispatch('session/restore');
   await store.dispatch('preferences/applyRestored');
   storage.setItem.mockClear();
   Object.values(effects).forEach(effect => effect.mockClear());
@@ -265,6 +268,54 @@ describe('session and preferences public contracts (#1 and #8)', () => {
     expect(persistedKeys(storage)).toEqual(['settings']);
   });
 
+  test('desktop settings are published only after saving succeeds, and a failed value can be retried', async () => {
+    const originalEnv = process.env;
+    const originalRequire = window.require;
+    const send = jest.fn();
+    process.env = { ...process.env, IS_ELECTRON: true };
+    window.require = () => ({ ipcRenderer: { send } });
+    try {
+      const { store, storage, effects } = await setup();
+      send.mockClear();
+      storage.setItem.mockImplementationOnce(() => {
+        throw new Error('storage unavailable');
+      });
+      await expect(
+        store.dispatch('preferences/setLanguage', 'tr')
+      ).rejects.toThrow('storage unavailable');
+      expect(send).not.toHaveBeenCalled();
+      expect(effects.applyLanguage).not.toHaveBeenCalled();
+
+      await store.dispatch('preferences/setLanguage', 'tr');
+      expect(storage.read('settings').lang).toBe('tr');
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledWith(
+        'settings',
+        expect.objectContaining({ lang: 'tr' })
+      );
+      expect(effects.applyLanguage).toHaveBeenCalledWith('tr');
+
+      send.mockClear();
+      const saving = deferred();
+      const setItem = storage.setItem.getMockImplementation();
+      storage.setItem.mockImplementationOnce((key, value) =>
+        saving.promise.then(() => setItem(key, value))
+      );
+      const change = store.dispatch('preferences/setLanguage', 'en');
+      for (let turn = 0; turn < 12; turn += 1) await Promise.resolve();
+      expect(send).not.toHaveBeenCalled();
+      saving.resolve();
+      await change;
+      expect(send).toHaveBeenCalledWith(
+        'settings',
+        expect.objectContaining({ lang: 'en' })
+      );
+    } finally {
+      process.env = originalEnv;
+      window.require = originalRequire;
+    }
+  });
+
   test('filter changes write only data and memory collections and QR display do not save', async () => {
     const { store, storage, time } = await setup({
       data: {
@@ -407,6 +458,7 @@ describe('session and preferences public contracts (#1 and #8)', () => {
       createStore: () =>
         createStore({
           storage,
+          lastfm: createLastfmOptions(storage),
           language: 'zh-TW',
           preferences: {
             clearCache,
