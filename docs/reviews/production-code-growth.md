@@ -1,8 +1,8 @@
 # 生产源码复杂度与缺陷审查
 
-审查版本：`0eb158bbc2be1eba2d46e558f6b8bd31d747007c`；生产源码与 `6c991784ed4f9838b132e48b356a602b4fb4a6f4` 相同。
+审查版本：`a09bc30de9cbda69de1a72eee48f6df8f8cb54de`；生产源码与 `6c991784ed4f9838b132e48b356a602b4fb4a6f4` 相同。
 
-**审查状态：本轮源码复杂度审查已完成，覆盖四个 spec、29 个关联 tickets 及四阶段变更并集中的 104 个生产文件。已确认问题、必要增长和待验证疑点分别记录；具体政策与真实 Web/Electron 运行边界见覆盖表，逐需求运行验收尚未完成。**
+**审查状态：调查完成。Q1–Q19 已逐项澄清为确认问题、排除项、后续交付范围或用户明确的补充目标；Q1/Q13 的新增行为要求由用户排除。范围复核后的五个独立子代理均无新增问题或疑点。覆盖四个 spec、29 个关联 tickets 及四阶段变更并集中的 104 个生产文件；真实平台运行边界按各条目保留，本结论为调查收敛，不宣称所有运行场景已验收。**
 
 依据 GitHub spec #1、#8、#17、#26 及关联 tickets 审查生产实现，不审查测试代码。分类为：目标功能所需增长、已确认冗余或缺陷、待验证疑点。代码增长和当前 UI 未使用某个结果字段，均不足以证明实现多余；明确契约必须保留。每项问题记录代码位置、需求依据、证据与建议。历史条目保留原编号，当前判断见各项。
 
@@ -75,7 +75,11 @@ E6 范围补证：windowOperations 的 inquiry 覆盖完整询问和保存，ipc
 
 可确认的耦合是装配依赖私有 mutation 名：改变资料提交方式时，必须同步维护播放器装配对交接完成的识别，否则歌词等待可能无法解除。身份等待与旧结果失效本身承担必要功能。本项与 F1 合并计为一个根因，不把等待位与接线整体计算为可删除面积。搜索动态订阅和资料变化观察服务不同的失效条件。上述歌词私有交接协议由 #26 引入；#1 的身份边界是其历史前提。
 
-#32 明确允许先接当前真实身份输入，待 #39 再接统一归属。因此当前 session/library 分离及临时装配本身不列为冗余；开始失效和交接等待还防止以新凭据配旧 userId 读取云盘歌词。问题限定为私有完成信号及 F1 已确认的失败出口遗漏，不要求提前实现后续身份重构。
+#32 明确允许先接当前真实身份输入，待 #39 再接统一归属。因此当前 session/library 分离及临时装配本身不列为冗余；开始失效和交接等待在无旧资料迟到的正常交接中等待新资料就绪。问题限定为私有完成信号及 F1 已确认的失败出口遗漏，不要求提前实现后续身份重构。
+
+等待保护边界：真实 Vuex/session/library/lyrics 配原 player.js:157–164 订阅规则，账号 A 的 loadApplication 资料挂起后登录 B，再先放行 A 资料、后放行 B 资料，云盘歌词请求的受控凭据/uid 依次为 A/1、B/1、B/2。library.js:85–87 的迟到 setUser 提前解除 B 的等待，lyrics/index.js:155–176 随即捕获混配身份。已确认该执行事实；该场景的范围已澄清：#1 明确排除旧请求结果屏蔽，#26 排除账号结果归属，#32 AC7 允许当前真实身份接合后再接 #39；[#27](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/27) §2/§7 已定义旧资料隔离。因此混配资料场景属于后续明确交付范围，不另列当前四个 spec 的缺陷。后续完成信号需对应当前身份交接，不能据此删除必要等待或另计三个消费者根因。
+
+失败出口补查：公开身份选择在加载前提交 user（session.js:171–177）；invalidate 与 logout 共用清理并提交空 user（library.js:208–210），均有解除等待的出口。daily 的成功、错误和 finally 以同一 operation 校验归属（dailyRecommendations.js:26–50）；搜索仅对歌曲分类应用身份失效（query.js:33–47），符合 #30 的分类边界。未发现 F1 式第二套完成等待。
 
 **4. 多份相关数据继续靠手工同步**
 
@@ -117,7 +121,7 @@ helper 在 favorite 为 true 时复制整个集合，给命中项增加 `subscri
 
 **L4：加载流程已共用，部分读取依赖与参数绑定仍重复。**
 
-位置：[library.js](../../src/store/modules/library.js):83、108–109、466–469 的身份检查及 `loadPlaylists → loadPreview` 顺序，88–104 与 238、257、385、396、407 的集合/API/limit 配对。普通加载和刷新各自维护前一依赖顺序；初次加载与写后刷新分别写出 albums/likedAlbums/2000、artists/likedArtists/2000、mvs/likedMVs/1000、cloudDisk/cloudDisk/1000。前三类配对和歌单预览双入口在 #1 已有；cloudDisk 写后刷新两处由 #8 新增，刷新本身服务 #14 集合同步，重复仅在参数绑定。
+位置：[library.js](../../src/store/modules/library.js):84、467 的身份检查，107–108、468–469 的 `loadPlaylists → loadPreview` 顺序，88–104 与 239、256、387、397、407 的集合/API/limit 配对。普通加载和刷新各自维护前一依赖顺序；初次加载与写后刷新分别写出 albums/likedAlbums/2000、artists/likedArtists/2000、mvs/likedMVs/1000、cloudDisk/cloudDisk/1000。前三类配对和歌单预览双入口在 #1 已有；cloudDisk 写后刷新两处由 #8 新增，刷新本身服务 #14 集合同步，重复仅在参数绑定。
 
 [#4](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/4) 要求场景入口共用内部实现、真实读取依赖集中表达。当前 loadApplication/loadPage 已共用 loadLibrary，loadCollection 也统一校验和提交；确认剩余重复仅为上述依赖顺序和参数知识，不是两套完整加载流程。简化方向限于减少同一读取规则的维护位置。
 
@@ -190,7 +194,7 @@ L1 只记录普通 add/remove 的公共控制流重复，L4 只记录读取顺�
 
 消费者支持进一步收窄：[background.js](../../src/background.js) 127–129 的 /player 读取全局完整快照，应保留更新；桌面 player IPC 的 [mpris.js](../../src/electron/mpris.js) 32–40、[touchBar.js](../../src/electron/touchBar.js) 52–57 只消费 playing/liked，消费者已取得初始状态后的相同投影发布属于优化候选。收藏 IPC 经 [ipcMain.js](../../src/electron/ipcMain.js) 236–238 到 [tray.js](../../src/electron/tray.js) 161–164，Linux 无条件 setContextMenu，所以上述无关变化还重复重设菜单；Windows 仅更新字段。位置发布保留曲目/duration、播放状态及原 progress/seek 节奏，纯音量、模式、队列与 loading 的位置效果属于收窄范围。
 
-范围限制：消费者首次建立时仍需取得当前值。真实 platform/MPRIS 组合中，playing=true 的首发早于 createMpris 时，MPRIS 未收到 playbackStatus；随后音量变化触发的同值发布才补齐 Playing。[background.js](../../src/background.js) 336–350、372–393 先 loadURL，再等待代理恢复和 DBus 后建立原生消费者，因此不能直接删除所有同值发布而忽略初始化交接。这里确认的是收窄建议的约束；实际原生启动与重建行为仍待验证。
+范围限制：消费者首次建立时仍需取得当前值。真实 platform/MPRIS 组合中，playing=true 的首发早于 createMpris 时，MPRIS 未收到 playbackStatus；随后音量变化触发的同值发布才补齐 Playing。[background.js](../../src/background.js) 336–350、372–393 先 loadURL，再等待代理恢复和 DBus 后建立原生消费者，因此不能直接删除所有同值发布而忽略初始化交接。首次交接遗漏已另列 F25；实际原生启动与重建行为仍属于运行验收边界。
 
 **B2：平台元数据键与发布判断重复。**
 
@@ -253,18 +257,20 @@ startup 把 reader 同时交给 musicData 和 createPlayer；搜索另定义一�
 | 已确认范围 | 位置与证据 |
 | --- | --- |
 | 同步入口重复检查 | 276 的 event 已检查操作、当前实例和 released，295 同步调用唯一的 handleError 入口，373 再检查操作与当前实例；中间没有 await。由 `15a6fefa` 引入，属于局部重复。 |
-| 已确认的实例归属缺陷 | 372–383 的起点检查实例，313–318 的异步完成只检查操作编号。双 playerror 的迟到恢复可替换同操作下已经成功的新实例，使位置从 7 回到 0；执行证据见生命周期补查。本项包含实际缺陷，不能只按重复检查处理。 |
+| 已确认的实例归属缺陷 | 372–383 只在恢复起点校验来源实例；成功完成的 313–318 和失败完成的 348–369 仅验证操作编号。双 playerror 启动同操作的两份恢复后，迟到成功可再次替换已成功实例；迟到设备应用失败则经 failSelection/stopCurrent 释放已成功实例，清零进度并提示失败。本项包含实际缺陷，不能只按重复检查处理。 |
 | 失败收尾覆盖分散 | `c4ed48a` 新增 124–140 的 stopCurrent/failSelection，把 select、loadFM、runSelection 三处 catch 改为释放 current，由此引入 F3 的交接后附属失败扩大处理。F12 的内部耗尽仅 pause/publish 在该提交之前已有；此次只给外部 runSelection 补 unavailable 清理，保留了内外收尾不一致。 |
 
 这里的维护负担是同一播放链需结合事件入口、异步完成、外层结果处理才能确定归属与释放范围。简化方向限于减少同一路径重复判断，并统一核查各失败路径的实际作用域；未制定新的状态模型或接口。
 
 排除范围：各 await 后的 valid 检查承担过时结果防护；外部增加操作编号、内部沿用编号是明确要求。核心 released 与 adapter disposed 保护不同对象，准备失败时还未建立实例；stopCurrent 的两次检查之间有外部上报回调，需考虑重入。以上均不能按检查次数计为冗余。F14 另说明公开 playing 被用于判断尚未完成的播放请求存在缺口，公开播放状态本身仍必需。
 
+失败交接补证：真实 Playback/audioAdapter 配受控 Howler/设备 I/O，Howl1 连发两次 playerror，Howl2 的 setSinkId 挂起，Howl3 成功并 seek(7)；随后 Howl2 拒绝 sink-denied。拒绝前 playing=true、position=7、unloaded=[true,false,false]，之后 playing=false、position=0、unloaded=[true,true,true]，并发出 failed/sink-denied。adapter.js:108、115–117 正确释放自己的失败准备，核心 catch 却继续释放当前 Howl3。对照在迟到拒绝前外部 playTracks([2])，曲 2 仍 playing=true、position=7，未被释放或提示失败。缺口限定于同操作内部恢复，成功与失败交接均须遵守实例归属；真实设备拒绝条件仍待验证。
+
 **D4：媒体错误的跳歌、重新取源和提示条件跨层维护。**
 
 位置：[audioAdapter.js](../../src/playback/audioAdapter.js):85–96 与 [playback/index.js](../../src/playback/index.js):353–383。adapter 用“非 3/4”生成 retryable；准备 catch 据此重新取源，并另外判断 3/4 跳歌、4 提示；后续 handleError 再维护同样的跳歌、提示及其他错误重新取源政策。后续分类来自 `15a6fefa`；`ab69926` 加入准备 catch 分类，`dfcb82d` 调整条件，`d1c543d` 再加入 retryable 交接。基线单个 loaderror 分支已有这套政策，新增问题是拆分后的多处维护。
 
-这不只是重复数字：新增一种应跳歌的媒体错误，需要同时检查 adapter 的 retryable 排除条件、准备 catch 和后续 handleError；专门提示也需同步两处核心条件。[#17](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/17)、[#20](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/20) 要求播放模块决定失败策略，adapter 封装音频平台；策略分类现在分布在两层、三处。
+当前 code 3/4 的跳歌分类分别维护在 adapter 的 retryable 排除条件、准备 catch 与后续 handleError，code 4 的提示条件在两处核心分支重复。[#17](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/17)、[#20](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/20) 要求播放模块决定失败策略，adapter 封装音频平台；策略分类现在分布在两层、三处。
 
 确认范围仅为分类与政策维护分散，简化方向是减少同一政策的多处定义。准备期释放自身资源、后续错误校验有效实例是不同职责，不能合并计为冗余。retryable 还区分 Howler 媒体事件与构造、设备等普通异常，不能直接删除标记。应用接合的提示文案也有独立用途。本项承接 Q16 的结构核查，不新增功能缺陷。
 
@@ -284,14 +290,14 @@ startup 把 reader 同时交给 musicData 和 createPlayer；搜索另定义一�
 
 **当前确认问题**
 
-F1–F19 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已注明边界的优化候选。确认事实与尚待判断的简化范围分别见各项。各项标明源码确认或执行复现；模块复现使用当前生产代码及受控 I/O，未以旧测试通过作为结论依据。
+F1–F30 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已注明边界的优化候选。确认事实与尚待判断的简化范围分别见各项。各项标明源码确认或执行复现；模块复现使用当前生产代码及受控 I/O，未以旧测试通过作为结论依据。
 
-**F1：账号资料失败后，歌词的身份等待永久不结束。**
+**F1：账号资料失败后，歌词身份等待不能通过切歌或重试结束。**
 
 - 位置：[session.js](../../src/store/modules/session.js) 76–84；[library.js](../../src/store/modules/library.js) 83–87；[player.js](../../src/application/player.js) 157–164；[lyrics/index.js](../../src/lyrics/index.js) 146–158、182–185。
 - 需求：[#26 §6](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/26)、[#32 AC2/AC6](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/32)，真实身份交接、普通/云盘读取与当前消费者重试。
 - 证据：登录先置 `identityPending=true` 并清空 track，仅 `library/setUser` 能解除等待；资料失败时无该 mutation。真实 createStore + createPlayer 的公开操作序列为 `playTracks([1]) → loginWithPassword（认证成功、资料请求失败）→ playTracks([2]) → lyrics.retry()`。初始 `{trackId:1, lyrics:'ready', calls:[1]}`，最终 `{hasAccount:true, trackId:2, lyrics:'idle', lyricTrackId:null, calls:[1]}`。另一组真实 session/library/lyrics 组合独立得到相同结果。
-- 影响：新歌正常选中，普通歌词不再请求；页面仅在 failed 状态显示重试，idle 下没有恢复入口。这是 #26 新增等待协议的失败出口缺失。
+- 影响：新歌正常选中，普通歌词不再请求；页面仅在 failed 状态显示重试，idle 下没有歌词恢复入口。后续成功资料提交或退出可以解除等待；这是 #26 新增等待协议在该失败路径上的出口缺失。
 - 建议：按 I1 的语义交接修复。普通歌词可用时继续读取；云盘缺少必要身份时表达可恢复状态，保留旧结果失效。此问题与 I1 共用根因，不重复计数。
 
 **F2：同歌单迟到重读恢复了后来已确认删除的歌曲。**
@@ -375,7 +381,7 @@ F1–F19 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已�
 - 需求：[#20](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/20)、[#22](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/22) 的自然结束、失败跳歌、正确资源交接及公开播放控制。
 - 证据：真实核心安装 `[1,2,3]`，仅曲 1 有音源并播放成功。曲 1 onEnd 后，曲 2/3 均无源，内部 advance 耗尽。此时 `{currentTrackID:3,playing:false,sourceInfo:null,disposeCount:0}`；操作已结束后调用公开 play，音频 handle 1 再次播放，结果 `{currentTrackID:3,playing:true,sounds:[1,1]}`。独立重跑同样复现。
 - 原因：外部 runSelection 在 unavailable 时有旧实例收尾；自然结束直接调用 advance，耗尽分支仅 pause/publish，保留了已与公开曲目不匹配的 current。
-- 建议：失败遍历的终止路径统一清理或明确恢复当前音频与状态归属，避免对已失配实例继续暴露 play。仅清理失配实例，保留正常到达队尾后重播当前歌曲的能力；保留外部选曲和内部自动跳歌的同一操作编号，无需新增选择队列。
+- 建议：在失败遍历结束时处理已失配实例，保证公开 play 操作与当前有效音频一致。正常队尾重播与该失配路径分开判断；保留外部选曲和内部自动跳歌的同一操作编号。
 - 对照：外部 playTracks 请求全无源时，off/on 模式均正确释放旧实例；缺陷限定于内部自然结束后的失败遍历，不扩写为所有取源失败。
 
 **F13：代理恢复失败中断无关桌面初始化。**
@@ -384,7 +390,7 @@ F1–F19 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已�
 - 需求：[#8](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/8)、[#11](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/11) 恢复已保存代理并共用应用规则；菜单、快捷键、Touch Bar、MPRIS 保留各自平台能力。
 - 判定依据：拒绝条件下的启动阻断已确认；隔离无关初始化是职责分析得出的修复建议，#11 未明文指定代理恢复失败政策。
 - 证据：执行真实 handleAppEvents 的 ready 回调与 restoreProxy，仅替换宿主 I/O。成功顺序为 window/window-events/ipc/updates/tray-theme/shortcuts-and-menu/dock-menu/touchbar/mpris；setProxy 拒绝后只出现 window/window-events/ipc，后续均未执行。async ready 监听没有该步骤的错误收尾。
-- 建议：代理恢复在本步骤报告失败并收尾，让无关平台初始化继续；不增加重试框架，也不把整个 ready 包成失败后直接结束。共用代理函数本身是必要职责，问题是装配新增的成功依赖。
+- 建议：限制代理恢复的失败作用域，保留既有错误传播或诊断，使独立平台初始化不依赖代理成功。共用代理函数本身是必要职责，问题是装配新增的成功依赖；不指定新的提示、代理回退或重试。
 - 验证边界：已证明拒绝条件下的生产控制流；真实 Electron 中可触发的 setProxy 拒绝条件和界面表现尚待验证。
 
 **F14：异步 play 事件到达前重复 Play，会在同一 Howl 建立两个活跃声音。**
@@ -431,11 +437,12 @@ F1–F19 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已�
 - 艺人路径：[artist.vue](../../src/views/artist.vue) 214–217、281–283、322–330。真实 SFC/Vuex/library 组合中，艺人 101 的收藏挂起，经原 beforeRouteUpdate/loadData 载入未收藏的 202，再放行旧成功结果；唯一远端写入是 `{id:101,t:1}`，当前 202.followed 却变为 true。await 后写 `this.artist`，没有核对它是否仍是提交对象。
 - 弹窗路径：[ModalAddTrackToPlaylist.vue](../../src/components/ModalAddTrackToPlaylist.vue) 76–95。曲目 1 加到歌单 55 挂起，关闭后为曲目 2 重开弹窗，旧成功结果关闭新弹窗。请求仍正确提交曲目 1；无条件 close 操作的是当前展示批次。
 - 专辑路径：[album.vue](../../src/views/album.vue) 174–177、242–249、277–296。原 loadData(101) 后收藏挂起，原路由更新钩子载入 202；101 成功后 202.isSub 从 false 变为 true。替换发生于原读取方法消费受控 API 响应，未直接替换页面业务状态。
+- MV 路径：[mv.vue](../../src/views/mv.vue):66–68、107–109、134–141。真实 Vue/Vuex/library 配原 SFC，getData(101) 后收藏挂起，原 beforeRouteUpdate 载入 202；唯一远端写入为 {mvid:101,t:1}，旧成功使当前 202.subed 从 false 变为 true。页面切换仍通过原读取方法消费受控响应。
 - 创建路径：[ModalNewPlaylist.vue](../../src/components/ModalNewPlaylist.vue) 71–89。提交 First draft 后关闭并重开，输入 Second draft/private=true；旧创建成功使新弹窗 show=false、title=''、private=false。执行使用原 SFC 方法及根 updateModal mutation。
 - 导航路径：[playlist.vue](../../src/views/playlist.vue) 468–473。删除 101 挂起，真实 VueRouter abstract history 从 /home→/playlist/101→/playlist/202，载入 202 后旧删除成功执行 go(-1)，导航退回 101。未挂载 router-view，此样本仅确认旧回调改变当前导航。
 - 建议：实体页核对发起路由及目标展示归属。album.vue:277–296 分别读取 album 与 dynamicDetail；202 的 dynamicDetail 先返回、album.id 仍为 101 时，旧 101 成功结果可通过单独的实体 ID 检查，继续污染 202 展示。仅核对实体 ID 不足；严格引用相等也需保留同实体同路由重读后的合法成功。弹窗按展示批次约束关闭/清理，导航核对发起路由。批次需覆盖外部 updateModal，且同步捕获关闭重开；真实 Vue 同栈 false→true 对照中普通 watcher 计数 0、同步 watcher 计数 2。仅比较歌曲 ID 无法区分同曲重开。
 - 修复约束：不能每次提交都提升全局代次。同对象两次请求、后请求拒绝而先请求成功时，latest-only 会丢弃合法成功；同展示的独立写入也应各自完成反馈及 library 同步。归属检查只约束当前展示效果。
-- 归因与边界：五条路径均在 `01f2de1` 已存在，重构保留了该结果归属缺口，未算新增复杂度。确认来自生产模块与原页面方法组合，浏览器交互待复核；MV 收藏仅有类似源码形状，未执行确认。
+- 归因与边界：艺人、专辑、添加、创建、删除导航五条路径均在 `01f2de1` 已存在，重构保留了该结果归属缺口，未算新增复杂度。MV 已补执行确认，其首次引入阶段未另行证明。确认来自生产模块与原页面方法组合，浏览器交互待复核。
 - 正向对照：新建歌单当前在 await 前捕获待加曲目，已消除基线创建完成后再读取可变选择的错加风险。TrackList 普通远端写入在 await 后只反馈，没有重新选择远端目标。
 
 **F19：相同身份的资料刷新触发搜索失效，清空合法结果并关闭分页。**
@@ -450,14 +457,106 @@ F1–F19 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已�
 - 横向边界：真实 store/player/library/daily/lyrics 组合中，同值 profile 重载后歌词代次/请求保持 2/1，daily 保持 loaded/请求 1；预览的一次请求来自显式 loadApplication 自身。vipType 改变后歌词代次/请求变为 3/2。仅 musicSearch 使用对象型 deep watcher；metadata 按调用取身份，没有同类监听。F19 不扩为所有身份消费者缺陷。
 - 关联边界：与 F1 的私有 mutation 解锁不同。认证后资料失败时，daily 可重新 load、search 可重新 replace；只有 lyrics 挂在 identityPending。公开身份选择和 logout 均有 setUser 完成交接，未复现相同挂起。
 
+**F20：旧音乐库集合读取覆盖后来已确认的取消收藏或删除。**
+
+- 位置：[library.js](../../src/store/modules/library.js):31–46 的预览读取提交、49–52 的喜欢 ID 读取提交；写入接线为 111–131、291–309、411–459。
+- 需求：[#8](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/8) 的已确认本地变化、受影响集合更新及完成条件，[#13](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/13) 的删除后同步、[#14](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/14) 的喜欢集合与预览维护，以及 [#15](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/15) 的添加后同步。全部执行均保持同一账号。
+- 预览证据：真实 Vue/Vuex/library/playlistDetail/libraryChange 配受控 API，喜欢歌曲 1 后挂起预览 metadata，随后取消喜欢完整结束，结果 succeeded/completed、songs=[]、songsWithDetails=[]。放行旧 metadata [1] 后，旧操作也返回 succeeded/completed，最终 songs=[]、songsWithDetails=[{id:1}]。
+- ID 证据：向喜欢歌单 9 添加歌曲 1 成功，挂起其 userLikedSongsIDs；随后删除歌曲 1 完整结束，结果 succeeded/completed、songs=[]。放行旧响应 {ids:[1]} 后，songs=[1]，旧添加操作同样返回 completed。
+- 其他集合覆盖：原模块六组执行先加载含条目 20 的集合，再挂起第二次 loadApplication 的目标集合读取；取消收藏/删除及第三次读取完成后，结果均为 succeeded/completed，最后放行第二次旧读取。albums、artists、mvs 从 [] 恢复为 [{id:20}]，cloudDisk 从 [] 恢复为 [{songId:20}]；playlists 的取消收藏与删除两条路径均从 [{id:9}] 恢复为 [{id:9},{id:20}]。另五组先收藏/上传、挂起写后刷新，再取消/删除，也复现相同覆盖。覆盖点为 library.js:17–27、55–58，普通加载入口 83–108，写入口 212–268、381–407。
+- 可达入口：[Player.vue](../../src/components/Player.vue):56、248–249 与 [TrackListItem.vue](../../src/components/TrackListItem.vue):239–240 未在等待时禁止再次提交喜欢操作；[library.vue](../../src/views/library.vue):25–26、34–39 分别展示喜欢 ID 数量与预览。
+- 其他集合入口：album.vue:244、artist.vue:324、mv.vue:136、playlist.vue:431、471、TrackList.vue:266 提交对应写入；library.vue:313–325 激活时重新加载。无需账号切换或打开匹配详情即可复现，未推断真实服务缓存一致性或详情最终状态。
+- 原因与方向：synchronize 等待任务结束并分类失败，各读取却直接覆盖集合，未核对期间已确认的修改。应让读取交接保留后来确认的成员变化。F2 位于 playlistDetail，本项位于 library；只修复详情归属无法覆盖此处。喜欢 ID、预览和详情仍服务不同消费者，独立尝试和写入/同步结果分离均须保留。
+- 归因与边界：读取主体可追溯至 #1 的 `89fd002b`，#8 增加校验及写后同步接线；尚未证明缺陷首次出现的阶段，不计为已证实新增复杂度。浏览器响应排序复现未完成。未知喜欢歌单 ID 时，预览与匹配详情确实都依赖 identifyPlaylist 的共享 Promise，此等待未列为重复协调。
+
+**F21：进度保存失败阻断已经完成的 seek 平台输出。**
+
+- 位置：[playback/index.js](../../src/playback/index.js):592–597 先改变实际位置和快照，再交付 onProgress；[application/player.js](../../src/application/player.js):137–143 先保存进度，再更新歌词及平台；[playerStorage.js](../../src/application/playerStorage.js):45–46 直接调用存储；核心 65–73 的 safe 捕获整个接收函数的异常。
+- 需求：[#17](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/17) 操作表定义 seek 为“调整播放位置及相应平台输出”；[#24](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/24) 要求操作、状态转换及音频事件显式触发所需保存及输出。平台输出被存储成功阻断没有目标依据。
+- 证据：原 Q14 的真实 createPlayer/Playback/storage/lyrics/reporting 组合中，仅进度保存抛错时，核心 seek 已到 7，平台未收到 progress=7；歌词仍在第一行。此项确认限定为 seek 的平台交接缺口。另一组存档保存抛错后播放仍 completed、dispose=0，但歌词 trackId=null、平台只有初始曲目 0，作为相邻输出串联证据保留。
+- 方向与必要职责：实际进度、进度保存及平台通知各有消费者；应避免保存失败跳过已完成位置变化的通知。核心 safe 保持播放运行是必要保护，但未处理接收函数内部的失败作用域。不能因该缺口删除保存、歌词或平台输出，也未由此推导所有步骤必须并行。
+- 范围：由 Q14 的既有执行证据与明确需求升级，未新增根因。相同失败作用域也跳过 [#32 AC3/AC6](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/32) 要求接合的歌词 seek 更新，合并归入本项；证据限定为该次位置交接被跳过，运行中的歌词时钟可能随后补正。存储失败的反馈与重试目标已由用户明确，集中见 U4；实体浏览器存储故障尚未复现。
+
+**F22：晚到的启动快捷键恢复覆盖正在进行的录制暂停。**
+
+- 需求：[#12 AC4–AC7](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/12) 要求录制期间暂停全局快捷键、结束后恢复，并共用启动和运行时应用规则。
+- 位置：[background.js](../../src/background.js):327–352 先创建窗口、安装 IPC，再等待代理恢复；358–365 随后以固定 recording=false 应用快捷键。[electron/preferences.js](../../src/electron/preferences.js):5–8 因此重新注册，而 [store/modules/preferences.js](../../src/store/modules/preferences.js):132–138 仍持有正在录制的状态。
+- 证据：真实 Background.handleAppEvents、initIpcMain、restoreProxy、Vuex/preferences 及 Electron preferences/globalShortcut/menu，仅替换宿主和平台 I/O。挂起 session.setProxy 后开始录制，recording={id:play,type:globalShortcut}、平台注册数为 0；放行代理成功后，录制状态未变，注册数成为 7。正常结束录制后 recording=null、注册数仍为 7。
+- 可达链：background.js:226–239 的 loadURL 未等待代理，328–330 的 ready-to-show 独立显示窗口；main.js:56–105、startup.js:29–35 挂载也不等待该恢复；settings.vue:705、1409–1416 没有相应启动门槛。真实 Electron 中代理延迟持续到用户开始录制的条件待原生验证。
+- 归因与方向：固定启动控制来自 5da4213e，前置异步等待来自 39d69dc7，均在 #8。启动恢复应尊重已接收的当前录制控制，保留共享平台应用函数和结束恢复能力。F13 是失败阻断，本项是成功迟到覆盖实时控制，根因独立。
+
+**F23：同曲歌词完成后的 metadata 发布短暂清零 MPRIS 位置（原 Q19）。**
+
+- 需求：#17/#24 的位置输出与 #32 的写词/metadata 顺序；[MPRIS Position 契约](https://specifications.freedesktop.org/mpris/latest/Player_Interface.html#Property:Position) 要求当前曲目的微秒位置。安装 mpris-service 的 player.js:102–110 直接读取 getPosition。
+- 位置：[mpris.js](../../src/electron/mpris.js):42–44 无条件置零；[playbackPlatform.js](../../src/application/playbackPlatform.js):176–193 在同曲歌词完成后重新发布 metadata。
+- 证据：真实 Playback/sourceOperations/lyrics/parser/platform/mpris，受控平台 I/O，暂停后 seek(7)，歌词完成并确认写词；实际及快照位置保持 7，getPosition 从 7000000 变为 0，下一次一秒采样恢复。独立复验真实 mpris 同曲 position→metadata 得到同样结果。协议输出已错误，Linux 客户端闪跳与 OSD 影响仍未实测。
+- 方向与归因：区分新曲交接与同曲内容更新，保留写词顺序、归属和采样。清零基线已有，#26 增加歌词驱动的重发；首次触发阶段未证明。与 R10/F21 的重复事件及保存失败根因不同。
+
+**F24：队尾自然结束后重新播放沿用旧记录标记（原 Q11）。**
+
+- 需求：[#17](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/17) 的听歌记录条款及 [#23 AC2/AC3](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/23) 要求自然结束触发，去重范围为同一次播放的自然结束与随后切歌。
+- 位置：[playback/index.js](../../src/playback/index.js):109–113 的 recorded 属于实例；213–217 队尾保留实例；583–585 的 play 复用它。
+- 证据：真实 Playback/sourceOperations/reporting，受控音频事件及请求，两次完整播放分别自然结束，Now Playing=2，网易云与 Last.fm 记录各=1。第二次已实际播放并结束，却被第一次的 recorded 吞掉。暂停恢复及重复事件去重仍必需。
+- 方向：让一次完整播放的记录边界与重复自然结束事件的保护相符，避免把音频实例寿命直接等同一次播放。与 F12 的失败耗尽路径不同；未发送真实第三方上报。
+
+**F25：晚注册的原生消费者缺少初始状态交接。**
+
+- 需求：[#24 AC1/AC4](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/24) 的启动接线及中间、最终桌面输出。
+- 位置：[background.js](../../src/background.js):327–352 先启动 renderer 再等待代理，372–393 才建立原生消费者；[mpris.js](../../src/electron/mpris.js):32–60 仅监听后续事件；[playbackPlatform.js](../../src/application/playbackPlatform.js):198–253 按事件发布且去重 metadata，没有消费者就绪后的读取或重放。
+- 证据：真实 platform/mpris，Electron 事件和原生服务 I/O 受控。先发布曲 1、playing=true、progress=7，再建立 MPRIS，status/metadata 均为空；progress=8 不补齐；音量变化只补 Playing，metadata 仍为空且全程仅发送一次。全生产检索未找到主动取当前快照入口；background 的独立 /player HTTP 读取未被消费者调用。
+- 方向：在消费者就绪时交付当前快照，保留后续变化去重。B1 的全量同值通知不能承担可靠初始化；该缺口与 B1 重复发布同处一条链，不能将修复成本计为可删除面积。原生 Linux 启动时序影响尚未实测。
+
+**F26：待播页保留旧身份的权限显示（原 Q3）。**
+
+- 需求：[#18 AC2](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/18) 的可播放映射及 [#22 AC3](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/22) 的待播资料展示；#17 允许受控身份和远端响应验证。
+- 位置：[next.vue](../../src/views/next.vue):85–96 只追加未知 ID，未随身份重算旧对象；[track.js](../../src/api/track.js):37–40 只在读取时映射；[TrackListItem.vue](../../src/components/TrackListItem.vue):6、142–143、196–200 直接消费旧 playable/reason。
+- 内置浏览器证据：真实本地应用与组件，API 为隔离本地 fixture，两个不同 ID 的曲目均 fee=1/pl=0。访客时加入 900000001，行 class 含 disable、title=VIP Only；通过真实 mutations 提供受控 account/VIP11 身份后加入 900000002，旧行仍灰色及 VIP Only，新行正常且 title 为空。DOM 与截图一致；未登录真实账号或测试远端播放权限，队列及受控身份已清理。
+- 归因与方向：基线 01f2de1 已只向页面追加新 ID；209322f 又增加读取前 loaded 过滤。旧对象保留是遗留缺口，新过滤进一步绕过统一读取及后台刷新。按当前身份更新展示投影，同时保留队列行身份和有限 upcoming；不可据此要求删除所有必要缓存。
+
+**F27：凭据解析依赖非标准的 Cookie 尾分号（原 Q8）。**
+
+- 需求：#1/#5 的真实登录凭据接合；[RFC 6265 §4.1.1](https://www.rfc-editor.org/rfc/rfc6265#section-4.1.1) 允许最后属性为 HttpOnly 且无尾分号。
+- 位置：[credentials.js](../../src/application/credentials.js):13–18 只按双分号拆分。安装 API 4.29.7 的 login_cellphone/login_qr_check/login_refresh 以 cookie.join(';') 交付，util/request.js:316–318 只移除 Domain，不补尾分号。
+- 证据：真实 request→login_cellphone→adapter 组合，两个受控合法 Set-Cookie 的末项为 HttpOnly 时仅保存 __csrf；末项添加尾分号时两项均保存。合法协议输入经过真实包装层后触发解析丢失，足够确认本地输入契约缺口；未取得真实账号成功响应，不声称所有实际登录都会失败。
+- 方向：让凭据适配与生产 API 的交付表示一致，不以双分号作为未声明分隔保证。保留凭据字段及持久化职责，不展开登录尝试隔离。
+
+**F28：已接受的歌曲响应经过缓存往返后变成不可读取数据（原 Q9）。**
+
+- 需求：#17 元数据流程及 [#18 AC1–AC3](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/18) 的命中可用、统一转换与后台刷新。
+- 位置：[track.js](../../src/api/track.js):53–58 缓存缺失 privilege；[db.js](../../src/utils/db.js):87–96 在命中时生成含 undefined 的 privileges；[common.js](../../src/utils/common.js):39 直接读取 item.id。
+- 证据：songs=[{id:987,fee:0}]、privileges=[] 经真实读取入口首次成功返回并缓存；再次读取命中后形成 [undefined]，转换抛错且后台刷新未启动。依赖 API 类型分别定义两个数组，未规定逐 ID 全覆盖；当前入口也已经接受这一输入。确认范围为本地成功读取到后续缓存命中的契约不一致，无需推断网易服务产生缺项的频率。
+- 方向与归因：统一缺失权限项的转换和缓存表示，保持首次成功结果可再次读取。关键缺项及 item.id 读取在基线已有，不计为四阶段新增缺陷，也不扩展为通用损坏修复。
+
+**F29：两个已确认喜欢结果重复追加同一成员（原 Q18）。**
+
+- 需求：#8/#14 的成功后应用已确认本地变化、维护喜欢集合与预览；受控响应是规格允许的验证边界。
+- 位置：[library.js](../../src/store/modules/library.js):411–415 捕获 like，431–437 在每次成功后直接追加 ID；[Player.vue](../../src/components/Player.vue):56 允许等待期间再次提交；[library.vue](../../src/views/library.vue):26 按数组长度展示数量。
+- 证据：真实 Vue/Vuex/library/playlistDetail，两次同曲请求都捕获 like=true，分别收到 code200 并完成同步，结果均 succeeded/completed；songs=[1,1]，预览只有一首，数量为 2。API 文档规定 like 为目标布尔值及 code200 成功。这里确认两个已确认结果的本地成员维护不幂等，未验证真实服务是否会连续返回成功，也不引入远端顺序保证。
+- 方向与归因：按 ID 幂等维护成员并保留每次确认后的同步；无需全局写队列。01f2de1 已有 push(id)，属于遗留规则。无需旧读取覆盖，与 F20 独立。
+
+**D5：UNM 字节/URL 表示由两端不同判据决定（原 Q17）。**
+
+- 需求：#17/#20 的音源交付与资源职责。[ipcMain.js](../../src/electron/ipcMain.js):169–170 按 bilivideo.com 域名编码字节，[audioResources.js](../../src/playback/audioResources.js):39、42、48 按 source=bilibili 解码。
+- 协议核查：安装 rust-napi 0.4.0 对应 [server-rust v0.4.0 固定提交](https://github.com/UnblockNeteaseMusic/server-rust/tree/477318fa3ab6861bb44d404871bb6d2bfee85498)。engines/bilibili 固定 source=bilibili，但 api/typing.rs 仅取 cdns[0] 并改协议，未约束域名；engines/ytdl 固定 source=ytdl，URL 来自可配置命令，同样无域名保证。上游未保证两判据等价，跨层隐含表示约定已确认。
+- 方向与边界：在交付边界明确表示类型，避免编码与解码分别猜测。受控 bilibili 字节及普通 URL 对照通过；未宣称真实服务已触发错误。两规则由旧实现迁入，不计为新增策略，也不因两次转换本身判冗余。上游保证疑问已澄清，实际故障频率不作为未决产品政策保留。
+
+**F30：OSD DBus 初始化失败阻断独立 MPRIS 消费者。**
+
+- 需求：[#24 AC4/AC5](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/24) 的桌面输出和 MPRIS 接合；[#32 AC5/AC6](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/32) 的 Linux 写词握手及失败路径。
+- 位置：[background.js](../../src/background.js):377–393 在 spawn(osdlyrics) 和 createMpris 前 await createDbus；[mpris.js](../../src/electron/mpris.js):105–118 的 getProxyObject 及 getInterface 位于写词错误收尾之外。
+- 证据：真实 handleAppEvents 的 ready 方法及 createDbus，宿主/DBus I/O 受控，代理恢复成功。getProxyObject 成功时依次调用 spawn、mpris；拒绝 OSD service unavailable 后这两项调用均为零，ready 直接拒绝。OSD 失败阻断系统播放器能力已确认；未运行真实 Linux DBus，实际启动出现频率未测。
+- 方向与关联：把 OSD 接合失败限制在其能力范围，并继续独立 MPRIS 初始化。与 F13 同属串联初始化失败作用域，但触发点是代理成功后的另一个服务；与 F25 的晚注册漏收也不同。保留写词内容、确认关联及超时收尾，不扩展重试框架。
+- 归因：git blame 及基线 01f2de1 的 background.js:429–445 均已有 await createDbus → spawn → createMpris 顺序，属于遗留联动，不能计为重构新增复杂度。
+
 **已确认问题的机制关联**
 
 | 机制 | 证据关系与调查边界 |
 | --- | --- |
 | 操作选择与完成时的对象脱节 | F17 是位置身份随队列变化失效，F18 是实体/展示批次被替换；均需在结果应用处核对原操作对象。菜单版本不能靠截断展示数组判断，页面也不能用一个全局代次取消所有独立写入。 |
 | 播放实例的阶段边界不完整 | F3 把交接后的附属操作失败当作整体失败，F12 内部失败遍历漏收尾，F14 一个 handle 包含多个声音却共享结束/记录身份。修复应分别限定失败作用域、统一终结收尾、绑定实际声音，而非再增加一套播放器状态镜像。 |
-| 持久化、镜像与平台效果的顺序 | S1 的重复保存不能只删入口，F13 的代理失败也不应阻断无业务依赖的初始化；Q14 已执行证实存储失败阻断同回调的歌词/平台输出，但降级契约待定。必须按具体契约判断依赖，不能把所有串行失败都当缺陷。 |
+| 持久化、镜像与平台效果的顺序 | S1 的重复保存不能只删入口，F13/F30 的附属服务失败不应阻断独立消费者初始化；F21 确认进度保存失败阻断 seek 平台输出。保存失败目标见 U4；按各输出契约判断依赖，不能把所有串行失败都当缺陷。 |
 | 身份过渡通知与消费者终止 | I1/F1 的等待由私有 mutation 解锁，F19 则把资料引用变化当身份变化。daily/search 的失败后重读可用，未继承歌词挂起；应统一身份变化含义，同时保留各消费者不同的终止行为。 |
+| 读取与确认修改的交接 | F2 位于当前详情，F20 位于音乐库集合（含喜欢 ID/预览）；等待所有 Promise 完成仍可能提交过时快照。各数据所有者都须保留已确认变化，不能只在详情侧补检查。 |
 
 | 编号 | 问题与代码位置 | 对应需求、证据 | 简化建议 |
 | --- | --- | --- | --- |
@@ -466,7 +565,7 @@ F1–F19 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已�
 | R3 | library 仍持有读取失败文案和展示效果；[library.js](../../src/store/modules/library.js) 77–80、88–105 | [#14](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/14) 写明 library 不调用 toast。reportBackground 在后台读取链直接 dispatch 根 showToast，固定“音乐库部分内容加载失败”；写操作已通过业务结果交接展示。本项记录读路径职责残留，不扩为写入调用者迁移遗漏 | 把读取失败交给应用接合处提示，保留必要后台请求；无需新增分区任务框架。 |
 | R4 | 未超容量也全量读取音频缓存；[audioCache/index.js](../../src/audioCache/index.js) 22–30、58–72 | [#19](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/19) 要求事务内准确统计与按时间淘汰。已知 total.bytes，仍先 `orderBy(...).toArray()` 物化包含音频 ArrayBuffer 的全部记录，再检查容量 | 未超限立即返回；超限按索引逐条读取并及时终止，保留事务和成功后统计更新。实际内存峰值尚未测量。 |
 | R5 | 待播页保留无界歌曲缓存，并新增已加载 ID 的读取过滤；[next.vue](../../src/views/next.vue) 39–42、85–96；[App.vue](../../src/App.vue) 10–12 | [#18](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/18)、[#22](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/22)。upcoming(100) 有界，页面 tracks 只追加且 keep-alive。无界累积在基线已有；`209322f` 新增请求前 loaded ID 过滤，使曾见 ID 不再进入统一读取及后台刷新。两项不能整体计为新增 | 核查超出当前展示窗口的数据保留与统一缓存的重复职责。需求未明确要求每次激活刷新或禁止页面缓存；不把缓存存在本身判为违反需求，用户可见旧权限另见 Q3。 |
-| R6 | 设置页保留部分重复默认值；[settings.vue](../../src/views/settings.vue) 940、949、966、976、1002、1013、1025、1037、1125 | [#9](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/9) 要求默认值集中。persistence:20–25 已补齐 undefined，页面仍兜底，自动缓存页面 false 与集中 true 不一致。回退在基线已有，属于集中化后的旧职责残留。生产合并规则保留显式 null，因此 966 的 musicQuality null 回退仍有效，其政策待确认 | 仅将已补齐的 undefined 分支计入冗余；暂不删除 musicQuality 的 null 回退。保留设备可用性判断与输入字符串转换。 |
+| R6 | 设置页保留部分重复默认值；[settings.vue](../../src/views/settings.vue) 940、949、966、976、1002、1013、1025、1037、1125 | [#9](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/9) 要求默认值集中。persistence:20–25 已补齐 undefined，页面仍兜底，自动缓存页面 false 与集中 true 不一致。回退在基线已有，属于集中化后的旧职责残留。生产合并规则保留显式 null，因此 966 的 musicQuality null 回退仍有效；#9 未要求改变该表示，保留此分支 | 仅将已补齐的 undefined 分支计入冗余；暂不删除 musicQuality 的 null 回退。保留设备可用性判断与输入字符串转换。 |
 | R7 | 快捷键控制 IPC 携带无人读取的深克隆数组；[preferences.js](../../src/store/modules/preferences.js) 24；[preferenceEffects.js](../../src/application/preferenceEffects.js) 27–28 | [#12](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/12)。electron/preferences:5–8 只读 enabled/recording；menu:9、globalShortcut:11 从已有镜像读取 shortcuts，无 control.shortcuts 消费者 | 删除控制消息中的 shortcuts 克隆，按键内容继续从设置镜像读取。 |
 | R8 | Last.fm storage adapter 重复创建后被覆盖；[store/index.js](../../src/store/index.js) 14、27、34、48–52 | [#33](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/33)。唯一生产 main.js:58–61 已传入 createLastfmOptions 的 storage/exchange，store 仍新建 storage 和空 exchange 后由展开覆盖；#26 新增装配 | store 直接使用已注入的 lastfm 依赖，删除被覆盖的默认构造。收益仅少量代码，保留真实 adapter 和授权所有者。 |
 | R9 | 迁移后保留无消费者映射；[Navbar.vue](../../src/components/Navbar.vue) 111；[Player.vue](../../src/components/Player.vue) 205–206；[settings.vue](../../src/views/settings.vue) 853、855；[album.vue](../../src/views/album.vue) 199–200 | [#7](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/7) 的残留接口清理。身份迁移新增 Navbar/Settings 的 likedSongPlaylistID、Player/Album 的 user/likedSongPlaylistID，均无读取；Settings 的 player 在 #8 设备操作迁出后失去消费者 | 删除六个身份 getter 映射及 Settings 的 player 映射，清理随之无用的 mapState/mapGetters import。收益小；Album 的 player 死映射在基线已存在，单独作为历史清理，不算新增。 |
@@ -475,28 +574,52 @@ F1–F19 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已�
 | R12 | 代理运行时关闭条件局部重复；[preferences.js](../../src/store/modules/preferences.js) 168–170；[proxy.js](../../src/electron/proxy.js) 11–14 | [#11](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/11)。唯一运行时发送链已把空 server/port 规范为 noProxy，接收端又检查这两项；两处同由 `39d69dc` 引入。启动 restoreProxy 直接读取规则字符串并调用 applyProxyRules，绕过该 handler，不能解释这两项复判 | 减少运行时同一空配置条件的重复解释。范围仅 server/port 两项，优先级低；保留 noProxy 到规则字符串、启动空字符串到平台配置的转换及两种存储表示。未发现功能错误。 |
 | R13 | 艺人访客路径重复补歌曲详情；[api/artist.js](../../src/api/artist.js):20–26、[artist.vue](../../src/views/artist.vue):281–283、302–305 | API 访客分支已补详情，页面只取 ID 再调用同一入口。原 SFC/API/metadataCache/common/Dexie 组合中，冷缓存访客详情请求两次、账号一次；访客二读展示字段相同，额外一次为后台刷新。两层补全在 `01f2de1` 已有，属低优先级遗留，未计入新增增长。#18 要求各次读取独立，单次缓存读取仍履约 | 减少访客同一链路的重复补全；账号 API 仅转换 hotSongs，页面详情读取实际补时长、封面与权限，不能整体删除。不引入跨调用共享请求；同值样本限于身份稳定、两读之间缓存未变化。每次转换重新取身份，身份变化也会改变 playable/reason。 |
 
-**待验证与范围待确认事项**
+**补充目标行为（用户于 2026-10-20 明确确认）**
 
-| 编号 | 疑点、代码位置与已有证据 | 尚缺证据及下一步 |
+以下规则集中在此维护，用于澄清原需求留白。其实现差距属于补充目标，不能追溯认定四个已完成 spec 违反当时未定义的政策；本轮仅记录。
+
+| 编号 | 已确认目标 |
+| --- | --- |
+| U1 / Q6 | 恢复默认快捷键只重置已知快捷键值，保留未知条目和扩展属性。 |
+| U2 / Q7 | Last.fm 交换读取存储失败时结束本次交换、释放资源并反馈错误，允许重新发起。 |
+| U3 / Q10 | 普通 MV 封面入口进入后不自动播放；显式播放入口才自动播放。 |
+| U4 / Q14 | 播放存储失败须明确反馈保存失败，保持播放及平台输出，下次正常保存时重试。 |
+| U5 / Q15 | 同一账号 VIP 资料更新时立即重算已加载推荐的可播放标记，无需重取推荐列表。 |
+
+**疑点逐项结论**
+
+| 编号 | 当前结论 | 依据、实现差距或剩余证据 |
 | --- | --- | --- |
-| Q1 | [audioAdapter.js](../../src/playback/audioAdapter.js):108、115–117 把设备设置失败归入音频准备失败。受控 NotFoundError 已复现新旧音频都卸载；settings.vue:985–993 只显示 default，保存值仍旧 | 需用真实失联设备验证持续失败及浏览器 fallback；#17 保留设备应用规则，但具体失败回退目标需明确。建议独立反馈设备失败，避免默认将其等同于解码失败；暂不以旧 Player 实现作为回退政策依据。 |
-| Q3 | [next.vue](../../src/views/next.vue):85–96 长期缓存可能保留旧身份下的 playable/reason；R5 已确认无界保存 | 需浏览器验证访客切换账号后同曲目的实际显示，尚未证明用户可见错误。 |
-| Q5 | 密码登录成功后等待 library 加载，加载失败可能进入账号密码错误提示；QR 初始 key 非 200 无后续轮询 | #1 明确排除失败恢复体验，需与后续会话 spec 区分。仅记录范围疑点，不作为四个 spec 的确定缺陷。 |
-| Q6 | [preferences.js](../../src/store/modules/preferences.js):152–156 恢复默认快捷键整体替换数组，执行样本中已有条目扩展字段被删除 | [#9](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/9) 要求嵌套扩展保留，[#12](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/12) 要求恢复默认值；需界定重置是否仅覆盖已知按键字段，再决定按 ID 合并。 |
-| Q7 | [lastfmExchange.js](../../src/application/lastfmExchange.js):12–21 中 storage.read 抛错逸出，受控执行后 timer 仍为 1，直到 stop/销毁才释放 | [#33](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/33) 未明确存储失败是否结束交换；若定义为结束，应在 check 捕获并停止，避免重复异常。存储故障降级范围待界定。 |
-| Q8 | [credentials.js](../../src/application/credentials.js):13–18 只按 `;;` 拆 cookie；当前安装 API 登录/QR/refresh 模块使用 cookie.join(';') | 安装 API 的 util/request:316–318 只移除 Domain，不补尾分号。真实 request→login_cellphone→adapter 组合中，虚构 cookie 结尾为 HttpOnly 时仅保存 __csrf，结尾为 HttpOnly; 时两项均保存。API 没有保证双分号；实际成功认证响应的无敏感格式仍待确认，再决定升级。勿扩大为登录尝试隔离。 |
-| Q9 | [track.js](../../src/api/track.js):53–58、[db.js](../../src/utils/db.js):87–96、[common.js](../../src/utils/common.js):39 对缺失 privilege 的缓存转换不一致；关键缺项入数组及读取 item.id 在基线已存在 | 输入 songs=[{id:987,fee:0}]、privileges=[]，首次成功，下一次缓存命中形成 [undefined] 并在读取 id 时抛错，后台刷新未启动。受支持响应是否允许缺项尚未证明；确认后统一过滤/处理缺项，不新增通用损坏恢复，也不计为四阶段新增缺陷。 |
-| Q10 | [MvRow.vue](../../src/components/MvRow.vue):47–53 默认 autoplay 从父页面可选播放器改为全局音乐 playing | 去掉父级耦合有需求，但搜索等普通 MV 入口新增的默认自动播放政策尚无明确目标依据。需确认入口策略并在浏览器验证；暂不按旧行为判回归，也不把该默认变化直接视为必要迁移。 |
-| Q11 | [playback/index.js](../../src/playback/index.js):109–113、213–217、583–585 正常单曲队列结束后公开 play 复用已 recorded 的实例 | 真实核心/reporting 连续完整播放两次，仅第一次有网易云/Last.fm 记录，Now Playing 两次。#23 明确自然结束后切歌去重，但未单列队尾重播的实例语义；需界定该重播是否应构成新的记录单位，再决定重置或重建。与 F12 的失败耗尽路径不同。 |
-| Q14 | [application/player.js](../../src/application/player.js):131–141 的存储失败跳过同接收函数内歌词及平台输出 | 真实 createPlayer/Playback/storage/lyrics/reporting 组合中，player 保存抛错后播放仍 completed、dispose=0，但歌词 trackId=null，平台仅有初始曲目 0；仅进度保存抛错时核心 seek 到 7，歌词仍在第一行且平台无 progress=7。核心 safe 保护整个接收函数，未隔离其内部职责。机制已证实；#24 的存储失败降级契约待确认，不新增功能缺陷编号。若各输出应独立，在应用接合分别处理失败。 |
-| Q15 | [dailyRecommendations.js](../../src/store/modules/dailyRecommendations.js):30–32 的 loaded 快照保留旧 VIP 可播放结果；[App.vue](../../src/App.vue):79–82、101–104 与 [api/playlist.js](../../src/api/playlist.js):201–215 | 真实 store/请求/转换组合中，启动每日读取先于 profile 返回；同 uid42 从 vip0 更新至 vip11 后，fee1/pl0 曲目的已存 playable=false，实时规则为 true，再次 load 不重读。相同 VIP 对照正确；正常登录、公开身份切换、退出均先 reset。[#31](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/31) 要求身份切换清理与已加载快照复用，VIP 更新是否要求即时重算尚未明确，暂不列为缺陷，也不据此要求每次 profile 重读清空推荐。 |
-| Q16 | 媒体错误分类分散的结构核查已转 D4；[playback/index.js](../../src/playback/index.js):361 的 3/4 判断还覆盖整个 select try | 核心 catch 同时接收资料、取源、构造及音频准备拒绝，3/4 判断未限制来源。这里保留分类作用范围疑点，尚无非媒体生产错误实际携带此 code 的可达证据，不升级为功能缺陷，也不与 D4 重复计数。 |
-| Q17 | UNM 的 url 字段由两端按不同条件解释；[ipcMain.js](../../src/electron/ipcMain.js):169–170 与 [audioResources.js](../../src/playback/audioResources.js):39、42、48 | 主进程按 bilivideo.com 域名将 url 改为 base64，资源侧按 source=bilibili 解码。本地 rust-napi 0.4.0 只声明 source/url，包装层未保证两判据等价。真实两端配受控 UNM/HTTP，bilibili 字节及普通 URL 对照均通过。确认隐含表示约定跨层维护；暂无真实引擎反例，不判功能错误。两端规则由旧实现迁入，不计为新策略增长；继续核查协议保证，不能仅因转换两次就认定冗余。 |
-| Q13 | [playbackPlatform.js](../../src/application/playbackPlatform.js):238–251；[mpris.js](../../src/electron/mpris.js):32–57 在最终无有效音频时保留旧系统元数据 | 真实组合中曲 1 成功后曲 2 取源失败，旧实例已释放，当前 ID=2/sourceInfo=null/playing=false，但 Web/MPRIS 仍显示曲 1、状态 Paused。#24 未规定应显示最后播放曲目还是空状态；先明确政策，不能对所有 sourceInfo=null 一概清空。 |
+| Q1 | 已澄清为本轮范围外，不要求新增设备失败回退策略 | audioAdapter.js:108、115–117 的设备拒绝进入准备失败、settings.vue:985–993 显示 default 但保存值未变，均保留为事实。用户明确本轮不考虑新增回退、提示或设备降级行为；撤销相应设计建议，不以此保留待决项。当前设备意图交接的确定缺陷仍见 F5。 |
+| Q2 | 已排除可见无效按钮问题 | 暂停态当前行的内置浏览器证据见下方“已核查的非问题与必要职责”。 |
+| Q3 | 已澄清并转 F26 | 需求、执行证据及剩余平台验收边界集中见 F26；不再列为待定问题。 |
+| Q4 | 已排除所列失败/删除分页问题 | 206 首唯一曲目及分页删除对照见下方非问题记录；独立的旧分页覆盖归 F6。 |
+| Q5 | 已澄清为后续会话交付范围 | #1 排除失败恢复体验，#26 将会话完善交给 [#27](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/27)。[#39 AC4/AC8](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/39) 已定义认证成功即导航、资料随后加载及失败可重试；[#35 AC1–3](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/35) 与 #40 承接 QR 普通失败出口及资源清理。关闭四个已完成 spec 的范围疑问，不展开后续交互设计。 |
+| Q6 | 已澄清；当前实现存在差距，见补充目标 U1 | preferences.js:152–156 整体替换默认数组，已执行样本确认扩展字段被删除；需要保留扩展并重置已知键值。普通保存与恢复的保留能力无需重写。 |
+| Q7 | 已澄清；当前实现存在差距，见补充目标 U2 | lastfmExchange.js:12–21 的读取异常逸出，受控执行 timer 仍为 1；缺少失败终止和反馈。stop/销毁能释放是必要现有能力。 |
+| Q8 | 已澄清并转 F27 | 判断限定于已证明的输入、缓存或交付契约；真实服务发生频率未测，具体证据集中见 F27。 |
+| Q9 | 已澄清并转 F28 | 判断限定于已证明的输入、缓存或交付契约；真实服务发生频率未测，具体证据集中见 F28。 |
+| Q10 | 已澄清；当前实现存在差距，见补充目标 U3 | MvRow.vue:47–53 普通封面入口取全局音乐 playing 为 autoplay；search.vue:59、artist.vue:137、library.vue:142 未传策略，因此音乐播放时会传 true。显式播放入口与 MV 内推荐策略须分别保留。 |
+| Q11 | 已澄清并转 F24 | 需求、执行证据及剩余平台验收边界集中见 F24；不再列为待定问题。 |
+| Q12 | 已澄清并转 F17 | 重复队列条目的删除身份问题及执行边界集中见 F17。 |
+| Q14 | 已澄清；保存失败反馈差距见补充目标 U4，输出交接缺口见 F21 | playerStorage.js:38–49 的保存失败抛出，player.js:130–143 的输出链未处理保存错误，Playback 的 safe 吸收回调异常；当前没有明确未保存反馈。save 仅在成功后更新 previous，保留后续正常保存重试能力。 |
+| Q15 | 已澄清；当前实现存在差距，见补充目标 U5 | dailyRecommendations.js:30–32 复用 loaded 快照；已执行同 uid42 从 vip0 更新为 vip11，fee1/pl0 曲目仍 playable=false，实时规则为 true。缺少权限重算；推荐内容复用与身份切换 reset 继续保留。 |
+| Q16 | 已完成当前生产入口核查；结构分散见 D4，未确认额外功能错误 | selection catch 范围较宽，但当前资料/取源抛普通 Error，Axios code 为字符串，标准 setSinkId 错误为具名 DOMException；未找到非媒体数值 3/4 的生产来源。关闭此具体可达性猜测，不以任意注入 code=3 推导缺陷；D4 的分类职责仍需集中。 |
+| Q17 | 已澄清并转 D5 | 判断限定于已证明的输入、缓存或交付契约；真实服务发生频率未测，具体证据集中见 D5。 |
+| Q18 | 已澄清并转 F29 | 判断限定于已证明的输入、缓存或交付契约；真实服务发生频率未测，具体证据集中见 F29。 |
+| Q19 | 已澄清并转 F23 | 需求、执行证据及剩余平台验收边界集中见 F23；不再列为待定问题。 |
+| Q13 | 已澄清为本轮范围外，不要求新增无音频终态展示策略 | playbackPlatform.js:238–251、mpris.js:32–57 在最终无有效音频时保留旧系统信息；已有执行证据保持。用户明确本轮不考虑新增清空曲目信息及停止状态政策，撤销相应建议。F23/F25/F30 的位置与初始化交接问题有独立依据。 |
+
+**Q1/Q13 的 fork 初始行为对照**
+
+基准为 Initial commit `01f2de154b4413bcc26de328bff5927218457930`。以下为该版本源码控制流，仅用于历史对照；用户已明确将新增设备回退及无音频终态展示策略排除本轮。
+
+- Q1：旧 `src/utils/Player.js:342–384` 先创建 Howl 并按需开始播放，再调用 `setOutputDevice`；879–887 直接调用节点的 `setSinkId(已保存值)`，没有 await、catch、默认设备重试或设备错误提示。异步拒绝不会进入取源失败/跳歌链，也不会由该方法主动卸载新音频。旧 `settings.vue:1003–1019` 在设备不存在时仅让选择框显示 default，未改写保存值。实际设备输出取决于浏览器/系统，不能从该代码确定成功回退。
+- Q13：旧 `Player.js:503–522` 先更新当前曲目并发布 metadata，再尝试取源；532–560 取源为空时提示无法播放并尝试下一首。普通列表到尾且无下一首时，738–743 停止旧 Howl、令 playing=false，没有清空 metadata。旧 `electron/mpris.js:27–33` 将 false 映射为 Paused。因 metadata 在取源前更新，通常留下最后尝试且资料已取得的曲目，而非固定保留最后成功播放的曲目；开启 OSD 时还要等待其异步歌词/写词链。循环及私人 FM 走其他继续选择路径，不能统一称为全失败后停止。
 
 **已核查的非问题与必要职责**
 
-- F3 横查：普通预取、onStateChange 和真实 reporting 请求分别同步抛错/异步拒绝，以及 FM 后台补充/预取拒绝，八组均 completed、当前曲保持 playing、dispose=0，FM loading 正常清除。未复现附属失败卸载；F3 限定为 trash 拒绝进入 runSelection.catch。接收函数内部的输出串联另见 Q14。
+- F3 横查：普通预取、onStateChange 和真实 reporting 请求分别同步抛错/异步拒绝，以及 FM 后台补充/预取拒绝，八组均 completed、当前曲保持 playing、dispose=0，FM loading 正常清除。未复现附属失败卸载；F3 限定为 trash 拒绝进入 runSelection.catch。接收函数内部的输出串联另见 F21。
 - Q2 的“暂停态当前曲目行显示无效播放按钮”未成立。内置浏览器在 /next 点击当前行后，DOM 中 `.play-track` 的 display 为 none；TrackListItem.vue:190–194 按当前 ID 高亮，暂停状态也隐藏该按钮。无 activate 接收者是事实，但缺少要求该展示行重新激活的明确目标，当前不列功能缺陷。
 - Q4 在所列失败/删除样本中未复现，关闭该具体疑点：失败时 traversed=1、tracks=102，继续分页最终 206 首唯一、missing=[]。同样核对分页期间删除前缀与批次内曲目，游标正确。另行发现的 F6 是 metadata 更新与旧分页交错，根因不同。
 
@@ -512,29 +635,45 @@ F1–F19 记录功能缺陷；R1–R13 记录具体冗余、职责残留及已�
 | #1 / [#5](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/5) | 密码、QR key/check/stop、公开身份、凭据 adapter、页面生命周期 | R2、F10；用户名空结果已在浏览器复现，真实登录/退出/QR 生命周期待验证。 |
 | #1 / [#6](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/6) | logout/invalidate 共用清理、request 301 信号、sessionEffects、路由 | 源码未发现额外确定问题；真实请求失效待验证。 |
 | #1 / [#7](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/7) | 旧鉴权入口、身份判断、残留导出与装配检索 | R1/R2/R9；完整运行验收未完成。 |
-| #8 / [#9](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/9) | 完整设置、动态字段、默认/迁移、投影保存与启动 | S1、R6；S2 按 #26 保留；旧档、动态嵌套与选择性写回样本通过，Q6 待界定。 |
+| #8 / [#9](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/9) | 完整设置、动态字段、默认/迁移、投影保存与启动 | S1、R6；S2 按 #26 保留；旧档、动态嵌套与选择性写回样本通过，Q6 已按 U1 澄清。 |
 | #8 / [#10](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/10) | 音质、设备、缓存、倒放与 applyRestored 差异 | F5、Q1；实体设备切换待验证。 |
 | #8 / [#11](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/11) | proxyDraft、submit/disable、主进程既有代理恢复 | 两种表示为需求所需；R12 为重复空配置条件；F13 为恢复失败耦合，真实平台拒绝条件待验证。 |
-| #8 / [#12](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/12) | 录制生命周期、设置镜像、平台注册、分类/筛选/关闭记忆入口 | R7；未找到绕过专用 actions 的生产写口；原生录制待验证。 |
-| #8 / [#13](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/13) | playlistDetail 全文件、删除分页、页面 open/close/loadMore | F2/F6 已执行复现，F9 为结果提示遗漏；Q4 所列样本未复现，分页期间删除对照正确。 |
-| #8 / [#14](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/14) | 收藏、删除、云盘写入、权限与业务结果 | L3、F18；R3 为同一 module 的读路径职责残留。保留明文结果字段；真实写入未执行。 |
-| #8 / [#15](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/15) | 添加、创建、详情重读与调用弹窗 | L1、F2/F6/F18；多阶段结果与同步职责必需。 |
+| #8 / [#12](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/12) | 录制生命周期、设置镜像、平台注册、分类/筛选/关闭记忆入口 | R7、F22；晚到启动覆盖录制暂停已有生产组合证据，原生延迟条件待验证；未找到绕过专用 actions 的生产写口。 |
+| #8 / [#13](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/13) | playlistDetail 全文件、删除分页、页面 open/close/loadMore | F2/F6/F20 已执行复现，F9 为结果提示遗漏；Q4 所列样本未复现，分页期间删除对照正确。 |
+| #8 / [#14](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/14) | 收藏、删除、云盘写入、权限与业务结果 | L3、F18/F20/F29；R3 为同一 module 的读路径职责残留。F20 覆盖喜欢 ID/预览及五类集合的加载/写后读取交错，F18 补齐 MV 结果错用；均为受控执行，真实远端写入未执行。 |
+| #8 / [#15](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/15) | 添加、创建、详情重读与调用弹窗 | L1、F2/F6/F18/F20；多阶段结果与同步职责必需，identifyPlaylist 的共享等待有真实依赖。 |
 | #8 / [#16](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/16) | 全调用面迁移与装配结构检索 | 已核查所列入口与装配，完整 Web/Electron 交互验收待补。 |
-| #17 / [#18](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/18) | metadataCache、歌曲/歌词/云盘/专辑、privileges 映射 | 真实元数据/缓存组合的次序、权限映射、命中刷新与写入失败收口已验证；R5、R13、Q9；浏览器数据库待补。 |
+| #17 / [#18](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/18) | metadataCache、歌曲/歌词/云盘/专辑、privileges 映射 | 真实元数据/缓存组合的次序、权限映射、命中刷新与写入失败收口已验证；R5、R13、F28；浏览器数据库待补。 |
 | #17 / [#19](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/19) | audioCache 事务、统计、下载、排队、淘汰、清空 | R4；真实 Dexie + fake-indexeddb 的覆盖差额/事务失败/淘汰/清空/初始化交错均验证；实际性能未测。 |
-| #17 / [#20](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/20) | Playback、audioResources、audioAdapter、装配 | P1、D4、F3/F5/F12/F14、Q1/Q16/Q17；重复 dispose、准备 abort、解码失败的受控执行均只释放一次且顺序正确；F14 使用真实 Howler 独立复现。真实浏览器音频/Blob 生命周期待补。 |
-| #17 / [#21](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/21) | sourceOperations 全部、来源装配与参数 | 未发现旧来源兼容 fallback；各来源页面运行待补。 |
+| #17 / [#20](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/20) | Playback、audioResources、audioAdapter、装配 | P1、D4/D5、F3/F5/F12/F14、Q1；Q16 已关闭具体可达性猜测；重复 dispose、准备 abort、解码失败的受控执行均只释放一次且顺序正确；F14 使用真实 Howler 独立复现。真实浏览器音频/Blob 生命周期待补。 |
+| #17 / [#21](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/21) | sourceOperations 全部、来源装配与参数 | F11 为菜单起点参数交接遗漏；未发现旧来源兼容 fallback，各来源页面运行待补。 |
 | #17 / [#22](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/22) | 普通/随机队列、模式、FM、next 与队列行身份 | F3/F8/F12/F17、R5；已执行有限失败遍历及待播上限，重复条目的浏览器激活待验证。 |
-| #17 / [#23](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/23) | 有效实例、recordOnce、上报条件/快照、Last.fm 门限 | D3 确认时长/门槛规则重复；1 秒、半长、240 秒边界，暂停恢复、重复事件、自然结束后切歌、过时回调、失败交接与 FM 来源快照均受控验证；Q11 队尾重播语义待明确。未发送真实第三方上报。 |
-| #17 / [#24](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/24) | archive/restore/dispose、storage、平台接线 | B1、D1、R10、F5/F7/F8；96 组扩展恢复验证中 12 组重复条目身份差异均属 F8；实体设备/原生平台待验证。 |
+| #17 / [#23](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/23) | 有效实例、recordOnce、上报条件/快照、Last.fm 门限 | D3 确认时长/门槛规则重复；1 秒、半长、240 秒边界，暂停恢复、重复事件、自然结束后切歌、过时回调、失败交接与 FM 来源快照均受控验证；队尾重播漏报已确认为 F24。未发送真实第三方上报。 |
+| #17 / [#24](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/24) | archive/restore/dispose、storage、平台接线 | B1、D1、R10、F5/F7/F8/F21；96 组扩展恢复验证中 12 组重复条目身份差异均属 F8；seek 输出阻断按明确契约确认，Q13 已按范围关闭，F23 同曲 metadata 位置清零、F25 初始消费者漏收及 F30 OSD 失败阻断；实体设备/原生平台待验证。 |
 | #17 / [#25](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/25) | 旧 Player 实例化、内部字段/输出入口全仓检索 | 未见旧生产实例；handler 旧名称本身不作为兼容冗余。完整运行验收待补。 |
 | #26 / [#28](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/28) | 八页面十三处列表、行 activate、完整来源与队列身份 | 播放字符串与行父级协议已删除；Q2 的可见无效按钮疑点已排除；F11 为参数迁移遗漏、F17 为菜单条目错位；重复行/筛选需浏览器验证。 |
 | #26 / [#29](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/29) | windowOperations、native/IPC/tray/MPRIS 关闭退出、保存确认 | 受控平台政策、并发询问、取消/保存失败重试、明确退出及IPC全退出清理通过；三平台原生冒烟待补。 |
 | #26 / [#30](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/30) | query 全文件、search/searchType 生命周期、分页与新页详情 | 内置浏览器综合搜索“周杰伦”显示五类结果，替换为“陈奕迅”后显示对应结果；歌曲分类加载更多后追加内容，主区域链接由 60 增为 121；受控旧详情乱序/销毁拒绝已验证；F19 为同身份资料刷新误清结果；更多页面交互组合待验证。 |
-| #26 / [#31](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/31) | dailyRecommendations、卡片/页面、共享 load、统一播放来源 | 真实模块并发 load 共用 Promise、旧身份失败不覆盖新合法空结果、空结果不重读均已验证；浏览器播放竞争待验证。 |
-| #26 / [#32](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/32) | lyrics 内容/时钟/重试、页面、平台原始歌词与握手 | F1、F15 经生产组合独立复现；B2/D2；旧曲握手丢弃、当前曲握手发布、暂停后 seek 更新歌词与 Touch Bar、页面消费释放已受控验证；实际 DOM 与 Linux/OSD 待验证。 |
-| #26 / [#33](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/33) | lastfm、exchange、回调/设置页、reporting/signing | R8、F16；受控成功采用/beforeunload 的 timer/listener 均释放；保存/删除失败不改状态；Q7 待界定，真实跨窗口交接待验证。 |
+| #26 / [#31](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/31) | dailyRecommendations、卡片/页面、共享 load、统一播放来源 | 真实模块并发 load 共用 Promise、旧身份失败不覆盖新合法空结果、空结果不重读均已验证；Q15 已按 U5 澄清，同账号 VIP 更新须重新投影，浏览器播放竞争待验证。 |
+| #26 / [#32](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/32) | lyrics 内容/时钟/重试、页面、平台原始歌词与握手 | I1/F1 身份完成交接、F15 显示选择、F21 seek 输出失败作用域均有生产组合证据；B2/D2、F23；旧曲握手丢弃、当前曲握手发布、暂停后 seek 更新歌词与 Touch Bar、页面消费释放已受控验证；实际 DOM 与 Linux/OSD 待验证。 |
+| #26 / [#33](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/33) | lastfm、exchange、回调/设置页、reporting/signing | R8、F16；受控成功采用/beforeunload 的 timer/listener 均释放；保存/删除失败不改状态；Q7 已按 U2 澄清，真实跨窗口交接待验证。 |
 | #26 / [#34](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/34) | MPRIS IPC 明确意图、repeat/shuffle 幂等 setter | 目标值迁移有实现，F14 暴露异步事件前重复 Play 不幂等；实际系统消息待原生验证。 |
+
+**独立复查覆盖**
+
+以下五个独立复查以 F1–F30、D5、U1–U5 为基准，均无新增问题或疑点。F30 的新失败边界已先单独执行确认；下表计数只包含其入档后的五个独立结论。Q1/Q13 已由用户明确排除新增行为要求，范围判断集中见疑点表。
+
+| 复查范围 | 需求与核查路径 | 补充证据及结论 |
+| --- | --- | --- |
+| 身份、每日推荐、搜索 | #1/#26/#5/#6/#30/#31；startup/main、session、QR 生命周期、退出、daily/query 与页面 | 真实 daily/query 对照确认旧身份结果不覆盖新加载、精确来源及起点、退出后禁播、退役详情失败不提示。再次核查启动/页面接合，Q3/Q5/Q8/Q15 均已归 F26/后续范围/F27/U5，无新增。 |
+| 写入、详情、桌面收藏 | #8/#13–#15；library/detail/结果消费者与快捷键、菜单、tray、Touch Bar | 真实组合确认后发拒绝不吞先发成功；创建成功、加曲拒绝、刷新失败分别保留结果；缺详情和重复删除的分页正确。补查所有桌面 like 入口和 library mutation 投影，均沿共同操作；F30 未阻断先建立的托盘/Touch Bar，无新增。 |
+| 播放、来源、资源与缓存 | #17/#18/#20/#23/#24；Playback、adapter/resources、metadata、reporting、恢复与平台接合 | 独立复验 F24 两次自然结束仅一次记录；字节资源/预取及 metadata 命中刷新对照通过。补查恢复、缓存初始化及输出失败作用域，现有 F21/U4、F25/F30 足以覆盖，F28/D5/Q16 判断保持，无新增。 |
+| 平台、歌词与 Last.fm | #24/#32/#33；OSD/MPRIS、歌词确认、存储交换、授权回调与销毁 | 旧曲写词确认不发布，新曲确认只发布当前曲目，dispose 后计时器和监听归零；交换读取异常归 U2。F30 入档后补测真实 createDbus 的写词成功/拒绝，均 write→ack 并保留 requestId=17，失败也完成握手。无新增。 |
+| 设置、桌面与关闭 | #8/#12/#28/#29；完整设置、IPC、启动、窗口关闭、八页面十三处列表 | 真实关闭操作确认重复关闭共享询问、记忆失败不退出且可重试、明确退出只一次。补查更新检查不被 ready 等待、设置失败传播、录制清理、Dock/Touch Bar 及行交接；F13/F22/F25/F30/U1 覆盖已知边界，无新增。 |
+
+范围复核覆盖同五个领域：身份侧保留 #27/#39 的后续归属；写入侧保留独立结果和同步，不引入全局排队；播放侧将 F12 限于失配实例、D4 限于现有分类重复；平台侧将 F13/F30 限于职责交接；设置侧保留有效 null 显示分支。五个独立结论均无新增问题或疑点，建议只覆盖既定目标及用户已确认的 U1–U5。
+
+表中受控执行仅替换请求、音频、时钟或平台 I/O，未执行真实远端写入或第三方上报，也未修改生产代码及测试文件。
 
 **#28 十三处列表调用面核对**
 
@@ -592,7 +731,7 @@ F14 的独立执行使用安装的 Howler、真实 Playback/audioAdapter，仅�
 | session.js:180–202 全部四阶段 diff | #1 将旧 dailyTask 的账号判断、日号及成功后保存顺序迁入 session；日号缺陷见 F4。invalidate/logout 共用 clearIdentity，分别处理远端同步抛错和异步拒绝，保证本地退出。#8/#17 此段无变化；#26 仅经 clearIdentity 增加身份开始通知。可选 auth 方法在正常注入下无缺失分支，但未发现重复业务规则，不单独计为冗余。 |
 | library.js:16–75、81–108 全部四阶段 diff | #1 从 root actions 与页面迁入歌单/预览/ID/历史读取，合并四类集合提交骨架；previewReady 区分未读与合法空预览，页面实际消费。歌单→预览的 await 修复原分散依赖；账号资料前置 await 是顺序调整，失败契约未扩入 #27。#8 新增数组校验以表达写后同步失败；#17/#26 文件无变化。局部参数和顺序重复见 L4，加载提示依赖见 R3。首项识别喜欢歌单来自旧逻辑，远端保证未独立验证，未据此判缺陷。 |
 | store/index.js:1–84 全部四阶段 diff | #1 建立 store 工厂、modules、迁移与持久化并移出 Proxy；#8 接详情及设置保存；#17 无变化；#26 接 daily/Last.fm 与身份广播。重复保存见 S1，私有完成交接见 I1，默认 Last.fm 装配见 R8。 |
-| application/player.js:1–202 全部四阶段 diff | Proxy 在 #1 移入，#8 无变化；#17 改资源、audio/reporting/storage/platform/source/restore/dispose 接合与初始发布；#26 接歌词、身份、Last.fm、缓存。必要资源接合与宽输出联动分别核查，后者见 B1/B2/Q14；身份知识见 I1/D2。 |
+| application/player.js:1–202 全部四阶段 diff | Proxy 在 #1 移入，#8 无变化；#17 改资源、audio/reporting/storage/platform/source/restore/dispose 接合与初始发布；#26 接歌词、身份、Last.fm、缓存。必要资源接合与宽输出联动分别核查，后者见 B1/B2/F21；身份知识见 I1/D2。 |
 | application/player.js:79–124、166–202 变更块补查 | #17 的来源/API 响应转 ID、单曲选择、FM 响应校验、真实音频资源注入均接合不同契约，没有复制来源算法。restoreSaved 是唯一恢复入口；dispose 分别释放订阅、平台与核心，先置 disposed 阻止销毁输出。对象展开后的 state getter 保持动态读取，非多余声明。#26 改缓存/身份注入并加入唯一歌词 owner；首次平台发布与恢复后发布用途不同，B1 保留晚注册限制。生产未传 overrides，不存在实际依赖总被覆盖的证据。 |
 | background.js:22–31、57–117、271、336–410；ipcMain.js:74–117、184 | 窗口关闭、保存确认和明确退出迁至 #29 所有者，新增监听清理有运行证据；代理恢复的失败耦合单列 F13。 |
 | background.js:127–135、357–366；ipcMain.js:194–196、223–240 | HTTP 入口改读 Playback 快照；启动/运行时共用代理、托盘、快捷键效果，settings 镜像不再重复注册快捷键。属于 #8/#17 必要迁移。 |
@@ -629,7 +768,7 @@ B1/B2/D1/D2 的面积为问题涉及范围，未承诺等量净删除。存档�
 
 R5 的页面横查：album/artist 每次载入替换当前展示；playlistDetail 的 Map 与游标服务 #13 当前详情分页；search 的追加结果随 replace 清空；daily 的共享已加载快照由 #31 要求；library 页面读取所属集合，TrackList 只接收展示数据。未找到第二处以跨窗口历史歌曲 ID 阻止统一读取的页面缓存。艺人 API 与页面两次补详情见 R13，不能与长期缓存混为同一问题。
 
-R5 清理路径核查：next.vue 只有初始化 tracks=[] 和 loadTracks 的 push；没有路由离开、deactivated 或销毁钩子清理，也没有清空/裁剪赋值。activated 与 upcomingKey watcher 都只追加读取。router 开启 keepAlive，App 的 keep-alive 未设 max/exclude/key，未找到普通路由离开时释放历史资料的路径；真实组件生命周期仍未验证。
+R5 清理路径核查：next.vue 只有初始化 tracks=[] 和 loadTracks 的 push；没有路由离开、deactivated 或销毁钩子清理，也没有清空/裁剪赋值。activated 与 upcomingKey watcher 都只追加读取。router 开启 keepAlive，App 的 keep-alive 未设 max/exclude/key，未找到普通路由离开时释放历史资料的路径。Codex 内置浏览器执行 /next → 点击发现 → 点击播放列表：Next uid=93 始终相同，inactive 为 false→true→false，destroyed 始终 false。实际路由切换确认保留组件；该样本 tracks.length=0，仅覆盖生命周期；旧权限显示另经非空受控浏览器样本确认，见 F26。
 
 R13 的详情补全横查：album.vue:277–288 先展示专辑歌曲，再读详情补 mark；原组合受控执行中二读新增 explicit 标记和权限，TrackListItem:60–68 实际消费，不能按访客艺人路径一并计为重复。playlistDetail 对完整 ID `[2,1,3]`、首批 `[2]` 只请求后续 `"1,3"`；track.js 恢复请求批次顺序，详情 module 合并完整歌单顺序，处理范围不同。公共可播放转换已集中，没有另建相同转换规则。
 
@@ -637,7 +776,7 @@ R13 的详情补全横查：album.vue:277–288 先展示专辑歌曲，再读�
 
 原歌单页 loadData 与真实详情 module 组合中，打开歌单 2 后歌单 1 的迟到失败未覆盖当前详情，close 后 current=null；旧失败仍弹出提示，当前只确认详情归属目标成立。查询双实例执行中，一个失败、另一个空结果各自结束 loading，只有失败实例通知一次；空关键词 replace 清除错误且不增加请求。以上均为生产模块受控执行，未推断全部页面交互通过。
 
-实例归属补充核查：真实 Howler/audioAdapter/Playback 中，一次原生 play 拒绝可从 Howler 的两个分支发出 playerror。audioAdapter.js:85–102 均转发；playback/index.js:372–383 只在入口检查来源实例，313–318 的恢复交接只检查操作编号。受控挂起第一次恢复、先完成第二次并 seek(7)，再放行迟到恢复，位置从 7 回到 0，成功实例被再次替换。最终只有一个 Howl，且只有一次外部播放命令；该证据补充 F12/F14 邻近的实例检查调查，不归为重复 Play。准备错误与播放错误、内部继续与外部选曲的分支本身受 #17/#20 要求，不能因此整段计入冗余；规则分散的具体面积仍在核查。
+实例归属补充核查：真实 Howler/audioAdapter/Playback 中，一次原生 play 拒绝可从 Howler 的两个分支发出 playerror。audioAdapter.js:85–102 均转发；playback/index.js:372–383 只在入口检查来源实例，313–318 的恢复交接只检查操作编号。受控挂起第一次恢复、先完成第二次并 seek(7)，再放行迟到恢复，位置从 7 回到 0，成功实例被再次替换。最终只有一个 Howl，且只有一次外部播放命令；该证据补充 F12/F14 邻近的实例检查调查，不归为重复 Play。准备错误与播放错误、内部继续与外部选曲的分支本身受 #17/#20 要求，不能因此整段计入冗余。重复检查、失败交接及分类分散的位置已分别归 P1/D4；未通过生产修改测量净删除量。
 
 **API 与缓存的四阶段归因**
 
@@ -683,4 +822,4 @@ R3 的失败展示职责横查：dailyRecommendations 保存失败状态，由 d
 
 Web 检查使用 Codex 内置浏览器和本地开发服务。首次首页读取发生于 API 尚未就绪时，出现 undefined 响应相关错误；之后 API 启动，综合搜索正常。该启动时序现象尚未归因为本次四个 spec 的缺陷。四阶段变更并集共 104 个生产 JS/Vue 文件，增长归因已核查并记录；真实音频/设备、原生消费者首次接合与重建、部分身份变化后的页面交互仍缺运行证据，不能据此声称逐需求验收完成。
 
-R5 的新增真实组件生命周期检查受当前工具环境限制：内置浏览器不可用，Codex 面板打开请求仅返回 queued。未改用外部浏览器；既有浏览器证据保持其原覆盖范围，不能补作 R5 的运行证明。
+R5 的内置浏览器生命周期检查已补齐，证据及空集合样本限制见其清理路径核查。Q3 的受控身份切换显示已由内置浏览器确认并转 F26；F20 的浏览器乱序响应及 P1 的实体设备条件仍属运行验收边界。
