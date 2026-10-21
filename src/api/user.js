@@ -1,4 +1,6 @@
 import request from '@/utils/request';
+import { readIdentity } from './readingContext';
+import { mapTrackPlayableStatus } from '@/utils/common';
 
 /**
  * 获取用户详情
@@ -64,6 +66,14 @@ export function userPlayHistory(params) {
     url: '/user/record',
     method: 'get',
     params,
+  }).then(data => {
+    const records = params.type === 1 ? data.weekData : data.allData;
+    mapTrackPlayableStatus(
+      records.map(record => record.song),
+      [],
+      readIdentity()
+    );
+    return data;
   });
 }
 
@@ -168,6 +178,10 @@ export function uploadSong(file) {
       'Content-Type': 'multipart/form-data',
     },
     timeout: 200000,
+  }).then(response => {
+    const track = response.body?.privateCloud || response.privateCloud;
+    if (track) mapTrackPlayableStatus([track.simpleSong], [], readIdentity());
+    return response;
   });
 }
 
@@ -186,6 +200,13 @@ export function cloudDisk(params = {}) {
     url: '/user/cloud',
     method: 'get',
     params,
+  }).then(data => {
+    mapTrackPlayableStatus(
+      data.data.map(record => record.simpleSong),
+      [],
+      readIdentity()
+    );
+    return data;
   });
 }
 

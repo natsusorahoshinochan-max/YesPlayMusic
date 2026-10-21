@@ -36,7 +36,7 @@ export function createLyrics({
   const notify = () => subscribers.forEach(listener => listener(state));
   function position() {
     if (disposed) return;
-    const seconds = playback.position() || 0;
+    const seconds = playback.position();
     let index = -1;
     state.lyric.forEach((line, i) => {
       if (seconds >= line.time) index = i;
@@ -104,8 +104,6 @@ export function createLyrics({
       })
       .then(data => {
         if (disposed || generation !== state.generation) return;
-        if (!data || typeof data !== 'object')
-          throw new Error('Lyrics response unavailable');
         const parsed = lyricParser(data);
         let lyric = parsed.lyric.filter(
           line =>

@@ -39,6 +39,7 @@ export default {
   data() {
     return {
       tracks: [],
+      tracksRequest: 0,
     };
   },
   computed: {
@@ -70,12 +71,12 @@ export default {
     },
   },
   watch: {
-    upcomingKey() {
-      this.loadTracks();
+    upcomingKey: {
+      immediate: true,
+      handler: 'loadTracks',
     },
   },
   activated() {
-    this.loadTracks();
     this.$parent.$refs.scrollbar.restorePosition();
   },
   methods: {
@@ -83,17 +84,13 @@ export default {
       return this.player.playQueuedTrack(track.id, identity);
     },
     async loadTracks() {
-      const loaded = new Set(this.tracks.map(track => track.id));
-      const ids = [
-        ...new Set(this.upcomingRows.map(row => row.trackId)),
-      ].filter(id => !loaded.has(id));
+      const request = ++this.tracksRequest;
+      const ids = this.upcomingRows.map(row => row.trackId);
+      this.tracks = [];
       if (!ids.length) return;
       try {
         const data = await getTrackDetail(ids.join(','));
-        const existing = new Set(this.tracks.map(track => track.id));
-        this.tracks.push(
-          ...data.songs.filter(track => !existing.has(track.id))
-        );
+        if (request === this.tracksRequest) this.tracks = data.songs;
       } catch (error) {
         console.debug('[upcoming metadata]', error);
       }

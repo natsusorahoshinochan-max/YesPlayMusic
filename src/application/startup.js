@@ -28,7 +28,7 @@ export async function startApplication({
   await initializeDependencies(store, { getSettings, getIdentity });
   store.state.player = createPlayer({ store, getSettings, getIdentity });
   // Restoration starts before mounting but does not hold the UI behind remote I/O.
-  store.state.player.restoreSaved?.().catch(error => {
+  store.state.player.restoreSaved().catch(error => {
     console.debug('[playback restore]', error);
   });
   await store.dispatch('preferences/applyRestored');

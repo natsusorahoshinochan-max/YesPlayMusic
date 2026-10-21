@@ -48,8 +48,11 @@ service.interceptors.response.use(
       data.msg === '需要登录' &&
       !url.split('?')[0].endsWith('/logout')
     ) {
-      await dependencies.onSessionInvalid();
+      await dependencies.onSessionInvalid().catch(sessionError => {
+        console.debug('[request] session invalidation failed', sessionError);
+      });
     }
+    throw error;
   }
 );
 

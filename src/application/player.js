@@ -59,11 +59,9 @@ export function createPlayer({
   let platform = suppliedPlatform;
   let disposed = false;
   const liked = () =>
-    (
-      store.getters['library/collections']?.songs ||
-      store.state.library?.collections?.songs ||
-      []
-    ).includes(playback.state.currentTrackID);
+    store.getters['library/collections'].songs.includes(
+      playback.state.currentTrackID
+    );
   const publish = () => platform?.publish(playback.state, liked());
   const settings = getSettings;
   const ipcRenderer =
@@ -97,13 +95,11 @@ export function createPlayer({
     },
     getTrack: async id => {
       const result = await getTrackDetail(id);
-      return result?.songs?.find(track => String(track.id) === String(id));
+      return result.songs[0];
     },
     personalFM: {
       load: async () => {
         const response = await personalFM();
-        if (!Array.isArray(response?.data))
-          throw new Error('invalid-fm-response');
         return response.data;
       },
       trash: fmTrash,
@@ -154,7 +150,7 @@ export function createPlayer({
     getCloudLyric,
     ...lyricsOptions,
   });
-  const unsubscribe = store.subscribe?.(mutation => {
+  const unsubscribe = store.subscribe(mutation => {
     if (
       mutation.type.startsWith('session/') ||
       mutation.type.startsWith('library/')
@@ -181,7 +177,7 @@ export function createPlayer({
     dispose() {
       if (disposed) return;
       disposed = true;
-      unsubscribe?.();
+      unsubscribe();
       lyrics.dispose();
       platform?.dispose();
       playback.dispose();
@@ -193,7 +189,7 @@ export function createPlayer({
       settings,
       lyrics,
       toggleFavorite: id => toggleTrackFavoriteWithFeedback(store, id),
-      onTitle: title => store.commit?.('updateTitle', title),
+      onTitle: title => store.commit('updateTitle', title),
       ...platformOptions,
     });
   }

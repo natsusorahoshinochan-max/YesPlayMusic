@@ -77,10 +77,12 @@ export default {
   methods: {
     search() {
       if (!this.keyword) return;
-      search({ keywords: this.keyword, limit: 9, type: 1002 }).then(data => {
-        this.result = data.result.userprofiles;
-        this.activeUser = this.result[0];
-      });
+      return search({ keywords: this.keyword, limit: 9, category: 'users' })
+        .then(({ items }) => {
+          this.result = items;
+          this.activeUser = items[0] || {};
+        })
+        .catch(() => this.$store.dispatch('showToast', '搜索失败'));
     },
     confirm() {
       return this.$store.dispatch(

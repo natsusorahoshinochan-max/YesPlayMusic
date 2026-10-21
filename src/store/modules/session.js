@@ -26,42 +26,46 @@ export default function createSession(
 
   async function createQr(context, run) {
     const result = await auth.loginQrCodeKey();
-    if (run.stopped) return;
-    if (result?.code !== 200) {
-      if (run.key) scheduleQr(context, run);
-      return;
-    }
+    if (run.stopped || result.code !== 200) return;
     run.key = result.data.unikey;
     context.commit('setQr', {
       url: `https://music.163.com/login?codekey=${run.key}`,
     });
-    scheduleQr(context, run);
   }
 
   function scheduleQr(context, run) {
-    if (run.stopped) return;
+    if (run.stopped || !run.key) return;
     run.timer = time.schedule(async () => {
-      const result = await auth.loginQrCodeCheck(run.key);
-      if (run.stopped) return;
-      if (result?.code === 800) {
-        context.commit('setQr', { information: '二维码已失效，请重新扫码' });
-        await createQr(context, run);
-        return;
+      let result;
+      try {
+        result = await auth.loginQrCodeCheck(run.key);
+        if (run.stopped) return;
+        if (result.code === 800) {
+          context.commit('setQr', { information: '二维码已失效，请重新扫码' });
+          await createQr(context, run);
+        } else if (result.code === 803) {
+          stopQr();
+          context.commit('setQr', { information: '登录成功，请稍等...' });
+          await enterAccount(
+            context,
+            result.cookie.replaceAll(' HTTPOnly', '')
+          );
+        } else if (result.code === 802) {
+          context.commit('setQr', {
+            information: '扫描成功，请在手机上确认登录',
+          });
+        } else if (result.code === 801) {
+          context.commit('setQr', { information: '打开网易云音乐APP扫码登录' });
+        }
+      } catch {
+        if (!run.stopped) {
+          context.commit('setQr', { information: '二维码连接失败，正在重试' });
+        } else if (result?.code === 803) {
+          notify('登录失败，请重试');
+        }
+      } finally {
+        scheduleQr(context, run);
       }
-      if (result?.code === 803) {
-        stopQr();
-        context.commit('setQr', { information: '登录成功，请稍等...' });
-        await enterAccount(context, result.cookie.replaceAll(' HTTPOnly', ''));
-        return;
-      }
-      if (result?.code === 802) {
-        context.commit('setQr', {
-          information: '扫描成功，请在手机上确认登录',
-        });
-      } else if (result?.code === 801) {
-        context.commit('setQr', { information: '打开网易云音乐APP扫码登录' });
-      }
-      scheduleQr(context, run);
     }, 1000);
   }
 
@@ -115,7 +119,7 @@ export default function createSession(
       },
     },
     actions: {
-      startQrLogin(context) {
+      async startQrLogin(context) {
         stopQr();
         const run = { stopped: false, timer: null, key: '' };
         qrRun = run;
@@ -123,7 +127,13 @@ export default function createSession(
           url: '',
           information: '打开网易云音乐APP扫码登录',
         });
-        return createQr(context, run);
+        try {
+          await createQr(context, run);
+          scheduleQr(context, run);
+        } catch {
+          if (!run.stopped)
+            context.commit('setQr', { information: '二维码加载失败，请重试' });
+        }
       },
       stopQrLogin() {
         stopQr();
@@ -184,8 +194,12 @@ export default function createSession(
           !auth.refreshCookie
         )
           return;
-        await auth.refreshCookie();
-        commit('setLastRefreshCookieDate', now().getDate());
+        try {
+          await auth.refreshCookie();
+          commit('setLastRefreshCookieDate', now().getDate());
+        } catch {
+          notify('登录状态刷新失败');
+        }
       },
       async invalidate(context) {
         await clearIdentity(context);

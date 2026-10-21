@@ -6,8 +6,6 @@ export function configureMusicData({
   getIdentity,
   ...cacheOptions
 }) {
-  if (typeof getSettings !== 'function')
-    throw new TypeError('Music data requires getSettings');
   configureMetadataReads({ getIdentity });
   configureTrackCache({
     ...cacheOptions,

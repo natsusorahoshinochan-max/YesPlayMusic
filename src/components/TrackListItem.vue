@@ -140,7 +140,7 @@ export default {
         : this.trackProp;
     },
     playable() {
-      return this.track?.privilege?.pl > 0 || this.track?.playable;
+      return this.track.playable;
     },
     imgUrl() {
       let image =

@@ -56,9 +56,7 @@ export function createPlaybackPlatform({
     nexttrack: () => playback.next(),
     seekto: event => playback.seek(event.seekTime),
     seekbackward: event =>
-      playback.seek(
-        Math.max(0, playback.position() - (event.seekOffset || 10))
-      ),
+      playback.seek(playback.position() - (event.seekOffset || 10)),
     seekforward: event =>
       playback.seek(playback.position() + (event.seekOffset || 10)),
   };
@@ -92,10 +90,10 @@ export function createPlaybackPlatform({
   listen('next', () => playback.next());
   listen('previous', () => playback.previous());
   listen('increaseVolume', () =>
-    playback.setVolume(Math.min(1, playback.state.volume + 0.1))
+    playback.setVolume(playback.state.volume + 0.1)
   );
   listen('decreaseVolume', () =>
-    playback.setVolume(Math.max(0, playback.state.volume - 0.1))
+    playback.setVolume(playback.state.volume - 0.1)
   );
   listen('like', () => toggleFavorite(playback.state.currentTrackID));
   listen('setRepeatMode', (_, mode) => playback.setRepeatMode(mode));

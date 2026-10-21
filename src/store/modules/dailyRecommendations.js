@@ -39,8 +39,6 @@ export default function createDailyRecommendations({ read, getPlayback }) {
           .then(() => read({ isCurrent }))
           .then(result => {
             if (!isCurrent()) return;
-            if (!Array.isArray(result?.data?.dailySongs))
-              throw new Error('Daily recommendations unavailable');
             commit('loaded', result.data.dailySongs);
           })
           .catch(error => {

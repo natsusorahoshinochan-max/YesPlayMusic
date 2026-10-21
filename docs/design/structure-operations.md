@@ -23,7 +23,7 @@
 | `src/musicSearch/query.js` | 每个查询的结果、分页、加载任务与采用归属；`replace`、`loadNext`、`dispose` | `src/application/musicSearch.js` 为每个页面创建实例，注入身份读取、订阅和反馈；两个搜索页面负责输入、展示与进度资源释放 |
 | `src/store/modules/dailyRecommendations.js` | 推荐快照、读取状态与进行中的加载；`load`、`play`、`identityChanged` | 卡片和页面读取同一 module 状态；装配注入推荐读取及取得现有 Playback 的函数；播放构造由 module 交给 `playTracks` |
 
-音乐搜索复用具体 `search` 与 `getTrackDetail` 读取，类别和响应映射留在查询实现内。元数据读取及可播放转换的职责见[Metadata reads](playback-and-audio-resources.md#元数据缓存读取)。公开音乐库浏览身份选择中的用户搜索由 `loginUsername.vue` 独立负责。
+`src/api/others.js` 的 `search({ category, keywords, offset, limit })` 集中解释远端类别、字段、空结果与分页协议，返回 `{ items, hasMore }`。音乐查询只累计结果、管理加载归属并通过 `getTrackDetail` 补齐歌曲；`loginUsername.vue` 使用 `users` 类别，独立管理公开音乐库身份选择。元数据读取及可播放转换的职责见[Metadata reads](playback-and-audio-resources.md#元数据缓存读取)。
 
 ## 歌词内容与平台发布
 

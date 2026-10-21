@@ -38,7 +38,7 @@ App 调用 `library/loadApplication`，音乐库页调用 `library/loadPage`，�
 
 `src/utils/request.js` 使用 Axios，返回成功响应的业务数据。应用必须调用 `configureRequest` 提供设置读取、凭据读取、失效处理和请求环境；缺少失效处理会拒绝配置，未配置时不允许发送请求。请求实现不导入 router 或 session。
 
-被拒绝的响应同时包含 `code === 301` 与 `msg === '需要登录'` 时，请求层调用失效处理；`/logout` 被排除，避免主动退出递归失效。普通网络故障、超时和其他拒绝维持 `undefined` 结果，不引入统一错误类型或失败 rejection 契约。
+被拒绝的响应同时包含 `code === 301` 与 `msg === '需要登录'` 时，请求层调用失效处理；`/logout` 被排除，避免主动退出递归失效。拦截器处理后交还原始请求错误，不另建错误类型。二维码操作集中处理初次读取与轮询失败，调度终点负责续排；每日凭据刷新在自身 action 收尾，成功后记录刷新日期。
 
 `src/application/requestEnvironment.js` 集中选择 Web/Electron API 地址，并配置 cookie、realIP 和 HTTP/HTTPS proxy。跨源 Web API 在参数中携带现有 `MUSIC_U`；相对 Web 地址与 Electron 继续使用浏览器凭据传输。`src/application/credentials.js` 统一浏览器 cookie 与 `cookie-*` 本地存储的读写和删除。
 

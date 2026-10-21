@@ -140,8 +140,21 @@ const router = new VueRouter({
 });
 
 const originalPush = VueRouter.prototype.push;
-VueRouter.prototype.push = function push(location) {
-  return originalPush.call(this, location).catch(err => err);
+VueRouter.prototype.push = function push(location, onComplete, onAbort) {
+  if (onComplete || onAbort) {
+    return originalPush.call(this, location, onComplete, onAbort);
+  }
+  return originalPush.call(this, location).catch(error => {
+    if (
+      VueRouter.isNavigationFailure(
+        error,
+        VueRouter.NavigationFailureType.duplicated
+      )
+    ) {
+      return error;
+    }
+    throw error;
+  });
 };
 
 router.beforeEach((to, from, next) => {

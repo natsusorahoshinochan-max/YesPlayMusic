@@ -110,7 +110,7 @@ const rows = playback.upcoming(100);
 const details = await getTrackDetail(rows.map(row => row.trackId).join(','));
 ```
 
-待播页面负责取得展示资料并按 `rows` 呈现，队列计算归 Playback。
+待播页面只保存当前待播条目的展示资料，依赖元数据缓存读取，不积累历史详情。队列变化启动整批读取，只有当前读取可替换展示资料；资料就绪过滤与分组展示留在页面，队列计算归 Playback。
 
 ## 完整播放操作的归属
 
@@ -176,6 +176,8 @@ Metadata reads 保留歌曲详情、普通歌词、云盘歌词和专辑的具�
 4. 将缓存写入纳入对应异步处理，统一接收后台刷新和写入失败。
 
 具体读取 implementation 负责歌曲 ID 顺序、privileges、可播放状态映射、云盘请求参数与专辑转换。共享 helper 只组织读取顺序和后台失败处理；各次调用独立执行。
+
+云盘读取与上传结果的 `simpleSong`、听歌排行的 `song` 在各自数据入口使用同一可播放映射，歌曲行直接读取 `playable`。私人 FM 的展示资料保持 `artists/album` 字段，FM 卡直接消费；实际播放仍按歌曲 ID 取得普通歌曲详情。
 
 艺人读取返回艺人资料与热门歌曲记录。艺人页面通过歌曲详情入口补齐展示资料；播放来源只提取歌曲 ID，艺人 MV 页面只读取艺人资料。
 

@@ -50,7 +50,7 @@ export function createAudioResources({
   };
   const resources = {
     async resolve(track) {
-      const row = await cache.getTrackSource(Number(track.id));
+      const row = await cache.getTrackSource(track.id);
       if (row)
         return {
           kind: 'bytes',
@@ -66,8 +66,6 @@ export function createAudioResources({
       const response = await getMP3(track.id, {
         quality: settings().musicQuality,
       });
-      if (!response || !Array.isArray(response.data))
-        throw new Error('Invalid NetEase audio response');
       const entry = response.data[0];
       if (!entry?.url || entry.freeTrialInfo !== null)
         return resolveFallback(track);

@@ -16,41 +16,31 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
       limit: 2000,
       timestamp: Date.now(),
     });
-    if (!Array.isArray(result?.playlist))
-      throw new Error('Playlist collection unavailable');
-    if (result.playlist) {
-      setCollection(context, 'playlists', result.playlist);
-      context.commit('setLikedSongPlaylistID', result.playlist[0]?.id || 0);
-    }
+    setCollection(context, 'playlists', result.playlist);
+    context.commit('setLikedSongPlaylistID', result.playlist[0]?.id || 0);
   }
 
   async function loadPreview(context) {
     const id = context.state.likedSongPlaylistID;
     const result = id ? await api.getPlaylistDetail(id, true) : null;
-    if (id && !Array.isArray(result?.playlist?.trackIds))
-      throw new Error('Liked songs preview unavailable');
-    const ids = result?.playlist?.trackIds?.map(track => track.id) || [];
+    const ids = id ? result.playlist.trackIds.map(track => track.id) : [];
     if (!context.rootGetters['session/hasAccount']) {
       setCollection(context, 'songs', ids);
     }
     const tracks = ids.length
       ? (await api.getTrackDetail(ids.slice(0, 12).join(','))).songs
       : [];
-    if (!Array.isArray(tracks))
-      throw new Error('Liked songs preview tracks unavailable');
     setCollection(context, 'songsWithDetails', tracks);
     context.commit('setPreviewReady');
   }
 
   async function loadSongs(context) {
     const result = await api.userLikedSongsIDs(context.state.user.userId);
-    if (!Array.isArray(result?.ids)) throw new Error('Liked songs unavailable');
-    if (result.ids) setCollection(context, 'songs', result.ids);
+    setCollection(context, 'songs', result.ids);
   }
 
   async function loadCollection(context, name, endpoint, limit) {
     const result = await api[endpoint]({ limit });
-    if (!Array.isArray(result?.data)) throw new Error('Collection unavailable');
     setCollection(context, name, result.data);
   }
 

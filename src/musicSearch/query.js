@@ -2,15 +2,9 @@ import Vue from 'vue';
 import { search } from '@/api/others';
 import { getTrackDetail } from '@/api/track';
 
-const categories = {
-  tracks: { type: 1, field: 'songs', count: 'songCount' },
-  artists: { type: 100, field: 'artists', count: 'artistCount' },
-  albums: { type: 10, field: 'albums', count: 'albumCount' },
-  musicVideos: { type: 1004, field: 'mvs', count: 'mvCount' },
-  playlists: { type: 1000, field: 'playlists', count: 'playlistCount' },
-};
+const categories = ['tracks', 'artists', 'albums', 'musicVideos', 'playlists'];
 const emptyResults = () =>
-  Object.fromEntries(Object.keys(categories).map(key => [key, []]));
+  Object.fromEntries(categories.map(category => [category, []]));
 
 export function createMusicSearchQuery({
   getIdentity = () => null,
@@ -57,25 +51,20 @@ export function createMusicSearchQuery({
     state.loading = true;
     const position = offset;
     try {
-      const config = categories[category];
       const isCurrent = () =>
         current(job) &&
         job.identityGeneration === identityGeneration &&
         job.identity === JSON.stringify(getIdentity());
-      const response = await search(
+      const { items: page, hasMore } = await search(
         {
           keywords: intent.keywords,
-          type: config.type,
+          category,
           offset: position,
-          ...(limit ? { limit } : {}),
+          limit,
         },
         { isCurrent }
       );
       if (!current(job)) return;
-      if (!response?.result)
-        throw new Error(response?.msg || response?.message || '搜索失败');
-      const result = response.result;
-      const page = result[config.field] ?? [];
       let items = page;
       if (category === 'tracks' && page.length) {
         const details = await getTrackDetail(
@@ -83,17 +72,13 @@ export function createMusicSearchQuery({
           { isCurrent }
         );
         if (!current(job)) return;
-        if (!details?.songs) throw new Error('歌曲详情读取失败');
         items = details.songs;
       }
       if (!current(job)) return;
       state.results[category] = state.results[category].concat(items);
       if (intent.category !== 'overview') {
         offset = position + page.length;
-        state.hasMore =
-          page.length > 0 &&
-          (result.hasMore ?? true) &&
-          (result[config.count] == null || offset < result[config.count]);
+        state.hasMore = hasMore;
       }
     } catch (error) {
       if (current(job)) {
@@ -119,15 +104,13 @@ export function createMusicSearchQuery({
       state.hasMore = false;
       if (
         !next.keywords ||
-        (!categories[next.category] && next.category !== 'overview')
+        (!categories.includes(next.category) && next.category !== 'overview')
       ) {
         state.loaded = true;
         return Promise.resolve();
       }
       return next.category === 'overview'
-        ? Promise.all(
-            Object.keys(categories).map(category => readPage(category, 16))
-          )
+        ? Promise.all(categories.map(category => readPage(category, 16)))
         : readPage(next.category);
     },
     loadNext() {

@@ -3,14 +3,16 @@
     <img :src="nextTrackCover" style="display: none" loading="lazy" />
     <img
       class="cover"
-      :src="(track.album || track.al || {}).picUrl | resizeImage(512)"
+      :src="(trackID ? track.album.picUrl : '') | resizeImage(512)"
       loading="lazy"
       @click="goToAlbum"
     />
     <div class="right-part">
       <div class="info">
         <div class="title">{{ track.name }}</div>
-        <div class="artist"><ArtistsInLine :artists="artists" /></div>
+        <div class="artist"
+          ><ArtistsInLine v-if="trackID" :artists="track.artists"
+        /></div>
       </div>
       <div class="controls">
         <div class="buttons">
@@ -63,15 +65,13 @@ export default {
     isPlaying() {
       return this.player.playing && this.player.isPersonalFM;
     },
-    artists() {
-      return this.track.artists || this.track.ar || [];
-    },
     nextTrackCover() {
-      const cover =
-        this.player.personalFMNextTrack?.album?.picUrl ||
-        this.player.personalFMNextTrack?.al?.picUrl;
-      return cover
-        ? `${cover.replace('http://', 'https://')}?param=512y512`
+      const nextTrack = this.player.personalFMNextTrack;
+      return nextTrack.id
+        ? `${nextTrack.album.picUrl.replace(
+            'http://',
+            'https://'
+          )}?param=512y512`
         : '';
     },
   },
@@ -91,17 +91,16 @@ export default {
       return this.playback.next({ personalFM: true });
     },
     goToAlbum() {
-      const album = this.track.album || this.track.al;
-      if (!album?.id) return;
-      this.$router.push({ path: '/album/' + album.id });
+      if (!this.trackID) return;
+      this.$router.push({ path: '/album/' + this.track.album.id });
     },
     moveToFMTrash() {
       if (this.$store.getters['session/hasAccount'])
         return this.playback.discardFMTrack();
     },
     getColor() {
-      if (!this.player.personalFMTrack?.album?.picUrl) return;
-      const cover = `${this.player.personalFMTrack.album.picUrl.replace(
+      if (!this.trackID) return;
+      const cover = `${this.track.album.picUrl.replace(
         'http://',
         'https://'
       )}?param=512y512`;
