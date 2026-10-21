@@ -1,81 +1,61 @@
 <template>
   <div class="track-list">
     <ContextMenu ref="menu">
-      <div v-show="type !== 'cloudDisk'" class="item-info">
-        <img
-          :src="rightClickedTrackComputed.al.picUrl | resizeImage(224)"
-          loading="lazy"
-        />
-        <div class="info">
-          <div class="title">{{ rightClickedTrackComputed.name }}</div>
-          <div class="subtitle">{{ rightClickedTrackComputed.ar[0].name }}</div>
-        </div>
-      </div>
-      <hr v-show="type !== 'cloudDisk'" />
-      <div class="item" @click="play">{{ $t('contextMenu.play') }}</div>
-      <div class="item" @click="addToQueue">{{
-        $t('contextMenu.addToQueue')
-      }}</div>
-      <div
-        v-if="extraContextMenuItem.includes('removeTrackFromQueue')"
-        class="item"
-        @click="removeTrackFromQueue"
-        >从队列删除</div
-      >
-      <hr v-show="type !== 'cloudDisk'" />
-      <div
-        v-show="!isRightClickedTrackLiked && type !== 'cloudDisk'"
-        class="item"
-        @click="like"
-      >
-        {{ $t('contextMenu.saveToMyLikedSongs') }}
-      </div>
-      <div
-        v-show="isRightClickedTrackLiked && type !== 'cloudDisk'"
-        class="item"
-        @click="like"
-      >
-        {{ $t('contextMenu.removeFromMyLikedSongs') }}
-      </div>
-      <div
-        v-if="extraContextMenuItem.includes('removeTrackFromPlaylist')"
-        class="item"
-        @click="removeTrackFromPlaylist"
-        >从歌单中删除</div
-      >
-      <div
-        v-show="type !== 'cloudDisk'"
-        class="item"
-        @click="addTrackToPlaylist"
-        >{{ $t('contextMenu.addToPlaylist') }}</div
-      >
-      <div v-show="type !== 'cloudDisk'" class="item" @click="copyLink">{{
-        $t('contextMenu.copyUrl')
-      }}</div>
-      <div
-        v-if="extraContextMenuItem.includes('removeTrackFromCloudDisk')"
-        class="item"
-        @click="removeTrackFromCloudDisk"
-        >从云盘中删除</div
-      >
+      <template v-if="rightClickedItem">
+        <slot name="context-menu" :item="rightClickedItem">
+          <div class="item-info">
+            <img
+              :src="rightClickedTrack.al.picUrl | resizeImage(224)"
+              loading="lazy"
+            />
+            <div class="info">
+              <div class="title">{{ rightClickedTrack.name }}</div>
+              <div class="subtitle">{{ rightClickedTrack.ar[0].name }}</div>
+            </div>
+          </div>
+          <hr />
+          <div class="item" @click="play">{{ $t('contextMenu.play') }}</div>
+          <div class="item" @click="addToQueue">{{
+            $t('contextMenu.addToQueue')
+          }}</div>
+          <hr />
+          <div v-show="!isRightClickedTrackLiked" class="item" @click="like">
+            {{ $t('contextMenu.saveToMyLikedSongs') }}
+          </div>
+          <div v-show="isRightClickedTrackLiked" class="item" @click="like">
+            {{ $t('contextMenu.removeFromMyLikedSongs') }}
+          </div>
+          <div
+            v-if="extraContextMenuItem.includes('removeTrackFromPlaylist')"
+            class="item"
+            @click="removeTrackFromPlaylist"
+            >从歌单中删除</div
+          >
+          <div class="item" @click="addTrackToPlaylist">{{
+            $t('contextMenu.addToPlaylist')
+          }}</div>
+          <div class="item" @click="copyLink">{{
+            $t('contextMenu.copyUrl')
+          }}</div>
+        </slot>
+        <slot name="context-menu-extra" :item="rightClickedItem" />
+      </template>
     </ContextMenu>
 
     <div :style="listStyles">
       <TrackListItem
-        v-for="(track, index) in tracks"
+        v-for="(item, index) in items"
         :key="index"
-        :track-prop="track"
+        :track="trackOf(item)"
         :track-no="index + 1"
         :type="type"
         :album-artist="albumObject.artist.name"
-        :is-liked="liked.songs.includes(track.id)"
+        :is-liked="liked.songs.includes(trackOf(item).id)"
         :menu-open="rightClickedTrackIndex === index"
         :menu-active="rightClickedTrackIndex >= 0"
-        :identity="rowIdentities[index] || index"
-        :row-index="index"
         :highlight-playing-track="highlightPlayingTrack"
-        @activate="$emit('activate', $event)"
-        @click.right.native="openMenu($event, track, index)"
+        @activate="$emit('activate', item)"
+        @click.right.native="openMenu($event, item, index)"
       />
     </div>
   </div>
@@ -99,13 +79,13 @@ export default {
     ContextMenu,
   },
   props: {
-    tracks: {
+    items: {
       type: Array,
       default: () => {
         return [];
       },
     },
-    rowIdentities: { type: Array, default: () => [] },
+    trackOf: { type: Function, default: item => item },
     type: {
       type: String,
       default: 'tracklist',
@@ -129,8 +109,6 @@ export default {
       default: () => {
         return [
           // 'removeTrackFromPlaylist'
-          // 'removeTrackFromQueue'
-          // 'removeTrackFromCloudDisk'
         ];
       },
     },
@@ -145,12 +123,7 @@ export default {
   },
   data() {
     return {
-      rightClickedTrack: {
-        id: 0,
-        name: '',
-        ar: [{ name: '' }],
-        al: { picUrl: '' },
-      },
+      rightClickedItem: null,
       rightClickedTrackIndex: -1,
       listStyles: {},
     };
@@ -161,15 +134,8 @@ export default {
     isRightClickedTrackLiked() {
       return this.liked.songs.includes(this.rightClickedTrack?.id);
     },
-    rightClickedTrackComputed() {
-      return this.type === 'cloudDisk'
-        ? {
-            id: 0,
-            name: '',
-            ar: [{ name: '' }],
-            al: { picUrl: '' },
-          }
-        : this.rightClickedTrack;
+    rightClickedTrack() {
+      return this.trackOf(this.rightClickedItem);
     },
   },
   created() {
@@ -184,18 +150,13 @@ export default {
   methods: {
     ...mapMutations(['updateModal']),
     ...mapActions(['showToast']),
-    openMenu(e, track, index = -1) {
-      this.rightClickedTrack = track;
+    openMenu(e, item, index) {
+      this.rightClickedItem = item;
       this.rightClickedTrackIndex = index;
       this.$refs.menu.openMenu(e);
     },
     closeMenu() {
-      this.rightClickedTrack = {
-        id: 0,
-        name: '',
-        ar: [{ name: '' }],
-        al: { picUrl: '' },
-      };
+      this.rightClickedItem = null;
       this.rightClickedTrackIndex = -1;
     },
     play() {
@@ -253,19 +214,6 @@ export default {
         .catch(err => {
           this.showToast(`${locale.t('toast.copyFailed')}${err}`);
         });
-    },
-    removeTrackFromQueue() {
-      const entry = this.rowIdentities[this.rightClickedTrackIndex];
-      if (entry?.group === 'next') this.player.removeNext(entry.index);
-    },
-    async removeTrackFromCloudDisk() {
-      if (!confirm(`确定要从云盘删除 ${this.rightClickedTrack.songName}？`))
-        return;
-      const result = await this.$store.dispatch(
-        'library/deleteCloudTrack',
-        this.rightClickedTrack.songId
-      );
-      showLibraryChangeFeedback(this.$store, result, '已将此歌曲从云盘删除');
     },
   },
 };

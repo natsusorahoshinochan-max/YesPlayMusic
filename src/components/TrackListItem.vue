@@ -105,22 +105,19 @@ import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 import ArtistsInLine from '@/components/ArtistsInLine.vue';
 import ExplicitSymbol from '@/components/ExplicitSymbol.vue';
 import { mapGetters } from 'vuex';
-import { isNil } from 'lodash';
 
 export default {
   name: 'TrackListItem',
   components: { ArtistsInLine, ExplicitSymbol },
 
   props: {
-    trackProp: { type: Object, required: true },
+    track: { type: Object, required: true },
     trackNo: { type: Number, required: true },
     type: { type: String, default: 'tracklist' },
     albumArtist: { type: String, default: '' },
     isLiked: Boolean,
     menuOpen: Boolean,
     menuActive: Boolean,
-    identity: { type: [Object, Number, String], default: null },
-    rowIndex: { type: Number, required: true },
     highlightPlayingTrack: {
       type: Boolean,
       default: true,
@@ -134,29 +131,20 @@ export default {
   computed: {
     ...mapGetters({ settings: 'preferences/settings' }),
 
-    track() {
-      return this.type === 'cloudDisk'
-        ? this.trackProp.simpleSong
-        : this.trackProp;
-    },
     playable() {
       return this.track.playable;
     },
     imgUrl() {
       let image =
         this.track?.al?.picUrl ??
-        this.track?.album?.picUrl ??
         'https://p2.music.126.net/UeTuwE7pvjBpypWLudqukA==/3132508627578625.jpg';
       return image + '?param=224y224';
     },
     artists() {
-      const { ar, artists } = this.track;
-      if (!isNil(ar)) return ar;
-      if (!isNil(artists)) return artists;
-      return [];
+      return this.track.ar;
     },
     album() {
-      return this.track.album || this.track.al || this.track?.simpleSong?.al;
+      return this.track.al;
     },
     subTitle() {
       let tn = undefined;
@@ -230,11 +218,7 @@ export default {
       this.$router.push({ path: '/album/' + this.track.al.id });
     },
     activate() {
-      this.$emit('activate', {
-        track: this.trackProp,
-        index: this.rowIndex,
-        identity: this.identity,
-      });
+      this.$emit('activate');
     },
     likeThisSong() {
       return toggleTrackFavoriteWithFeedback(this.$store, this.track.id);

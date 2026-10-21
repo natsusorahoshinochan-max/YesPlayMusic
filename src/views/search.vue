@@ -42,11 +42,7 @@
           $t('home.seeMore')
         }}</router-link></div
       >
-      <TrackList
-        :tracks="tracks"
-        type="tracklist"
-        @activate="playSearchTrack"
-      />
+      <TrackList :items="tracks" type="tracklist" @activate="playSearchTrack" />
     </div>
 
     <div v-show="musicVideos.length > 0" class="music-videos">
@@ -148,7 +144,7 @@ export default {
     this.progress.dispose();
   },
   methods: {
-    playSearchTrack({ track }) {
+    playSearchTrack(track) {
       return this.$store.state.player.playTracks(
         this.tracks.map(t => t.id),
         {

@@ -45,19 +45,12 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
   }
 
   async function loadHistory(context) {
-    const result = await Promise.all(
+    const [allData, weekData] = await Promise.all(
       [0, 1].map(type =>
         api.userPlayHistory({ uid: context.state.user.userId, type })
       )
     );
-    const data = {};
-    ['allData', 'weekData'].forEach((name, index) => {
-      data[name] = result[index][name].map(item => ({
-        ...item.song,
-        playCount: item.playCount,
-      }));
-    });
-    setCollection(context, 'playHistory', data);
+    setCollection(context, 'playHistory', { allData, weekData });
   }
 
   function reportBackground(context, work) {
@@ -206,10 +199,8 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
         return write(
           context,
           () => api.uploadSong(file),
-          response => [
+          ({ track }) => [
             () => {
-              const track =
-                response?.body?.privateCloud || response?.privateCloud;
               if (track)
                 setCollection(context, 'cloudDisk', [
                   track,

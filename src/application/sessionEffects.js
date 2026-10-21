@@ -16,7 +16,7 @@ export function createSessionEffects({
           : isElectron
           ? 'loginAccount'
           : 'login';
-      if (router.currentRoute.name !== name) return router.push({ name });
+      return router.push({ name });
     },
   };
 }

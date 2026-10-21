@@ -6,7 +6,7 @@
 
 ## 歌曲行与播放入口
 
-`TrackListItem.vue` 接收展示 props，发出 `activate({ track, index, identity })`；`TrackList.vue` 提供行资料并转交事件。页面选择 Playback 的已有来源操作，或把当前集合交给 `playTracks`。`next.vue` 提供的 `identity` 是含分组与绝对位置的队列描述，页面把它交给 `playQueuedTrack`。列表布局类型只参与展示。
+`TrackListItem.vue` 接收歌曲，发出无参数的 `activate`。`TrackList.vue` 接收单一 `items` 序列，通过 `trackOf(item)` 取得展示歌曲，激活时交回原条目；普通歌曲列表使用默认恒等函数。待播页面传入附有歌曲详情的队列条目，并将原条目交给 `playQueuedTrack`；云盘页面传入云盘记录，使用其中的 `simpleSong` 展示、`songId` 执行操作。两类页面通过菜单插槽提供自身操作，通用列表不解释条目身份。列表布局类型只参与展示。
 
 歌单、专辑、艺人、音乐库、综合搜索、分类搜索、每日推荐和待播队列页面拥有各自的激活处理。每日推荐通过其 module 播放；其余来源读取、选择归属和音频交接由 [Playback](playback-and-audio-resources.md#playback-的公开-interface) 负责。菜单与收藏调用 [library 完整写操作](library-mutations-and-playlist-detail.md#library-的公开-interface)。
 
@@ -23,7 +23,7 @@
 | `src/musicSearch/query.js` | 每个查询的结果、分页、加载任务与采用归属；`replace`、`loadNext`、`dispose` | `src/application/musicSearch.js` 为每个页面创建实例，注入身份读取、订阅和反馈；两个搜索页面负责输入、展示与进度资源释放 |
 | `src/store/modules/dailyRecommendations.js` | 推荐快照、读取状态与进行中的加载；`load`、`play`、`identityChanged` | 卡片和页面读取同一 module 状态；装配注入推荐读取及取得现有 Playback 的函数；播放构造由 module 交给 `playTracks` |
 
-`src/api/others.js` 的 `search({ category, keywords, offset, limit })` 集中解释远端类别、字段、空结果与分页协议，返回 `{ items, hasMore }`。音乐查询只累计结果、管理加载归属并通过 `getTrackDetail` 补齐歌曲；`loginUsername.vue` 使用 `users` 类别，独立管理公开音乐库身份选择。元数据读取及可播放转换的职责见[Metadata reads](playback-and-audio-resources.md#元数据缓存读取)。
+`src/api/others.js` 的 `search({ category, keywords, offset, limit })` 集中解释远端类别、字段、空结果与分页协议，并通过 `getTrackDetail` 补齐歌曲，返回可直接展示的 `{ items, nextOffset }`。`nextOffset` 按原始搜索页数量推进，结束时为 `null`；音乐查询累计结果、保存续读位置并管理加载归属。`loginUsername.vue` 使用 `users` 类别，独立管理公开音乐库身份选择。元数据读取及可播放转换的职责见[Metadata reads](playback-and-audio-resources.md#元数据缓存读取)。
 
 ## 歌词内容与平台发布
 

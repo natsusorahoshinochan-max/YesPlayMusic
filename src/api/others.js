@@ -1,4 +1,5 @@
 import request from '@/utils/request';
+import { getTrackDetail } from '@/api/track';
 
 const searchCategories = {
   tracks: { type: 1, field: 'songs', count: 'songCount' },
@@ -21,14 +22,23 @@ export async function search(
     method: 'get',
     params: { keywords, type, limit, offset },
   });
-  const items = result[field] ?? [];
-  return {
-    items,
-    hasMore:
-      items.length > 0 &&
-      (result.hasMore ?? true) &&
-      (result[count] == null || offset + items.length < result[count]),
-  };
+  const page = result[field] ?? [];
+  const nextOffset = offset + page.length;
+  const hasMore =
+    page.length > 0 &&
+    (result.hasMore ?? true) &&
+    (result[count] == null || nextOffset < result[count]);
+  let items = page;
+  if (category === 'tracks' && page.length) {
+    const details = await getTrackDetail(
+      page.map(track => track.id).join(','),
+      {
+        isCurrent,
+      }
+    );
+    items = details.songs;
+  }
+  return { items, nextOffset: hasMore ? nextOffset : null };
 }
 
 export function personalFM() {

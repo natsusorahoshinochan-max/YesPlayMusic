@@ -36,9 +36,8 @@ export default function createSession(
   function scheduleQr(context, run) {
     if (run.stopped || !run.key) return;
     run.timer = time.schedule(async () => {
-      let result;
       try {
-        result = await auth.loginQrCodeCheck(run.key);
+        const result = await auth.loginQrCodeCheck(run.key);
         if (run.stopped) return;
         if (result.code === 800) {
           context.commit('setQr', { information: '二维码已失效，请重新扫码' });
@@ -46,10 +45,14 @@ export default function createSession(
         } else if (result.code === 803) {
           stopQr();
           context.commit('setQr', { information: '登录成功，请稍等...' });
-          await enterAccount(
-            context,
-            result.cookie.replaceAll(' HTTPOnly', '')
-          );
+          try {
+            await enterAccount(
+              context,
+              result.cookie.replaceAll(' HTTPOnly', '')
+            );
+          } catch {
+            notify('登录失败，请重试');
+          }
         } else if (result.code === 802) {
           context.commit('setQr', {
             information: '扫描成功，请在手机上确认登录',
@@ -60,8 +63,6 @@ export default function createSession(
       } catch {
         if (!run.stopped) {
           context.commit('setQr', { information: '二维码连接失败，正在重试' });
-        } else if (result?.code === 803) {
-          notify('登录失败，请重试');
         }
       } finally {
         scheduleQr(context, run);

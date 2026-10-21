@@ -21,9 +21,9 @@
       </div>
 
       <TrackList
-        :tracks="dailyTracks"
+        :items="dailyTracks"
         type="playlist"
-        @activate="playDailyTracks($event.track.id)"
+        @activate="playDailyTracks($event.id)"
       />
     </div>
   </div>

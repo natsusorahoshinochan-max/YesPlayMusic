@@ -33,10 +33,10 @@
       </div>
       <div class="songs">
         <TrackList
-          :tracks="liked.songsWithDetails"
+          :items="liked.songsWithDetails"
           :column-number="3"
           type="tracklist"
-          @activate="playLikedSongs($event.track.id)"
+          @activate="playLikedSongs($event.id)"
         />
       </div>
     </div>
@@ -144,12 +144,28 @@
 
       <div v-show="currentTab === 'cloudDisk'">
         <TrackList
-          :tracks="liked.cloudDisk"
+          :items="liked.cloudDisk"
+          :track-of="record => record.simpleSong"
           :column-number="3"
           type="cloudDisk"
-          :extra-context-menu-item="['removeTrackFromCloudDisk']"
           @activate="playCloudTrack"
-        />
+        >
+          <template #context-menu="{ item }">
+            <div
+              class="item"
+              @click="
+                $store.state.player.enqueueNext(item.songId, { playNow: true })
+              "
+              >{{ $t('contextMenu.play') }}</div
+            >
+            <div
+              class="item"
+              @click="$store.state.player.enqueueNext(item.songId)"
+              >{{ $t('contextMenu.addToQueue') }}</div
+            >
+            <div class="item" @click="removeCloudTrack(item)">从云盘中删除</div>
+          </template>
+        </TrackList>
       </div>
 
       <div v-show="currentTab === 'playHistory'">
@@ -172,7 +188,7 @@
           {{ $t('library.playHistory.all') }}
         </button>
         <TrackList
-          :tracks="playHistoryList"
+          :items="playHistoryList"
           :column-number="1"
           type="tracklist"
           @activate="playHistoryTrack"
@@ -330,7 +346,7 @@ export default {
         .catch(() => this.showToast('音乐库加载失败'))
         .finally(() => NProgress.done());
     },
-    playCloudTrack({ track }) {
+    playCloudTrack(track) {
       return this.$store.state.player.playTracks(
         this.liked.cloudDisk.map(t => t.songId),
         {
@@ -339,7 +355,15 @@ export default {
         }
       );
     },
-    playHistoryTrack({ track }) {
+    async removeCloudTrack(track) {
+      if (!confirm(`确定要从云盘删除 ${track.songName}？`)) return;
+      const result = await this.$store.dispatch(
+        'library/deleteCloudTrack',
+        track.songId
+      );
+      showLibraryChangeFeedback(this.$store, result, '已将此歌曲从云盘删除');
+    },
+    playHistoryTrack(track) {
       return this.$store.state.player.playTracks(
         this.playHistoryList.map(t => t.id),
         {

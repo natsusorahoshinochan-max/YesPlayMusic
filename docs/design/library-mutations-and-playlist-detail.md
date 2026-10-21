@@ -94,6 +94,8 @@ type CreatePlaylistResult = {
 
 远端响应字段和嵌套结构留在 library implementation。普通业务结果使用上述结构，程序错误继续抛出。无结果的处理归属本次 library 操作，现有请求 module 继续承担其请求处理职责。
 
+上传入口将远端包装解为 `{ code, message, track }`；共享写操作根据确认字段判断结果，云盘集合更新直接使用 `track`，不再读取远端包装。
+
 ### 执行顺序与完成条件
 
 1. library 在每次写操作执行前读取当前账号权限。访客和公开音乐库浏览身份获得 `denied`，不发送写请求。

@@ -1,24 +1,31 @@
 <template>
   <div class="next-tracks">
-    <h1>{{ $t('next.nowPlaying') }}</h1>
-    <TrackList :tracks="[currentTrack]" type="playlist" />
+    <template v-if="currentTrack.id">
+      <h1>{{ $t('next.nowPlaying') }}</h1>
+      <TrackList :items="[currentTrack]" type="playlist" />
+    </template>
     <h1 v-show="nextRows.length > 0"
       >插队播放
       <button @click="player.clearNext()">清除队列</button>
     </h1>
     <TrackList
       v-show="nextRows.length > 0"
-      :tracks="nextRows.map(row => row.track)"
-      :row-identities="nextRows"
+      :items="nextRows"
+      :track-of="row => row.track"
       type="playlist"
       :highlight-playing-track="false"
-      :extra-context-menu-item="['removeTrackFromQueue']"
       @activate="playQueueEntry"
-    />
+    >
+      <template #context-menu-extra="{ item }">
+        <div class="item" @click="player.removeNext(item.index)"
+          >从队列删除</div
+        >
+      </template>
+    </TrackList>
     <h1>{{ $t('next.nextUp') }}</h1>
     <TrackList
-      :tracks="mainRows.map(row => row.track)"
-      :row-identities="mainRows"
+      :items="mainRows"
+      :track-of="row => row.track"
       type="playlist"
       :highlight-playing-track="false"
       @activate="playQueueEntry"
@@ -28,6 +35,7 @@
 
 <script>
 import { mapState } from 'vuex';
+import { isEqual } from 'lodash';
 import { getTrackDetail } from '@/api/track';
 import TrackList from '@/components/TrackList.vue';
 
@@ -38,7 +46,7 @@ export default {
   },
   data() {
     return {
-      tracks: [],
+      entries: [],
       tracksRequest: 0,
     };
   },
@@ -47,50 +55,46 @@ export default {
     currentTrack() {
       return this.player.state.currentTrack;
     },
-    upcomingKey() {
-      // Reading the snapshot makes queue and mode transitions reactive.
-      this.player.state;
-      return JSON.stringify(this.player.upcoming(100));
-    },
     upcomingRows() {
-      return JSON.parse(this.upcomingKey);
-    },
-    readyRows() {
-      return this.upcomingRows
-        .map(row => ({
-          ...row,
-          track: this.tracks.find(track => track.id === row.trackId),
-        }))
-        .filter(row => row.track);
+      this.player.state;
+      return this.player.upcoming(100);
     },
     nextRows() {
-      return this.readyRows.filter(row => row.group === 'next');
+      return this.entries.filter(row => row.group === 'next');
     },
     mainRows() {
-      return this.readyRows.filter(row => row.group === 'main');
+      return this.entries.filter(row => row.group === 'main');
     },
   },
   watch: {
-    upcomingKey: {
+    upcomingRows: {
       immediate: true,
-      handler: 'loadTracks',
+      handler(rows, previous) {
+        if (!isEqual(rows, previous)) this.loadTracks(rows);
+      },
     },
   },
   activated() {
     this.$parent.$refs.scrollbar.restorePosition();
   },
   methods: {
-    playQueueEntry({ track, identity }) {
-      return this.player.playQueuedTrack(track.id, identity);
+    playQueueEntry(entry) {
+      return this.player.playQueuedTrack(entry.trackId, entry);
     },
-    async loadTracks() {
+    async loadTracks(rows) {
       const request = ++this.tracksRequest;
-      const ids = this.upcomingRows.map(row => row.trackId);
-      this.tracks = [];
+      const ids = rows.map(row => row.trackId);
+      this.entries = [];
       if (!ids.length) return;
       try {
         const data = await getTrackDetail(ids.join(','));
-        if (request === this.tracksRequest) this.tracks = data.songs;
+        if (request !== this.tracksRequest) return;
+        this.entries = rows
+          .map(row => ({
+            ...row,
+            track: data.songs.find(track => track.id === row.trackId),
+          }))
+          .filter(row => row.track);
       } catch (error) {
         console.debug('[upcoming metadata]', error);
       }

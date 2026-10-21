@@ -1,6 +1,5 @@
 import Vue from 'vue';
 import { search } from '@/api/others';
-import { getTrackDetail } from '@/api/track';
 
 const categories = ['tracks', 'artists', 'albums', 'musicVideos', 'playlists'];
 const emptyResults = () =>
@@ -15,14 +14,16 @@ export function createMusicSearchQuery({
     results: emptyResults(),
     loading: false,
     loaded: false,
-    hasMore: false,
+    nextOffset: null,
+    get hasMore() {
+      return this.nextOffset !== null;
+    },
     error: null,
   });
   let generation = 0;
   let identityGeneration = 0;
   let disposed = false;
   let intent;
-  let offset = 0;
   const jobs = new Set();
   const current = job =>
     !disposed &&
@@ -37,7 +38,7 @@ export function createMusicSearchQuery({
   const unsubscribe = subscribeIdentity?.(() => {
     identityGeneration++;
     state.results.tracks = [];
-    if (intent?.category === 'tracks') state.hasMore = false;
+    if (intent?.category === 'tracks') state.nextOffset = null;
     updateLoading();
   });
   async function readPage(category, limit) {
@@ -49,13 +50,13 @@ export function createMusicSearchQuery({
     };
     jobs.add(job);
     state.loading = true;
-    const position = offset;
+    const position = state.nextOffset ?? 0;
     try {
       const isCurrent = () =>
         current(job) &&
         job.identityGeneration === identityGeneration &&
         job.identity === JSON.stringify(getIdentity());
-      const { items: page, hasMore } = await search(
+      const { items, nextOffset } = await search(
         {
           keywords: intent.keywords,
           category,
@@ -65,20 +66,9 @@ export function createMusicSearchQuery({
         { isCurrent }
       );
       if (!current(job)) return;
-      let items = page;
-      if (category === 'tracks' && page.length) {
-        const details = await getTrackDetail(
-          page.map(track => track.id).join(','),
-          { isCurrent }
-        );
-        if (!current(job)) return;
-        items = details.songs;
-      }
-      if (!current(job)) return;
       state.results[category] = state.results[category].concat(items);
       if (intent.category !== 'overview') {
-        offset = position + page.length;
-        state.hasMore = hasMore;
+        state.nextOffset = nextOffset;
       }
     } catch (error) {
       if (current(job)) {
@@ -96,12 +86,11 @@ export function createMusicSearchQuery({
       if (disposed) return Promise.resolve();
       generation++;
       intent = next;
-      offset = 0;
       state.results = emptyResults();
       state.error = null;
       state.loaded = false;
       state.loading = false;
-      state.hasMore = false;
+      state.nextOffset = null;
       if (
         !next.keywords ||
         (!categories.includes(next.category) && next.category !== 'overview')

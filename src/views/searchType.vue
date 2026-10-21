@@ -18,7 +18,7 @@
       />
     </div>
     <div v-if="type === 'tracks'">
-      <TrackList :tracks="result" type="playlist" @activate="playSearchTrack" />
+      <TrackList :items="result" type="playlist" @activate="playSearchTrack" />
     </div>
     <div v-if="type === 'musicVideos'">
       <MvRow :mvs="result" />
@@ -99,7 +99,7 @@ export default {
     this.progress.dispose();
   },
   methods: {
-    playSearchTrack({ track }) {
+    playSearchTrack(track) {
       return this.$store.state.player.playTracks(
         this.result.map(t => t.id),
         {

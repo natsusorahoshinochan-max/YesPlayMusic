@@ -68,12 +68,11 @@ export function userPlayHistory(params) {
     params,
   }).then(data => {
     const records = params.type === 1 ? data.weekData : data.allData;
-    mapTrackPlayableStatus(
-      records.map(record => record.song),
+    return mapTrackPlayableStatus(
+      records.map(record => ({ ...record.song, playCount: record.playCount })),
       [],
       readIdentity()
     );
-    return data;
   });
 }
 
@@ -179,9 +178,20 @@ export function uploadSong(file) {
     },
     timeout: 200000,
   }).then(response => {
-    const track = response.body?.privateCloud || response.privateCloud;
-    if (track) mapTrackPlayableStatus([track.simpleSong], [], readIdentity());
-    return response;
+    const body = response.body || response;
+    const record = body.privateCloud;
+    return {
+      code: body.code,
+      message: body.message || body.msg,
+      track: record && {
+        ...record,
+        simpleSong: mapTrackPlayableStatus(
+          [record.simpleSong],
+          [],
+          readIdentity()
+        )[0],
+      },
+    };
   });
 }
 
@@ -201,12 +211,16 @@ export function cloudDisk(params = {}) {
     method: 'get',
     params,
   }).then(data => {
-    mapTrackPlayableStatus(
-      data.data.map(record => record.simpleSong),
-      [],
-      readIdentity()
-    );
-    return data;
+    return {
+      data: data.data.map(record => ({
+        ...record,
+        simpleSong: mapTrackPlayableStatus(
+          [record.simpleSong],
+          [],
+          readIdentity()
+        )[0],
+      })),
+    };
   });
 }
 
