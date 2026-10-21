@@ -1,4 +1,6 @@
 import { createPlayback } from '@/playback';
+import { createAudioAdapter } from '@/playback/audioAdapter';
+import { EventEmitter } from 'events';
 
 const track = id => ({
   id,
@@ -16,7 +18,7 @@ const deferred = () => {
   });
   return { promise, resolve, reject };
 };
-function setup() {
+function setup(audio) {
   const outputs = { states: [], progress: [], feedback: [], events: [] };
   const handles = [];
   const getTrack = jest.fn(async id => track(id));
@@ -54,12 +56,13 @@ function setup() {
     handles.push(handle);
     return handle;
   });
+  const trash = jest.fn(async () => {});
   const playback = createPlayback({
     getTrack,
     sourceLists: { playlist },
     resources: { resolve },
-    audio: { prepare },
-    personalFM: { load: loadFM },
+    audio: audio || { prepare },
+    personalFM: { load: loadFM, trash },
     setInterval: () => 0,
     clearInterval: () => {},
     onStateChange: value => outputs.states.push(value),
@@ -82,6 +85,7 @@ function setup() {
     playlist,
     prepare,
     loadFM,
+    trash,
   };
 }
 
@@ -186,26 +190,6 @@ describe('latest selection terminal failure contract (Spec #17)', () => {
     f.playback.dispose();
   });
 
-  test('retryable preparation remains in the same operation until successful handoff', async () => {
-    const f = setup();
-    await f.playback.playTracks([1, 4]);
-    const old = f.handles[0];
-    f.prepare.mockRejectedValueOnce(
-      Object.assign(new Error('retry'), { retryable: true })
-    );
-    expect(await f.playback.playTracks([2, 3])).toEqual({
-      status: 'completed',
-    });
-    expect(f.playback.state.currentTrackID).toBe(2);
-    expect(f.playback.state.playing).toBe(true);
-    expect(old.dispose).toHaveBeenCalledTimes(1);
-    expect(f.outputs.feedback).toHaveLength(0);
-    expect(
-      f.outputs.events.filter(e => e.type === 'before-replace')
-    ).toHaveLength(1);
-    f.playback.dispose();
-  });
-
   test('terminal private FM request failure uses the same release and feedback contract', async () => {
     const f = setup();
     await f.playback.playTracks([1, 4]);
@@ -293,6 +277,148 @@ describe('unavailable selection terminal contract (Spec #17)', () => {
     expect(f.playback.state.playing).toBe(false);
     f.playback.toggle();
     expect(f.playback.state.playing).toBe(true);
+    f.playback.dispose();
+  });
+});
+
+function mediaFixture() {
+  const sounds = [];
+  const loads = [];
+  class Howl extends EventEmitter {
+    constructor() {
+      super();
+      this.position = 0;
+      this.unload = jest.fn();
+      this._sounds = [];
+      sounds.push(this);
+    }
+    load() {
+      const failure = loads.shift();
+      if (failure !== undefined) this.emit('loaderror', 0, failure);
+      else this.emit('load');
+    }
+    play() {
+      this.emit('play');
+    }
+    pause() {
+      this.emit('pause');
+    }
+    seek(value) {
+      if (value !== undefined) this.position = value;
+      return this.position;
+    }
+    volume() {}
+  }
+  return { sounds, loads, audio: createAudioAdapter({ Howl }) };
+}
+
+describe('media failures through the production audio adapter', () => {
+  test.each(['preparation', 'playing'])(
+    '%s media network errors re-resolve the same song and retain position',
+    async phase => {
+      const media = mediaFixture();
+      const f = setup(media.audio);
+      await f.playback.playTracks([1, 2]);
+      const old = media.sounds[0];
+      if (phase === 'preparation') {
+        media.loads.push(2);
+        await f.playback.playTracks([3, 4]);
+      } else {
+        f.playback.seek(12);
+        old.emit('playerror', 0, 2);
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      expect(f.playback.state.currentTrackID).toBe(
+        phase === 'preparation' ? 3 : 1
+      );
+      expect(f.playback.state.playing).toBe(true);
+      expect(f.playback.position()).toBe(phase === 'preparation' ? 0 : 12);
+      expect(old.unload).toHaveBeenCalledTimes(1);
+      expect(f.resolve.mock.calls.map(([value]) => value.id)).toEqual(
+        phase === 'preparation' ? [1, 3, 3] : [1, 1]
+      );
+      expect(f.outputs.feedback).toHaveLength(0);
+      f.playback.dispose();
+    }
+  );
+  test.each([3, 4])(
+    'media code %s skips through the same policy before and after preparation',
+    async code => {
+      for (const phase of ['preparation', 'playing']) {
+        const media = mediaFixture();
+        const f = setup(media.audio);
+        if (phase === 'preparation') media.loads.push(code);
+        await f.playback.playTracks([1, 2]);
+        if (phase === 'playing') {
+          media.sounds[0].emit('playerror', 0, code);
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        expect(f.playback.state.currentTrackID).toBe(2);
+        expect(f.playback.state.playing).toBe(true);
+        expect(f.outputs.feedback.map(value => value.reason)).toEqual(
+          code === 4 ? ['unsupported-format'] : []
+        );
+        f.playback.dispose();
+      }
+    }
+  );
+  test('output device rejection ends selection without media retry', async () => {
+    const media = mediaFixture();
+    const f = setup(media.audio);
+    await f.playback.playTracks([1]);
+    const failure = new DOMException(
+      'Requested device was not found',
+      'NotFoundError'
+    );
+    const original = media.audio.prepare;
+    media.audio.prepare = (descriptor, options) => {
+      const prepared = original(descriptor, options);
+      media.sounds.at(-1)._sounds = [
+        { _node: { setSinkId: () => Promise.reject(failure) } },
+      ];
+      return prepared;
+    };
+    expect(await f.playback.playTracks([2, 3])).toEqual({
+      status: 'failed',
+      reason: failure,
+    });
+    expect(f.resolve).toHaveBeenCalledTimes(2);
+    expect(f.playback.state.playing).toBe(false);
+    f.playback.dispose();
+  });
+});
+
+describe('personal FM reading and discard ownership', () => {
+  test('FM end adopts a failed next read through the FM operation', async () => {
+    const f = setup();
+    f.loadFM.mockResolvedValueOnce([track(6)]).mockResolvedValueOnce([]);
+    await f.playback.playPersonalFM();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    f.loadFM.mockRejectedValueOnce(new Error('read failed'));
+    f.handles[0].callbacks.onEnd();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(f.playback.state.playing).toBe(false);
+    expect(f.playback.state.personalFMLoading).toBe(false);
+    expect(f.handles[0].dispose).toHaveBeenCalledTimes(1);
+    expect(f.outputs.feedback.map(value => value.reason)).toEqual([
+      'fm-timeout',
+    ]);
+    f.playback.dispose();
+  });
+  test('trash failure reports failure while the handed-off FM song keeps playing', async () => {
+    const f = setup();
+    await f.playback.playPersonalFM();
+    const failure = new Error('trash rejected');
+    f.trash.mockRejectedValueOnce(failure);
+    expect(await f.playback.discardFMTrack()).toEqual({
+      status: 'failed',
+      reason: failure,
+    });
+    expect(f.trash).toHaveBeenCalledWith(6);
+    expect(f.playback.state.currentTrackID).toBe(7);
+    expect(f.playback.state.playing).toBe(true);
+    expect(f.handles.at(-1).dispose).not.toHaveBeenCalled();
+    expect(f.outputs.feedback.map(value => value.reason)).toEqual([failure]);
     f.playback.dispose();
   });
 });

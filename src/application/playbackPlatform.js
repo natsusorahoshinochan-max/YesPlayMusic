@@ -170,7 +170,25 @@ export function createPlaybackPlatform({
     };
     send('sendLyrics', { track, lyrics: content.raw, requestId: generation });
   }
-  let lyricRevision;
+  function reconcileMetadata() {
+    const state = lastState;
+    const key =
+      state?.currentTrack?.id && state.sourceInfo
+        ? JSON.stringify([
+            state.currentTrack,
+            lyrics?.state.generation,
+            lyrics?.state.status,
+          ])
+        : undefined;
+    if (key === metadataKey) return;
+    metadataKey = key;
+    if (key) {
+      publishMetadata(state.currentTrack, state);
+    } else {
+      metadataGeneration++;
+      cancelLyricsWrite();
+    }
+  }
   let currentLine;
   const releaseClock = ipc && createTouchBar ? lyrics?.consume() : undefined;
   const unsubscribeLyrics = lyrics?.subscribe(content => {
@@ -178,20 +196,7 @@ export function createPlaybackPlatform({
       currentLine = content.currentLine;
       send('updateLyric', { lyric: currentLine });
     }
-    const revision = `${content.generation}:${content.status}`;
-    if (revision === lyricRevision) return;
-    lyricRevision = revision;
-    metadataGeneration++;
-    cancelLyricsWrite();
-    metadataKey = undefined;
-    if (lastState?.sourceInfo && content.trackId === lastState.currentTrackID) {
-      metadataKey = JSON.stringify([
-        lastState.currentTrack,
-        content.generation,
-        content.status,
-      ]);
-      publishMetadata(lastState.currentTrack, lastState);
-    }
+    reconcileMetadata();
   });
   listen('saveLyricFinished', (_, requestId) => finishLyricsWrite(requestId));
   return {
@@ -235,21 +240,7 @@ export function createPlaybackPlatform({
         send('switchRepeatMode', state.repeatMode);
       if (createMpris && (!previous || previous.shuffle !== state.shuffle))
         send('switchShuffle', state.shuffle);
-      if (state.currentTrack?.id && state.sourceInfo) {
-        const key = JSON.stringify([
-          state.currentTrack,
-          lyrics?.state.generation,
-          lyrics?.state.status,
-        ]);
-        if (key !== metadataKey) {
-          metadataKey = key;
-          publishMetadata(state.currentTrack, state);
-        }
-      } else {
-        metadataKey = undefined;
-        metadataGeneration++;
-        cancelLyricsWrite();
-      }
+      reconcileMetadata();
       updatePosition(state.progress);
     },
     progress(position, detail = {}) {

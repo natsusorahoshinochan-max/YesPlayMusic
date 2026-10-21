@@ -153,10 +153,10 @@ const result = await this.$store.dispatch('library/removePlaylistTracks', {
   trackIds: [track.id],
 });
 
-this.showToast(
-  result.outcome.status === 'succeeded'
-    ? locale.t('toast.removedFromPlaylist')
-    : describeLibraryOutcome(result.outcome)
+showLibraryChangeFeedback(
+  this.$store,
+  result,
+  locale.t('toast.removedFromPlaylist')
 );
 ```
 

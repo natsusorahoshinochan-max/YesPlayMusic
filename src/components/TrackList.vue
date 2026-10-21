@@ -88,7 +88,6 @@ import TrackListItem from '@/components/TrackListItem.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
 import locale from '@/locale';
 import {
-  describeLibraryOutcome,
   toggleTrackFavoriteWithFeedback,
   showLibraryChangeFeedback,
 } from '@/utils/libraryOutcome';
@@ -238,10 +237,10 @@ export default {
           trackIds: [this.rightClickedTrack.id],
         }
       );
-      this.showToast(
-        result.outcome.status === 'succeeded'
-          ? locale.t('toast.removedFromPlaylist')
-          : describeLibraryOutcome(result.outcome)
+      showLibraryChangeFeedback(
+        this.$store,
+        result,
+        locale.t('toast.removedFromPlaylist')
       );
     },
     copyLink() {

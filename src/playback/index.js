@@ -239,7 +239,6 @@ export function createPlayback({
     visited.add(id);
     let prepared;
     let preparation;
-    let preparingAudio = false;
     try {
       const track = await getTrack(id);
       if (!valid(context)) return outcome('superseded');
@@ -290,12 +289,14 @@ export function createPlayback({
             void select(context, instance.track.id);
           else void advance(context);
         } else {
-          void handleError(context, instance, value);
+          void recoverAudio(context, instance.track.id, value, {
+            position: instance.handle.position(),
+            prefetch: false,
+          });
         }
       };
       preparation = new AbortController();
       preparations.add(preparation);
-      preparingAudio = true;
       prepared = await audio.prepare(resource, {
         signal: preparation.signal,
         volume: state.volume,
@@ -306,7 +307,6 @@ export function createPlayback({
         onEnd: () => event('end'),
         onError: error => event('error', error),
       });
-      preparingAudio = false;
       preparations.delete(preparation);
       if (!valid(context)) {
         prepared.dispose();
@@ -348,37 +348,27 @@ export function createPlayback({
       if (prepared && (!current || current.handle !== prepared))
         prepared.dispose();
       if (!valid(context)) return outcome('superseded');
-      if (preparingAudio && error?.retryable === true)
-        return select(context, id, {
+      if (error?.name === 'AudioMediaError')
+        return recoverAudio(context, id, error, {
           autoplay,
           position,
           direction,
           prefetch,
           visited,
         });
-      if (error?.code === 3 || error?.code === 4) {
-        const reason = error.code === 4 ? 'unsupported-format' : 'audio-decode';
-        if (error.code === 4) feedback(context, outcome('unavailable', reason));
-        await advance(context, direction, visited);
-        return valid(context)
-          ? outcome('unavailable', reason)
-          : outcome('superseded');
-      }
       return failSelection(context, error);
     }
   }
-  async function handleError(context, instance, error) {
-    if (!valid(context) || current !== instance) return;
-    const code = error && error.code;
-    if (code === 3 || code === 4) {
-      if (code === 4)
-        feedback(context, outcome('unavailable', 'unsupported-format'));
-      return advance(context);
+  async function recoverAudio(context, id, error, options = {}) {
+    if (error.code === 3 || error.code === 4) {
+      const reason = error.code === 4 ? 'unsupported-format' : 'audio-decode';
+      if (error.code === 4) feedback(context, outcome('unavailable', reason));
+      await advance(context, options.direction, options.visited);
+      return valid(context)
+        ? outcome('unavailable', reason)
+        : outcome('superseded');
     }
-    return select(context, instance.track.id, {
-      position: instance.handle.position(),
-      prefetch: false,
-    });
+    return select(context, id, options);
   }
   async function loadFM(context) {
     state.personalFMLoading = true;
@@ -386,21 +376,21 @@ export function createPlayback({
     try {
       for (let attempt = 0; attempt < 6; attempt++) {
         const tracks = await personalFM.load();
-        if (!valid(context)) return null;
+        if (!valid(context)) return [];
         if (tracks?.length) return tracks;
         if (attempt < 5) await delay(1000);
-        if (!valid(context)) return null;
+        if (!valid(context)) return [];
       }
       feedback(context, outcome('unavailable', 'fm-empty'));
     } catch (error) {
-      if (valid(context)) return failSelection(context, 'fm-timeout');
+      return Promise.reject('fm-timeout');
     } finally {
       if (valid(context)) {
         state.personalFMLoading = false;
         publish();
       }
     }
-    return null;
+    return [];
   }
   async function loadFMNext(context) {
     const request = ++fmRequest;
@@ -430,34 +420,36 @@ export function createPlayback({
   async function initializeFM(context) {
     const tracks = await loadFM(context);
     if (!valid(context)) return outcome('superseded');
-    if (!Array.isArray(tracks))
-      return tracks || outcome('unavailable', 'fm-empty');
+    if (!tracks.length) return outcome('unavailable', 'fm-empty');
     state.personalFMTrack = clone(tracks[0]);
     state.personalFMNextTrack = clone(tracks[1] || { id: 0 });
     return null;
   }
   async function advanceFM(context, visited = new Set()) {
-    fmRequest++;
-    state.personalFMNextLoading = false;
-    state.isPersonalFM = true;
-    state.playlistSource = { type: 'personalFM', id: 0 };
-    let target = state.personalFMNextTrack;
-    if (!target?.id) {
-      const tracks = await loadFM(context);
-      if (!valid(context)) return outcome('superseded');
-      if (!Array.isArray(tracks))
-        return tracks || outcome('unavailable', 'fm-empty');
-      target = tracks[0];
+    try {
+      fmRequest++;
+      state.personalFMNextLoading = false;
+      state.isPersonalFM = true;
+      state.playlistSource = { type: 'personalFM', id: 0 };
+      let target = state.personalFMNextTrack;
+      if (!target?.id) {
+        const tracks = await loadFM(context);
+        if (!valid(context)) return outcome('superseded');
+        if (!tracks.length) return outcome('unavailable', 'fm-empty');
+        target = tracks[0];
+      }
+      if (visited.has(target.id)) return outcome('unavailable', 'queue-ended');
+      if (target.id === state.personalFMTrack.id)
+        return outcome('unavailable', 'fm-same-track');
+      state.personalFMTrack = clone(target);
+      state.personalFMNextTrack = { id: 0 };
+      publish();
+      const result = await select(context, target.id, { visited });
+      if (valid(context)) void loadFMNext(context);
+      return result;
+    } catch (error) {
+      return failSelection(context, error);
     }
-    if (visited.has(target.id)) return outcome('unavailable', 'queue-ended');
-    if (target.id === state.personalFMTrack.id)
-      return outcome('unavailable', 'fm-same-track');
-    state.personalFMTrack = clone(target);
-    state.personalFMNextTrack = { id: 0 };
-    publish();
-    const result = await select(context, target.id, { visited });
-    if (valid(context)) void loadFMNext(context);
-    return result;
   }
   function runSelection(work) {
     operationId++;
@@ -638,23 +630,30 @@ export function createPlayback({
         return result;
       });
     },
-    discardFMTrack() {
-      if (state.personalFMLoading)
-        return Promise.resolve(outcome('unavailable', 'fm-loading'));
-      return runSelection(async context => {
+    async discardFMTrack() {
+      if (state.personalFMLoading) return outcome('unavailable', 'fm-loading');
+      let id;
+      let context;
+      const result = await runSelection(async selectionContext => {
+        context = selectionContext;
         if (!state.personalFMTrack?.id) {
           const failure = await initializeFM(context);
           if (!valid(context)) return outcome('superseded');
           if (failure) return failure;
         }
-        const id = state.personalFMTrack.id;
-        const result = await advanceFM(context);
-        if (valid(context) && result.status === 'completed') {
-          await personalFM.trash(id);
-          return valid(context) ? result : outcome('superseded');
-        }
-        return result;
+        id = state.personalFMTrack.id;
+        return advanceFM(context);
       });
+      if (result.status !== 'completed') return result;
+      if (!valid(context)) return outcome('superseded');
+      try {
+        await personalFM.trash(id);
+        return valid(context) ? result : outcome('superseded');
+      } catch (error) {
+        return valid(context)
+          ? feedback(context, outcome('failed', error))
+          : outcome('superseded');
+      }
     },
     setRepeatMode(mode) {
       if (

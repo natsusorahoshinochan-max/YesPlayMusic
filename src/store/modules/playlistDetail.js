@@ -1,5 +1,4 @@
 export default function createPlaylistDetail({ api = {} } = {}) {
-  let generation = 0;
   let pending;
 
   async function loadMore(context, { count = 100 } = {}) {
@@ -33,14 +32,9 @@ export default function createPlaylistDetail({ api = {} } = {}) {
     }
   }
 
-  async function open(context, id, range, retainCurrent = false) {
-    const request = ++generation;
+  async function open(context, id, range) {
     const current = context.state.current;
-    const retained = retainCurrent ? current : null;
-    const confirmedFavorite =
-      Number(current?.id) === Number(id)
-        ? current.confirmedFavorite
-        : undefined;
+    const retained = Number(current?.id) === Number(id) ? current : null;
     context.commit('replace', {
       id,
       playlist: null,
@@ -48,20 +42,23 @@ export default function createPlaylistDetail({ api = {} } = {}) {
       hasMore: false,
       traversed: 0,
       ...(retained || {}),
-      confirmedFavorite,
+      confirmedFavorite: retained?.confirmedFavorite,
       loading: true,
       loadingMore: false,
     });
+    const detail = context.state.current;
     try {
       const result = await api.getPlaylistDetail(id, true);
-      if (request !== generation) return;
+      if (context.state.current !== detail) return;
       const playlist = result.playlist;
       const tracks = playlist.tracks || [];
       const initial = tracks.reduce((end, track) => {
         const index = playlist.trackIds.findIndex(item => item.id === track.id);
         return Math.max(end, index + 1);
       }, 0);
-      const available = new Map(tracks.map(track => [track.id, track]));
+      const available = new Map(
+        [...detail.tracks, ...tracks].map(track => [track.id, track])
+      );
       context.commit('patch', {
         playlist: {
           ...playlist,
@@ -78,28 +75,13 @@ export default function createPlaylistDetail({ api = {} } = {}) {
         traversed: initial,
         hasMore: initial < playlist.trackIds.length,
       });
-      try {
-        await loadMore(context, {
-          count: range === undefined ? 100 : Math.max(0, range - initial),
-        });
-      } catch (error) {
-        if (retained?.playlist && request === generation) {
-          const confirmedTracks = new Map(
-            [...retained.tracks, ...context.state.current.tracks].map(track => [
-              track.id,
-              track,
-            ])
-          );
-          context.commit('patch', {
-            tracks: playlist.trackIds
-              .map(track => confirmedTracks.get(track.id))
-              .filter(Boolean),
-          });
-        }
-        throw error;
-      }
+      await loadMore(context, {
+        count: range === undefined ? 100 : Math.max(0, range - initial),
+      });
     } finally {
-      if (request === generation) context.commit('patch', { loading: false });
+      if (context.state.current === detail) {
+        context.commit('patch', { loading: false });
+      }
     }
   }
 
@@ -153,7 +135,6 @@ export default function createPlaylistDetail({ api = {} } = {}) {
       open: (context, id) => open(context, id),
       loadMore,
       close({ commit }) {
-        generation++;
         commit('replace', null);
       },
       async applyLibraryChange(context, change) {
@@ -171,14 +152,13 @@ export default function createPlaylistDetail({ api = {} } = {}) {
           });
         }
         if (!detail.playlist) {
-          return open(context, detail.id, undefined, true);
+          return open(context, detail.id);
         }
         if (change.type === 'tracks-removed') {
           context.commit('removeTracks', change.trackIds);
         } else if (change.type === 'favorite') {
-          const request = generation;
           const result = await api.getPlaylistDetail(detail.id, true);
-          if (request === generation && context.state.current === detail) {
+          if (context.state.current === detail) {
             context.commit('patch', {
               playlist: {
                 ...result.playlist,
@@ -190,7 +170,7 @@ export default function createPlaylistDetail({ api = {} } = {}) {
             });
           }
         } else if (change.type === 'tracks-added' || change.type === 'reload') {
-          return open(context, detail.id, detail.traversed, true);
+          return open(context, detail.id, detail.traversed);
         }
       },
     },

@@ -83,20 +83,15 @@ export function createAudioAdapter({
             listen('pause', () => options.onPause?.());
             listen('end', () => options.onEnd?.());
             const error = (_, detail) => {
-              const failure = {
-                code: typeof detail === 'number' ? detail : undefined,
-                error: detail,
-              };
+              const failure = Object.assign(
+                new Error(`Audio failed: ${detail}`),
+                {
+                  name: 'AudioMediaError',
+                  code: typeof detail === 'number' ? detail : undefined,
+                }
+              );
               if (ready) options.onError?.(failure);
-              else {
-                rejectPreparation(
-                  Object.assign(
-                    new Error(`Audio preparation failed: ${detail}`),
-                    failure,
-                    { retryable: failure.code !== 3 && failure.code !== 4 }
-                  )
-                );
-              }
+              else rejectPreparation(failure);
             };
             listen('loaderror', error);
             listen('playerror', error);

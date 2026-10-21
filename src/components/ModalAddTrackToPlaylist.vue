@@ -31,7 +31,7 @@
 import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
 import Modal from '@/components/Modal.vue';
 import locale from '@/locale';
-import { describeLibraryOutcome } from '@/utils/libraryOutcome';
+import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 
 export default {
   name: 'ModalAddTrackToPlaylist',
@@ -82,16 +82,11 @@ export default {
           playlistId,
           trackIds: [this.modals.addTrackToPlaylistModal.selectedTrackID],
         });
-        if (result.outcome.status !== 'succeeded') {
-          this.showToast(describeLibraryOutcome(result.outcome));
-          return;
-        }
-        this.close();
-        const feedback = locale.t('toast.savedToPlaylist');
-        this.showToast(
-          result.synchronization === 'incomplete'
-            ? `${feedback}；部分内容更新失败，请稍后刷新`
-            : feedback
+        if (result.outcome.status === 'succeeded') this.close();
+        showLibraryChangeFeedback(
+          this.$store,
+          result,
+          locale.t('toast.savedToPlaylist')
         );
       } catch (error) {
         this.showToast(error.message || '添加歌曲失败');

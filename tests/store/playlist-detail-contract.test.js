@@ -232,3 +232,60 @@ test('successful requests advance past unavailable songs even when the remote se
   expect(current().tracks.map(song => song.id)).toEqual([1, 100, 205]);
   expect(current().hasMore).toBe(false);
 });
+
+test.each(['close', 'reopen'])(
+  'metadata from an earlier open cannot replace the current view after %s',
+  async action => {
+    const { store, api, current } = fixture({ initialCount: 2, length: 2 });
+    const pending = deferred();
+    api.getPlaylistDetail.mockReturnValueOnce(pending.promise);
+    const opening = store.dispatch('playlistDetail/open', 10);
+    if (action === 'close') await store.dispatch('playlistDetail/close');
+    else await store.dispatch('playlistDetail/open', 10);
+    pending.resolve({
+      playlist: {
+        id: 10,
+        trackCount: 1,
+        trackIds: [{ id: 999 }],
+        tracks: [track(999)],
+      },
+    });
+    await opening;
+    if (action === 'close') expect(current()).toBeNull();
+    else {
+      expect(current().tracks.map(song => song.id)).toEqual([1, 2]);
+      expect(current().loading).toBe(false);
+    }
+  }
+);
+
+test('refresh adopts known songs in the new order while reading the restored range', async () => {
+  const { store, api, current, replaceIds } = fixture({
+    initialCount: 1,
+    length: 3,
+  });
+  await store.dispatch('playlistDetail/open', 10);
+  replaceIds([3, 999, 2, 1]);
+  const pending = deferred();
+  const started = deferred();
+  api.getTrackDetail.mockImplementationOnce(() => {
+    started.resolve();
+    return pending.promise;
+  });
+  const addition = store.dispatch('library/addPlaylistTracks', {
+    playlistId: 10,
+    trackIds: [999],
+  });
+  await started.promise;
+  expect(current().tracks.map(song => song.id)).toEqual([3, 2, 1]);
+  expect(current().loading).toBe(true);
+  pending.resolve({ songs: [track(999), track(2)] });
+  await expect(addition).resolves.toMatchObject({
+    synchronization: 'completed',
+  });
+  expect(current().tracks.map(song => song.id)).toEqual([3, 999, 2, 1]);
+  expect(current().hasMore).toBe(true);
+  await store.dispatch('playlistDetail/loadMore', { count: 100 });
+  expect(api.getTrackDetail.mock.calls.at(-1)[0]).toBe('1');
+  expect(current().hasMore).toBe(false);
+});

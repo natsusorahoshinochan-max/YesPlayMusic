@@ -33,6 +33,8 @@
 
 应用释放播放器时，`player.js` 依次释放身份订阅、歌词、平台 adapter 与 Playback。页面离开只释放自身需求和界面资源。
 
+平台的歌曲状态与歌词内容通知共用一个元数据发布判断，以当前歌曲和歌词内容的代次、状态识别变化并管理写词交接。当前行变化只更新 Touch Bar，沿用进行中的写词等待。
+
 ## Last.fm 授权与上报
 
 `src/store/modules/lastfm.js` 是每个 renderer 的授权状态所有者，提供 `authorization` getter 及 `restore`、`connect`、`completeAuthorization`、`disconnect`、`stopConnecting` 完整操作。设置与回调页面只提交这些操作。
