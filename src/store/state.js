@@ -1,7 +1,6 @@
 export default function createState() {
   return {
     showLyrics: false,
-    enableScrolling: true,
     title: 'YesPlayMusic',
     toast: {
       show: false,

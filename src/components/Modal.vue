@@ -1,6 +1,12 @@
 <template>
   <div v-show="show" class="shade" @click="clickOutside">
-    <div class="modal" :style="modalStyles" @click.stop>
+    <div
+      ref="modal"
+      class="modal"
+      tabindex="-1"
+      :style="modalStyles"
+      @click.stop
+    >
       <div class="header">
         <div class="title">{{ title }}</div>
         <button class="close" @click="close"
@@ -52,6 +58,11 @@ export default {
       };
     },
   },
+  watch: {
+    show(show) {
+      if (show) this.$nextTick(() => this.$refs.modal.focus());
+    },
+  },
   methods: {
     clickOutside() {
       if (this.clickOutsideHide) {
@@ -73,6 +84,8 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow: auto;
+  overscroll-behavior: contain;
   z-index: 1000;
 }
 
@@ -113,6 +126,7 @@ export default {
 .content {
   overflow: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 0 24px;
 }
 

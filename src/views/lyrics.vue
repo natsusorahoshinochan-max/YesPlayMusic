@@ -443,11 +443,9 @@ export default {
       if (show) {
         this.releaseLyricsClock?.();
         this.releaseLyricsClock = this.playback.lyrics.consume();
-        this.$store.commit('enableScrolling', false);
       } else {
         this.releaseLyricsClock?.();
         this.releaseLyricsClock = null;
-        this.$store.commit('enableScrolling', true);
         // Fullscreen is requested on documentElement, so it makes the whole
         // window fullscreen. Since the only way to leave fullscreen from the
         // UI lives on this page, closing it would leave the window stuck in

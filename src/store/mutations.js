@@ -4,18 +4,9 @@ export default {
   },
   updateModal(state, { modalName, key, value }) {
     state.modals[modalName][key] = value;
-    if (key === 'show') {
-      // 100ms的延迟是为等待右键菜单blur之后再disableScrolling
-      value === true
-        ? setTimeout(() => (state.enableScrolling = false), 100)
-        : (state.enableScrolling = true);
-    }
   },
   toggleLyrics(state) {
     state.showLyrics = !state.showLyrics;
-  },
-  enableScrolling(state, status) {
-    state.enableScrolling = status;
   },
   updateTitle(state, title) {
     state.title = title;
