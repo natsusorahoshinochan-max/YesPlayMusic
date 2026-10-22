@@ -164,7 +164,7 @@ export default {
     isPlaying() {
       return (
         this.highlightPlayingTrack &&
-        this.$store.state.player.state.currentTrackID === this.track?.id
+        this.$store.state.player.state.currentTrack.id === this.track?.id
       );
     },
     trackClass() {

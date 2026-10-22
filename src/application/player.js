@@ -55,7 +55,7 @@ export function createPlayer({
   let disposed = false;
   const liked = () =>
     store.getters['library/collections'].songs.includes(
-      playback.state.currentTrackID
+      playback.state.currentTrack.id
     );
   const settings = getSettings;
   const ipcRenderer =
