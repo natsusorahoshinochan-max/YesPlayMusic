@@ -1,0 +1,753 @@
+{
+  "date": "2026-10-22",
+  "baseline": "7c70e85",
+  "previousScrollCandidate": "12d8297",
+  "environment": "Codex in-app browser, 1280x600, real public API pages",
+  "oldTestsRun": false,
+  "businessStateInjected": false,
+  "observations": [
+    {
+      "action": "artist: open long description",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: PageDown",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: Shift+Tab",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: Shift+Tab again",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": false,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: Tab",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: wheel beyond content bottom",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: wheel backdrop",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: PageDown after leaving document tab focus",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": false,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 560,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: Tab returns from browser focus",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 560,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: PageDown from close button",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 560,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: Escape closes once",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 560,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "closed artist: browser Back",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "closed artist: browser Forward",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 560,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "artist: reopen before route departure",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "open artist: browser Back deactivates",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "open artist: browser Forward reactivates",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "reactivated artist: PageDown",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "reactivated artist: Escape",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "tabindex=0: open artist description",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "tabindex=0: Shift+Tab reaches close",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "tabindex=0: Tab returns to content",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "tabindex=0: PageDown after Tab return",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 352,
+          "contentScrollHeight": 414,
+          "contentTop": 62,
+          "focusInside": true,
+          "title": "艺术家介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "tabindex=0: Escape",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/artist/6452",
+      "visibleMenus": 0
+    },
+    {
+      "action": "back to album for original failure case",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: open description",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 81,
+          "contentScrollHeight": 81,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "专辑介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: original Shift+Tab failure case",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 81,
+          "contentScrollHeight": 81,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "专辑介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: Tab returns to content",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 81,
+          "contentScrollHeight": 81,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "专辑介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: wheel short content",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 81,
+          "contentScrollHeight": 81,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "专辑介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: wheel backdrop",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 81,
+          "contentScrollHeight": 81,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "专辑介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: close button once",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: reopen",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 81,
+          "contentScrollHeight": 81,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "专辑介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: click backdrop once",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: context menu open",
+      "activeClass": "menu",
+      "activeTag": "DIV",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 233,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 1
+    },
+    {
+      "action": "album: background wheel with menu open",
+      "activeClass": "menu",
+      "activeTag": "DIV",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 833,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 1
+    },
+    {
+      "action": "album menu: outside Discover click",
+      "activeClass": "router-link-exact-active router-link-active active",
+      "activeTag": "A",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/explore",
+      "visibleMenus": 0
+    },
+    {
+      "action": "return to album after menu",
+      "activeClass": "",
+      "activeTag": "A",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: open before destruction",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 81,
+          "contentScrollHeight": 81,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "专辑介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "open album: Forward destroys page",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/explore",
+      "visibleMenus": 0
+    },
+    {
+      "action": "album: Back recreates page closed",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "visitor: Add to playlist entry",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 233,
+      "url": "http://127.0.0.1:8093/album/1754736",
+      "visibleMenus": 0
+    },
+    {
+      "action": "playlist: open description",
+      "activeClass": "content",
+      "activeTag": "DIV",
+      "dialogs": [
+        {
+          "contentHeight": 60,
+          "contentScrollHeight": 60,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "歌单介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/playlist/6792103822",
+      "visibleMenus": 0
+    },
+    {
+      "action": "playlist: Shift+Tab",
+      "activeClass": "close",
+      "activeTag": "BUTTON",
+      "dialogs": [
+        {
+          "contentHeight": 60,
+          "contentScrollHeight": 60,
+          "contentTop": 0,
+          "focusInside": true,
+          "title": "歌单介绍"
+        }
+      ],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/playlist/6792103822",
+      "visibleMenus": 0
+    },
+    {
+      "action": "playlist: Escape",
+      "activeClass": "",
+      "activeTag": "BODY",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/playlist/6792103822",
+      "visibleMenus": 0
+    },
+    {
+      "action": "lyrics: open",
+      "activeClass": "button-icon lyrics-button",
+      "activeTag": "BUTTON",
+      "dialogs": [],
+      "mainOverflow": "hidden",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/playlist/6792103822",
+      "visibleMenus": 0
+    },
+    {
+      "action": "lyrics: context menu open",
+      "activeClass": "menu",
+      "activeTag": "DIV",
+      "dialogs": [],
+      "mainOverflow": "hidden",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/playlist/6792103822",
+      "visibleMenus": 1
+    },
+    {
+      "action": "lyrics: manual wheel with menu open",
+      "activeClass": "menu",
+      "activeTag": "DIV",
+      "dialogs": [],
+      "mainOverflow": "hidden",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/playlist/6792103822",
+      "visibleMenus": 1
+    },
+    {
+      "action": "lyrics: local scroll measurement",
+      "lyricsScrollTop": 600,
+      "mainScrollTop": 0
+    },
+    {
+      "action": "lyrics: close restores main overflow",
+      "activeClass": "",
+      "activeTag": "BUTTON",
+      "dialogs": [],
+      "mainOverflow": "auto",
+      "mainScrollTop": 0,
+      "url": "http://127.0.0.1:8093/playlist/6792103822",
+      "visibleMenus": 0
+    }
+  ],
+  "confirmed": [
+    "Initial and post-Tab PageDown scroll the overflowing artist content from 0 to 62; main stays at 0.",
+    "Original album Shift+Tab case reaches the close button; background links are not selected.",
+    "Content and backdrop wheel stay local.",
+    "Esc, close button and backdrop each close without reopening.",
+    "Artist keep-alive Back/Forward closes then restores the open modal.",
+    "Album destruction/recreation does not leave an open modal.",
+    "Playlist description opens and closes.",
+    "Context menu permits main wheel and closes on one outside navigation click.",
+    "Lyrics main overflow follows showLyrics; local lyrics wheel works with menu open."
+  ],
+  "uncertain": [
+    {
+      "sequence": "Artist content -> Shift+Tab close -> Shift+Tab browser focus -> PageDown",
+      "observation": "mainScrollTop changed 0 -> 560 after page lost focus",
+      "documentHasFocus": false,
+      "activeTag": "BODY",
+      "classification": "Browser/tool input focus boundary; not classified as a confirmed application regression. CUA still delivered PageDown while document.hasFocus was false.",
+      "status": "Needs actual desktop/browser-chrome keyboard verification; no guard was added."
+    }
+  ],
+  "notExercised": [
+    {
+      "path": "Menu -> Add -> New -> Cancel; lyrics -> Add; account modal removal/remount",
+      "reason": "Actual Add to playlist entry displays 此操作需要登录网易云帐号; no account session was created or faked."
+    },
+    {
+      "path": "Electron 13 keyboard, focus and scrolling",
+      "reason": "Electron 13.6.9 binary exists, but native CUA controls are disabled and no Electron browser surface is available."
+    },
+    {
+      "path": "Touch scrolling; custom scrollbar drag under modal",
+      "reason": "Not exercised in this browser run."
+    }
+  ],
+  "candidateCommit": "ab6c319",
+  "adoption": "pending-user-decision",
+  "complexity": {
+    "baseline": "7c70e85",
+    "added": 56,
+    "removed": 36,
+    "net": 20,
+    "scope": "scroll candidate only; currentTrackID, UNM and observation tooling excluded",
+    "deleted": [
+      "enableScrolling state",
+      "enableScrolling mutation",
+      "ten UI writes",
+      "100ms menu/modal coordination timer"
+    ],
+    "addedResponsibility": "Native dialog styling, Vue mount/cache lifecycle synchronization and initial keyboard focus stay in Modal.vue; caller interface unchanged"
+  },
+  "checks": {
+    "targetedEslint": "0 errors, existing close prop default warning",
+    "diffCheck": "passed",
+    "staticDeletionReview": "passed",
+    "javascriptReview": "passed",
+    "evidenceReview": "passed",
+    "electronRuntime": "not run",
+    "oldTestsRun": false
+  }
+}

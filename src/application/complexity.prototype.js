@@ -4,7 +4,7 @@ export function observeComplexity({ store, router }) {
   panel.id = 'complexity-prototype';
   panel.style.cssText =
     'position:fixed;right:12px;bottom:82px;z-index:2000;width:340px;max-height:65vh;overflow:auto;background:#fff;color:#17212b;border:1px solid #888;border-radius:8px;padding:10px;font:12px/1.5 monospace;box-shadow:0 2px 12px #0003';
-  panel.innerHTML = `<summary>一次性原型，采用待决定</summary>
+  panel.innerHTML = `<summary>一次性原型：滚动控制待决定</summary>
     <nav></nav>
     <p>曲目：播放、切歌、打开歌词，再刷新观察恢复。<br>
     UNM：在设置页改写/清空字段，再查询真实备用音源。<br>
@@ -60,6 +60,16 @@ export function observeComplexity({ store, router }) {
         mainOverflow: main && getComputedStyle(main).overflow,
         showLyrics: store.state.showLyrics,
         visibleModal: visible('.shade > .modal'),
+        dialogs: [...document.querySelectorAll('dialog[open]')].map(dialog => {
+          const content = dialog.querySelector('.content');
+          return {
+            title: dialog.querySelector('.title').textContent,
+            focusInside: dialog.contains(active),
+            contentScrollTop: content.scrollTop,
+            contentHeight: content.clientHeight,
+            contentScrollHeight: content.scrollHeight,
+          };
+        }),
         visibleMenu: visible('.context-menu .menu'),
         activeElement: `${active.tagName}#${active.id}.${active.className}`,
         unmJooxCookie: settings.unmJooxCookie ? '已填' : '空',
