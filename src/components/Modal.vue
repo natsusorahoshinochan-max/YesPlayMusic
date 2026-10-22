@@ -1,26 +1,26 @@
 <template>
-  <div v-show="show" class="shade" @click="clickOutside">
-    <div
-      ref="modal"
-      class="modal"
-      tabindex="-1"
-      :style="modalStyles"
-      @click.stop
-    >
+  <dialog
+    ref="dialog"
+    class="shade"
+    :aria-label="title"
+    @cancel.prevent="close"
+    @click="clickOutside"
+  >
+    <div class="modal" :style="modalStyles" @click.stop>
       <div class="header">
         <div class="title">{{ title }}</div>
         <button class="close" @click="close"
           ><svg-icon icon-class="x"
         /></button>
       </div>
-      <div class="content"><slot></slot></div>
+      <div ref="content" class="content" tabindex="0"><slot></slot></div>
       <div v-if="showFooter" class="footer">
         <!-- <button>取消</button>
         <button class="primary">确定</button> -->
         <slot name="footer"></slot>
       </div>
     </div>
-  </div>
+  </dialog>
 </template>
 
 <script>
@@ -59,11 +59,32 @@ export default {
     },
   },
   watch: {
-    show(show) {
-      if (show) this.$nextTick(() => this.$refs.modal.focus());
+    show() {
+      this.$nextTick(this.syncDialog);
     },
   },
+  mounted() {
+    this.syncDialog();
+  },
+  activated() {
+    this.syncDialog();
+  },
+  deactivated() {
+    this.$refs.dialog.close();
+  },
+  beforeDestroy() {
+    this.$refs.dialog.close();
+  },
   methods: {
+    syncDialog() {
+      if (!this.show) {
+        this.$refs.dialog.close();
+        return;
+      }
+      this.$refs.dialog.showModal();
+      const content = this.$refs.content;
+      (content.querySelector('input, textarea, select') || content).focus();
+    },
     clickOutside() {
       if (this.clickOutsideHide) {
         this.close();
@@ -76,17 +97,31 @@ export default {
 <style lang="scss" scoped>
 .shade {
   background: rgba(255, 255, 255, 0.58);
+  color: var(--color-text);
   position: fixed;
   top: 0;
   bottom: 0;
   left: 0;
   right: 0;
-  display: flex;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
   justify-content: center;
   align-items: center;
   overflow: auto;
   overscroll-behavior: contain;
-  z-index: 1000;
+
+  &[open] {
+    display: flex;
+  }
+
+  &::backdrop {
+    background: transparent;
+  }
 }
 
 .modal {
