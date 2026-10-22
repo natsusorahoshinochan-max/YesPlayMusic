@@ -104,7 +104,26 @@ export function createPlayer({
       hasAccount: () => getIdentity().hasAccount,
       isElectron: process.env.IS_ELECTRON === true,
       settings,
-      unblock: (...args) => ipcRenderer.invoke(...args),
+      unblock: track => {
+        const {
+          unmSource,
+          unmSearchMode,
+          unmEnableFlac,
+          unmProxyUri,
+          unmJooxCookie,
+          unmQQCookie,
+          unmYtDlExe,
+        } = settings();
+        return ipcRenderer.invoke('unblock-music', track, {
+          unmSource,
+          unmSearchMode,
+          unmEnableFlac,
+          unmProxyUri,
+          unmJooxCookie,
+          unmQQCookie,
+          unmYtDlExe,
+        });
+      },
       onBackgroundError: error =>
         console.debug('[audio cache] background write failed', error),
     }),

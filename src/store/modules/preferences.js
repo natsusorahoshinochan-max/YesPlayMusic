@@ -50,17 +50,6 @@ export default function createPreferences(
         ];
         if (dedicated.includes(key))
           throw new Error(`Use the dedicated preference action for ${key}`);
-        if (
-          [
-            'unmSource',
-            'unmProxyUri',
-            'unmJooxCookie',
-            'unmQQCookie',
-            'unmYtDlExe',
-          ].includes(key)
-        )
-          value = value.length ? value : 0;
-        if (key === 'unmEnableFlac') value = value || false;
         if (isPlainObject(value))
           value = mergeWith({}, state.settings[key], value, (previous, next) =>
             Array.isArray(next) ? cloneDeep(next) : undefined
