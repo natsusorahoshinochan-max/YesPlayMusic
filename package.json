@@ -20,7 +20,8 @@
     "postuninstall": "electron-builder install-app-deps",
     "prettier": "npx prettier --write ./src",
     "netease_api:run": "npx @neteaseapireborn/api",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "prototype:complexity": "node scripts/complexity-prototype.cjs"
   },
   "main": "background.js",
   "engines": {

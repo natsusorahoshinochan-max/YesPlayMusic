@@ -109,4 +109,10 @@ Vue.component('PageLoading', PageLoading);
     },
     render: h => h(App),
   }).$mount('#app');
+  if (process.env.VUE_APP_COMPLEXITY_PROTOTYPE === 'true') {
+    const { observeComplexity } = await import(
+      '@/application/complexity.prototype'
+    );
+    observeComplexity({ store, router });
+  }
 })();

@@ -311,7 +311,10 @@
         </div>
       </div>
 
-      <section v-if="isElectron" class="unm-configuration">
+      <section
+        v-if="isElectron || isComplexityPrototype"
+        class="unm-configuration"
+      >
         <h3>UnblockNeteaseMusic</h3>
         <div class="item">
           <div class="left">
@@ -852,6 +855,8 @@ export default {
   },
   data() {
     return {
+      isComplexityPrototype:
+        process.env.VUE_APP_COMPLEXITY_PROTOTYPE === 'true',
       proxyDraft: cloneDeep(
         this.$store.getters['preferences/settings'].proxyConfig
       ),

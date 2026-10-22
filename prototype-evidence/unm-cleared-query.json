@@ -1,0 +1,46 @@
+{
+  "request": {
+    "trackId": 19140591,
+    "settings": {
+      "unmSource": "",
+      "unmSearchMode": "fast-first",
+      "unmEnableFlac": false,
+      "unmProxyUri": "",
+      "unmYtDlExe": "",
+      "unmJooxCookie": "",
+      "unmQQCookie": ""
+    }
+  },
+  "status": 200,
+  "result": {
+    "request": {
+      "sources": [
+        "ytdl",
+        "bilibili",
+        "pyncm",
+        "kugou"
+      ],
+      "song": {
+        "id": "19140591",
+        "name": "Road to Horizon",
+        "duration": 322000,
+        "album": {
+          "id": "1754736",
+          "name": "In the Eye of the Beholder"
+        },
+        "artists": [
+          {
+            "id": "76177",
+            "name": "Solitary Experiments"
+          }
+        ]
+      },
+      "context": {
+        "enableFlac": false,
+        "searchMode": 0,
+        "config": {}
+      }
+    },
+    "result": null
+  }
+}

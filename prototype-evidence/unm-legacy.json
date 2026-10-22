@@ -1,0 +1,70 @@
+{
+  "baseline": "7c70e85",
+  "archive": "/tmp/ypm-PROTOTYPE-wipe-me-unm-dP8TJH/local-storage.json",
+  "historical": {
+    "unmSource": {
+      "value": 0,
+      "type": "number"
+    },
+    "unmProxyUri": {
+      "value": 0,
+      "type": "number"
+    },
+    "unmJooxCookie": {
+      "value": 0,
+      "type": "number"
+    },
+    "unmQQCookie": {
+      "value": 0,
+      "type": "number"
+    },
+    "unmYtDlExe": {
+      "value": 0,
+      "type": "number"
+    }
+  },
+  "runtime": {
+    "unmSource": {
+      "value": "",
+      "type": "string"
+    },
+    "unmProxyUri": {
+      "value": "",
+      "type": "string"
+    },
+    "unmJooxCookie": {
+      "value": "",
+      "type": "string"
+    },
+    "unmQQCookie": {
+      "value": "",
+      "type": "string"
+    },
+    "unmYtDlExe": {
+      "value": "",
+      "type": "string"
+    }
+  },
+  "persisted": {
+    "unmSource": {
+      "value": "",
+      "type": "string"
+    },
+    "unmProxyUri": {
+      "value": "",
+      "type": "string"
+    },
+    "unmJooxCookie": {
+      "value": "",
+      "type": "string"
+    },
+    "unmQQCookie": {
+      "value": "",
+      "type": "string"
+    },
+    "unmYtDlExe": {
+      "value": "",
+      "type": "string"
+    }
+  }
+}

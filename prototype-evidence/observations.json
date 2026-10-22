@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-22",
+  "baseline": "7c70e85",
+  "adoption": "pending-user-decision",
+  "environment": "Codex IAB, Node 16.20.2, installed rust-napi 0.4.0, public Netease API data",
+  "oldTestsRun": false,
+  "candidates": [
+    {
+      "target": "currentTrackID",
+      "commit": "a5e069b",
+      "lines": { "added": 11, "removed": 17 },
+      "deleted": ["mirror initial value", "selection mirror write", "restore mirror write", "lyrics forwarding computed"],
+      "observed": [
+        { "action": "initial app", "trackId": 0, "mirrorExists": false },
+        { "action": "double-click Rise and Fall", "trackId": 19140589, "playing": true, "progress": 7.709514, "highlight": "Rise and Fall", "mirrorExists": false },
+        { "action": "Next twice, second from lyrics", "trackId": 19140591, "title": "Road to Horizon", "playing": true, "mirrorExists": false },
+        { "action": "reload", "trackId": 19140591, "progress": 25.95886, "playing": false, "mirrorExists": false }
+      ],
+      "notExercised": ["native like IPC", "account favorites writes", "personal FM"]
+    },
+    {
+      "target": "UNM configuration",
+      "commit": "307b502",
+      "lines": { "added": 124, "removed": 156 },
+      "deleted": ["save-time empty string to zero", "seven settings getter fallbacks", "library protocol conversion in audioResources"],
+      "owners": ["persistence reads old numeric zero once", "unblockMusic maps native library protocol"],
+      "observed": [
+        { "action": "historical real Vuex clear then current restore/save", "evidence": "unm-legacy.json", "fiveFields": "number 0 -> string empty -> persisted string empty" },
+        { "action": "settings UI fill bilibili then clear", "runtime": "", "saved": "", "type": "string" },
+        { "action": "native default search then cleared/reloaded search", "sources": ["ytdl", "bilibili", "pyncm", "kugou"], "context": { "enableFlac": false, "searchMode": 0, "config": {} }, "result": null, "nativeError": "NoMatchedSong: Road to Horizon Solitary Experiments" },
+        { "action": "UI source BILIBILI with surrounding whitespace and typo; FLAC on; order-first", "sources": ["bilibili"], "context": { "enableFlac": true, "searchMode": 1, "config": {} }, "result": null }
+      ],
+      "notExercised": ["successful native search/retrieve and audio handoff", "Electron IPC runtime", "nonempty authenticated cookies or executable/proxy settings"]
+    },
+    {
+      "target": "scroll control",
+      "commit": "12d8297",
+      "lines": { "added": 17, "removed": 32 },
+      "deleted": ["enableScrolling state", "enableScrolling mutation", "ten UI writes", "100ms modal coordination timer"],
+      "observed": [
+        { "action": "album description content and backdrop wheel", "mainScrollTop": 0 },
+        { "action": "artist 6452 description wheel in 1280x600 viewport", "contentHeight": 352, "contentScrollHeight": 414, "contentScrollTop": 62, "mainScrollTop": 0 },
+        { "action": "album context menu open then wheel outside", "mainScrollTop": 720, "visibleMenus": 1 },
+        { "action": "click outside Discover navigation", "route": "/explore", "clicks": 1 },
+        { "action": "lyrics automatic following with menu open", "lyricsScrollTopBefore": 369, "lyricsScrollTopAfter": 815, "visibleMenus": 1 },
+        { "action": "manual lyric wheel with menu open", "lyricsScrollTop": 1129, "visibleMenus": 1 },
+        { "action": "album description then Shift+Tab", "status": "confirmed-limitation", "focus": "background album link", "mainScrollTopBefore": 0, "mainScrollTopAfter": 823 },
+        { "action": "overflowing artist description immediately PageDown", "status": "confirmed-limitation", "focus": "modal", "contentHeight": 352, "contentScrollHeight": 414, "contentScrollTop": 0, "mainScrollTop": 0 }
+      ],
+      "notExercised": ["account-only add/new playlist modal handoff", "Electron 13 GUI", "touch scrolling", "custom scrollbar drag under modal"]
+    }
+  ],
+  "checks": {
+    "electronMainAndRendererCompile": "passed --skipElectronBuild; existing optional ws dependency and lint warnings",
+    "codeReview": "completed; no confirmed complexity relocation in candidates",
+    "javascriptReview": "completed; scoped lint and prototype CJS syntax passed",
+    "unrelatedOriginRequest": "403 before native call",
+    "duplicateRunnerStart": "failed bind without new API/web listeners; original three listeners retained"
+  }
+}
