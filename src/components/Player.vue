@@ -212,7 +212,7 @@ export default {
     },
     isCurrentTrackLiked() {
       return this.$store.getters['library/collections'].songs.includes(
-        this.player.currentTrackID
+        this.currentTrack.id
       );
     },
     progress: {

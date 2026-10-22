@@ -64,7 +64,7 @@ test('Playback restores its queue, modes and independent progress without sharin
   await restored.restore(initial.archive, initial.position);
   initial.archive._list.push(98);
   expect(restored.state).toMatchObject({
-    currentTrackID: 1,
+    currentTrack: { id: 1 },
     playing: false,
     repeatMode: 'on',
     volume: 0,
@@ -111,7 +111,7 @@ test('the 0.2.5 migration resets the incompatible player archive', async () => {
   const { archive, position } = createPlayerStorage(localStorage).initial;
   await playback.restore(archive, position);
   expect(playback.state.enabled).toBe(false);
-  expect(playback.state.currentTrackID).toBe(0);
+  expect(playback.state.currentTrack.id).toBe(0);
   playback.dispose();
 });
 

@@ -97,7 +97,7 @@ export function createPlaybackPlatform({
   listen('decreaseVolume', () =>
     playback.setVolume(playback.state.volume - 0.1)
   );
-  listen('like', () => toggleFavorite(playback.state.currentTrackID));
+  listen('like', () => toggleFavorite(playback.state.currentTrack.id));
   listen('setRepeatMode', (_, mode) => playback.setRepeatMode(mode));
   listen('setShuffle', (_, enabled) => playback.setShuffle(enabled));
   listen('repeat', () => playback.cycleRepeat());

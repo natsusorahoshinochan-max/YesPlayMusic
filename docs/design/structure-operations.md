@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-10-22
 
-本文维护歌曲行、窗口、音乐搜索、每日推荐、歌词与 Last.fm 的职责和生命周期接合。目标行为与验收条件集中在 [Spec #26](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/26)。
+本文维护歌曲行、窗口、音乐搜索、每日推荐、歌词、浮层与 Last.fm 的职责和生命周期接合。目标行为与验收条件集中在 [Spec #26](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/26)。
 
 ## 歌曲行与播放入口
 
@@ -44,6 +44,14 @@
 应用释放播放器时，`player.js` 依次释放身份订阅、歌词、平台 adapter 与 Playback。页面离开只释放自身需求和界面资源。
 
 `playbackPlatform.js` 在歌曲交接时建立媒体元数据；Linux OSD 启用时，等待歌词内容完成，再执行原始歌词写入与元数据发布。写词等待通过代次确认和超时收尾，新的歌曲或内容替换旧等待。当前行变化只更新 Touch Bar。
+
+## 浮层与滚动
+
+`App.vue` 从 `showLyrics` 直接决定主页面的滚动样式，歌词页面管理自身内容滚动。`ContextMenu.vue` 只管理菜单显示、位置和关闭，打开菜单时背景继续滚动。
+
+`Modal.vue` 接收调用者的 `show`、`close` 与内容，通过原生 `dialog.showModal()` 建立模态交互，由浏览器隔离背景焦点与交互。组件内部容纳滚动，初始焦点落在内容中的输入控件或可滚动内容区。显示状态与挂载、缓存激活同步；停用或销毁时关闭原生弹窗。用户关闭意图交给 `close`，程序同步关闭只更新原生元素。
+
+页面和全局弹窗只持有各自显示状态与业务内容，菜单到弹窗、添加到新建的交接直接改变显示状态。
 
 ## Last.fm 授权与上报
 

@@ -45,7 +45,6 @@ export function createPlayback({
   let volumeBeforeMuted = 1;
   const state = {
     currentTrack: { id: 0 },
-    currentTrackID: 0,
     playlistSource: {},
     enabled: false,
     playing: false,
@@ -261,7 +260,6 @@ export function createPlayback({
       if (!valid(context)) return outcome('superseded');
       if (!track || track.id == null) throw new Error('invalid-track');
       state.currentTrack = clone(track);
-      state.currentTrackID = track.id;
       state.progress = position;
       state.sourceInfo = null;
       state.enabled = true;
@@ -648,7 +646,7 @@ export function createPlayback({
     playPersonalFM() {
       if (
         state.isPersonalFM &&
-        state.currentTrackID === state.personalFMTrack?.id &&
+        state.currentTrack.id === state.personalFMTrack?.id &&
         current &&
         current.operationId === operationId
       ) {
@@ -822,7 +820,6 @@ export function createPlayback({
           saved._personalFMNextTrack || { id: 0 }
         );
         state.currentTrack = clone(saved._currentTrack || { id: 0 });
-        state.currentTrackID = state.currentTrack.id;
         state.enabled = Boolean(saved._enabled);
         state.progress = position;
         nextList = saved._playNextList || [];

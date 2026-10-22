@@ -70,6 +70,8 @@ flowchart TD
 - 私人 FM 的展示资料与加载状态。
 - 当前音源的 `sourceInfo`，供页面生成来源提示。
 
+当前歌曲由 `currentTrack` 持有，歌曲身份统一读取 `currentTrack.id`。选曲与恢复只更新该歌曲对象；行高亮、收藏、歌词和平台入口直接读取同一身份。
+
 `upcoming(limit)` 提供有限长度的待播条目，包含歌曲 ID、主队列或下一首列表的分组信息，以及删除下一首条目所需的位置。私人 FM 条目另含 `personalFM: true`，将该条目传给 `playQueuedTrack` 时选择对应推荐。它与实际下一首选择共用规则，调用者按返回顺序展示。待播集合由队列与模式操作更新，独立于进度等公开状态；页面直接监听该集合加载详情。
 
 `position()` 读取即时音频位置，供需要即时值的歌词和桌面入口使用。普通进度展示使用响应式快照。
@@ -135,7 +137,9 @@ prefetch(track); // Promise<void>
 
 `Descriptor` 表达远端地址或音频字节，并携带来源信息。`null` 表达无可用音源，请求失败走拒绝路径。实际来源顺序、条件与失败策略依据需求文档实现。
 
-原生 UNM adapter 直接交付该 descriptor：普通地址使用 `kind: 'url'`，需要特殊请求头的 Bilibili 音源在主进程下载后以 `kind: 'bytes'` 交付字节。Audio resources 将同一资源交给播放准备与后台缓存。
+Audio resources 根据平台与启用设置选择备用取源，调用 `unblock(track)`。`src/application/player.js` 读取七项 UNM 设置，连同歌曲经 IPC 交给 `src/electron/unblockMusic.js`；`ipcMain.js` 只登记该调用。UNM adapter 独占歌曲字段、音源名称、搜索模式与可选配置到原生库协议的转换，以及搜索、取得音源和失败收束。设置值的表示与恢复见[配置数据](settings-and-persistence.md#配置数据)。
+
+原生 UNM adapter 直接交付该 descriptor：普通地址使用 `kind: 'url'`，需要特殊请求头的 Bilibili 音源在主进程下载后以 `kind: 'bytes'` 交付字节；无可用备用音源时返回 `null`。Audio resources 将同一资源交给播放准备与后台缓存。
 
 `resolve` 与 `prefetch` 共用来源解析 implementation。预取只执行数据准备及符合既有条件的缓存操作；后台错误在资源与缓存职责内收束。
 
@@ -223,6 +227,7 @@ Playback 的 `archive()` 与 `restore()` 集中定义恢复字段，存档包含
 | --- | --- |
 | `src/playback/index.js` | Playback、来源操作与私有队列；操作编号覆盖完整选择流程 |
 | `src/playback/audioResources.js`、`audioAdapter.js` | 来源与预取、Howler 与临时地址的独立持有和释放 |
+| `src/electron/unblockMusic.js` | 原生 UNM 协议转换、搜索与取源，交付音源 descriptor |
 | `src/audioCache/index.js`、`src/utils/db.js` | 串行缓存提交、真实数据库及下载 adapter；缓存实例由显式配置创建 |
 | `src/api/metadataCache.js` 与各元数据 API | 缓存读取编排与各类型转换 |
 | `src/application/musicData.js` | 绑定应用的设置与身份读取函数，创建音频缓存并连接容量设置 |

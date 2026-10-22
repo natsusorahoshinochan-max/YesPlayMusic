@@ -513,11 +513,6 @@ export default {
     },
     toggleFullDescription() {
       this.showFullDescription = !this.showFullDescription;
-      if (this.showFullDescription) {
-        this.$store.commit('enableScrolling', false);
-      } else {
-        this.$store.commit('enableScrolling', true);
-      }
     },
   },
 };

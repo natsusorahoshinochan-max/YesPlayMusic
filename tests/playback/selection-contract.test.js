@@ -164,7 +164,7 @@ describe('latest selection terminal failure contract (Spec #17)', () => {
       expect(await pending).toEqual({ status: 'superseded' });
       expect(active.dispose).not.toHaveBeenCalled();
       expect(active.isPlaying()).toBe(true);
-      expect(f.playback.state.currentTrackID).toBe(3);
+      expect(f.playback.state.currentTrack.id).toBe(3);
       expect(f.playback.state.playing).toBe(true);
       expect(Object.values(f.outputs).map(items => items.length)).toEqual(
         counts
@@ -183,7 +183,7 @@ describe('latest selection terminal failure contract (Spec #17)', () => {
     await f.playback.playTracks([4, 5]);
     expect(f.playback.upcoming(3).map(row => row.trackId)).toEqual([9, 8, 5]);
     await f.playback.enqueueNext(7, { playNow: true });
-    expect(f.playback.state.currentTrackID).toBe(9);
+    expect(f.playback.state.currentTrack.id).toBe(9);
     expect(f.playback.upcoming(3).map(row => row.trackId)).toEqual([8, 7, 5]);
     f.playback.clearNext();
     expect(f.playback.upcoming(3).map(row => row.trackId)).toEqual([5]);
@@ -270,7 +270,7 @@ describe('unavailable selection terminal contract (Spec #17)', () => {
       reason: 'no-source',
     });
     const active = f.handles.at(-1);
-    expect(f.playback.state.currentTrackID).toBe(3);
+    expect(f.playback.state.currentTrack.id).toBe(3);
     expect(f.playback.state.playing).toBe(true);
     expect(active.dispose).not.toHaveBeenCalled();
     f.playback.pause();
@@ -328,7 +328,7 @@ describe('media failures through the production audio adapter', () => {
         old.emit('playerror', 0, 2);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
-      expect(f.playback.state.currentTrackID).toBe(
+      expect(f.playback.state.currentTrack.id).toBe(
         phase === 'preparation' ? 3 : 1
       );
       expect(f.playback.state.playing).toBe(true);
@@ -353,7 +353,7 @@ describe('media failures through the production audio adapter', () => {
           media.sounds[0].emit('playerror', 0, code);
           await new Promise(resolve => setTimeout(resolve, 0));
         }
-        expect(f.playback.state.currentTrackID).toBe(2);
+        expect(f.playback.state.currentTrack.id).toBe(2);
         expect(f.playback.state.playing).toBe(true);
         expect(f.outputs.feedback.map(value => value.reason)).toEqual(
           code === 4 ? ['unsupported-format'] : []
@@ -415,7 +415,7 @@ describe('personal FM reading and discard ownership', () => {
       reason: failure,
     });
     expect(f.trash).toHaveBeenCalledWith(6);
-    expect(f.playback.state.currentTrackID).toBe(7);
+    expect(f.playback.state.currentTrack.id).toBe(7);
     expect(f.playback.state.playing).toBe(true);
     expect(f.handles.at(-1).dispose).not.toHaveBeenCalled();
     expect(f.outputs.feedback.map(value => value.reason)).toEqual([failure]);

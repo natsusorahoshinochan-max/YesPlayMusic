@@ -92,6 +92,8 @@ Vue 页面的 computed setter 只提交对应 action。缓存数量等展示查�
 
 迁移后的有效配置用于建立 Vuex 状态、启动应用以及后续读取。静态默认值集中在 `initLocalStorage`，提交值的转换规则位于 preferences actions。
 
+`unmSource`、`unmProxyUri`、`unmJooxCookie`、`unmQQCookie`、`unmYtDlExe` 在页面、运行状态和保存数据中均为字符串。`persistence.js` 在读取历史存储时将这五项的数值 `0` 转为空字符串；页面直接读写配置，保存沿用字符串。音源名称、枚举和原生配置字段的解释归[UNM adapter](playback-and-audio-resources.md#音频资源与音频-adapter)。
+
 ### 配置应用与变更动作
 
 使用普通函数组织应用规则。外观模式与主题色共同调用外观应用函数，自动主题监听也调用同一函数。语言、输出设备、托盘和桌面设置同样各有明确的应用归属。

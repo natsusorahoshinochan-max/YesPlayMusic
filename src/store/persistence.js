@@ -23,6 +23,15 @@ export function createPersistence(storage, language = 'en') {
     restoredSettings,
     (previous, value) => (Array.isArray(value) ? cloneDeep(value) : undefined)
   );
+  for (const key of [
+    'unmSource',
+    'unmProxyUri',
+    'unmJooxCookie',
+    'unmQQCookie',
+    'unmYtDlExe',
+  ]) {
+    if (settings[key] === 0) settings[key] = '';
+  }
   const missingShortcuts = defaults.settings.shortcuts.filter(
     shortcut =>
       !settings.shortcuts.some(existing => existing.id === shortcut.id)

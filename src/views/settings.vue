@@ -351,7 +351,7 @@
                 可以点此到 UNM 的说明页面查询。 </a
               ><br />
               多个音源请用 <code>,</code> 逗号分隔。<br />
-              留空则使用 UNM 内置的默认值。
+              留空使用默认备选音源。
             </div>
           </div>
           <div class="right">
@@ -1188,9 +1188,9 @@ export default {
        * @returns {string}
        */
       get() {
-        return this.settings.unmSource || '';
+        return this.settings.unmSource;
       },
-      /** @param {string?} value */
+      /** @param {string} value */
       set(value) {
         this.submitPreference('setPreference', {
           key: 'unmSource',
@@ -1200,7 +1200,7 @@ export default {
     },
     unmSearchMode: {
       get() {
-        return this.settings.unmSearchMode || 'fast-first';
+        return this.settings.unmSearchMode;
       },
       set(value) {
         this.submitPreference('setPreference', {
@@ -1211,7 +1211,7 @@ export default {
     },
     unmEnableFlac: {
       get() {
-        return this.settings.unmEnableFlac || false;
+        return this.settings.unmEnableFlac;
       },
       set(value) {
         this.submitPreference('setPreference', {
@@ -1222,7 +1222,7 @@ export default {
     },
     unmProxyUri: {
       get() {
-        return this.settings.unmProxyUri || '';
+        return this.settings.unmProxyUri;
       },
       set(value) {
         this.submitPreference('setPreference', {
@@ -1233,7 +1233,7 @@ export default {
     },
     unmJooxCookie: {
       get() {
-        return this.settings.unmJooxCookie || '';
+        return this.settings.unmJooxCookie;
       },
       set(value) {
         this.submitPreference('setPreference', {
@@ -1244,7 +1244,7 @@ export default {
     },
     unmQQCookie: {
       get() {
-        return this.settings.unmQQCookie || '';
+        return this.settings.unmQQCookie;
       },
       set(value) {
         this.submitPreference('setPreference', {
@@ -1255,7 +1255,7 @@ export default {
     },
     unmYtDlExe: {
       get() {
-        return this.settings.unmYtDlExe || '';
+        return this.settings.unmYtDlExe;
       },
       set(value) {
         this.submitPreference('setPreference', {

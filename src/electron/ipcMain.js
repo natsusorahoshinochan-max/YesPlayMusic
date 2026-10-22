@@ -1,62 +1,10 @@
 import { ipcMain } from 'electron';
-import UNM from '@unblockneteasemusic/rust-napi';
+import unblockMusic from './unblockMusic';
 import { applyDesktopShortcuts } from './preferences';
 import { registerProxy } from './proxy';
 import { isCreateTray } from '@/utils/platform';
 
-const clc = require('cli-color');
-const log = text => {
-  console.log(`${clc.blueBright('[ipcMain.js]')} ${text}`);
-};
-
 const client = require('discord-rich-presence')('818936529484906596');
-
-/**
- * Download the audio bytes using the headers required by bilivideo.
- *
- * @param {string} url The URL to fetch.
- * @returns {Promise<ArrayBuffer>} The audio bytes.
- */
-async function getBiliVideoFile(url) {
-  const axios = await import('axios').then(m => m.default);
-  const response = await axios.get(url, {
-    headers: {
-      Referer: 'https://www.bilibili.com/',
-      'User-Agent': 'okhttp/3.4.1',
-    },
-    responseType: 'arraybuffer',
-  });
-
-  const bytes = response.data;
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength
-  );
-}
-
-/**
- * Parse the source string (`a, b`) to source list `['a', 'b']`.
- *
- * @param {import("@unblockneteasemusic/rust-napi").Executor} executor
- * @param {string} sourceString The source string.
- * @returns {string[]} The source list.
- */
-function parseSourceStringToList(executor, sourceString) {
-  const availableSource = executor.list();
-
-  return sourceString
-    .split(',')
-    .map(s => s.trim().toLowerCase())
-    .filter(s => {
-      const isAvailable = availableSource.includes(s);
-
-      if (!isAvailable) {
-        log(`This source is not one of the supported source: ${s}`);
-      }
-
-      return isAvailable;
-    });
-}
 
 let closePreferenceRequest = 0;
 
@@ -104,73 +52,8 @@ export function rememberCloseOption(win, value) {
 }
 
 export function initIpcMain(win, store, trayEventEmitter, windowOperations) {
-  // WIP: Do not enable logging as it has some issues in non-blocking I/O environment.
-  // UNM.enableLogging(UNM.LoggingType.ConsoleEnv);
-  const unmExecutor = new UNM.Executor();
-
-  ipcMain.handle(
-    'unblock-music',
-    /**
-     *
-     * @param {*} _
-     * @param {string | null} sourceListString
-     * @param {Record<string, any>} ncmTrack
-     * @param {UNM.Context} context
-     */
-    async (_, sourceListString, ncmTrack, context) => {
-      // Formt the track input
-      // FIXME: Figure out the structure of Track
-      const song = {
-        id: ncmTrack.id && ncmTrack.id.toString(),
-        name: ncmTrack.name,
-        duration: ncmTrack.dt,
-        album: ncmTrack.al && {
-          id: ncmTrack.al.id && ncmTrack.al.id.toString(),
-          name: ncmTrack.al.name,
-        },
-        artists: ncmTrack.ar
-          ? ncmTrack.ar.map(({ id, name }) => ({
-              id: id && id.toString(),
-              name,
-            }))
-          : [],
-      };
-
-      const sourceList =
-        typeof sourceListString === 'string'
-          ? parseSourceStringToList(unmExecutor, sourceListString)
-          : ['ytdl', 'bilibili', 'pyncm', 'kugou'];
-      log(`[UNM] using source: ${sourceList.join(', ')}`);
-
-      try {
-        // TODO: tell users to install yt-dlp.
-        const matchedAudio = await unmExecutor.search(
-          sourceList,
-          song,
-          context
-        );
-        const retrievedSong = await unmExecutor.retrieve(matchedAudio, context);
-
-        log(`respond with retrieve song…`);
-        log(JSON.stringify(matchedAudio));
-        const sourceInfo = {
-          from: `unm:${retrievedSong.source}`,
-          bitRate: 128000,
-          cached: false,
-        };
-        return retrievedSong.url.includes('bilivideo.com')
-          ? {
-              kind: 'bytes',
-              bytes: await getBiliVideoFile(retrievedSong.url),
-              sourceInfo,
-            }
-          : { kind: 'url', url: retrievedSong.url, sourceInfo };
-      } catch (err) {
-        const errorMessage = err instanceof Error ? `${err.message}` : `${err}`;
-        log(`UnblockNeteaseMusic failed: ${errorMessage}`);
-        return null;
-      }
-    }
+  ipcMain.handle('unblock-music', (_, track, preferences) =>
+    unblockMusic(track, preferences)
   );
 
   ipcMain.on('close', () => windowOperations.close());

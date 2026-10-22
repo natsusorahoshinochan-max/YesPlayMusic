@@ -232,7 +232,7 @@ async function nativeMain() {
         let state = await until(
           'Cached archive restoration',
           value =>
-            value.currentTrackID === 900000001 &&
+            value.currentTrack.id === 900000001 &&
             value.sourceInfo &&
             !value.loading
         );
@@ -242,7 +242,7 @@ async function nativeMain() {
         );
         check(
           'Actual application restores cached metadata/WAV through production assembly',
-          { track: state.currentTrackID, source: state.sourceInfo }
+          { track: state.currentTrack.id, source: state.sourceInfo }
         );
         contents.send('play');
         state = await until('Actual Howler play event', value => value.playing);
@@ -305,7 +305,7 @@ async function nativeMain() {
         state = await until(
           'Native next',
           value =>
-            value.currentTrackID === 900000002 &&
+            value.currentTrack.id === 900000002 &&
             value.playing &&
             value.sourceInfo
         );
@@ -321,7 +321,7 @@ async function nativeMain() {
         contents.send('previous');
         await until(
           'Native previous',
-          value => value.currentTrackID === 900000001 && value.playing
+          value => value.currentTrack.id === 900000001 && value.playing
         );
         check('Native previous returns to first cached track');
         const endpoint = await new Promise((resolve, reject) => {

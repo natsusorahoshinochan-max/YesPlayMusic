@@ -4,7 +4,7 @@
     <Navbar v-show="showNavbar" ref="navbar" />
     <main
       ref="main"
-      :style="{ overflow: enableScrolling ? 'auto' : 'hidden' }"
+      :style="{ overflow: showLyrics ? 'hidden' : 'auto' }"
       @scroll="handleScroll"
     >
       <keep-alive>
@@ -54,7 +54,7 @@ export default {
   },
   computed: {
     ...mapGetters({ settings: 'preferences/settings' }),
-    ...mapState(['showLyrics', 'player', 'enableScrolling']),
+    ...mapState(['showLyrics', 'player']),
     hasAccount() {
       return this.$store.getters['session/hasAccount'];
     },

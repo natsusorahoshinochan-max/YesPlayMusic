@@ -17,21 +17,7 @@ export function createAudioResources({
     const preferences = settings();
     if (!isElectron || preferences.enableUnblockNeteaseMusic === false)
       return null;
-    const result = await unblock(
-      'unblock-music',
-      preferences.unmSource,
-      track,
-      {
-        enableFlac: preferences.unmEnableFlac || null,
-        proxyUri: preferences.unmProxyUri || null,
-        searchMode: preferences.unmSearchMode === 'order-first' ? 1 : 0,
-        config: {
-          'joox:cookie': preferences.unmJooxCookie || null,
-          'qq:cookie': preferences.unmQQCookie || null,
-          'ytdl:exe': preferences.unmYtDlExe || null,
-        },
-      }
-    );
+    const result = await unblock(track);
     if (result === null) return null;
     cacheInBackground(track, result);
     return result;

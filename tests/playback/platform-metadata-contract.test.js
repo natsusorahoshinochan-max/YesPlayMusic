@@ -12,7 +12,6 @@ function setup() {
   const playback = {
     state: {
       currentTrack: track(1),
-      currentTrackID: 1,
       sourceInfo: { type: 'online' },
       durationSeconds: 120,
       progress: 0,
@@ -48,7 +47,6 @@ function setup() {
   const select = (id, sourceInfo = { type: 'online' }) => {
     Object.assign(playback.state, {
       currentTrack: track(id),
-      currentTrackID: id,
       sourceInfo,
     });
     lyrics.sync();
