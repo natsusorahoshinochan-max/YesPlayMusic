@@ -1,17 +1,11 @@
 import { createMusicSearchQuery } from '@/musicSearch/query';
+import { readIdentity } from '@/api/readingContext';
 
 export function createMusicSearch(store) {
-  const getIdentity = () => ({
-    mode: store.state.session.loginMode,
-    hasAccount: store.getters['session/hasAccount'],
-    userId: store.getters['library/user'].userId,
-    vipType: store.getters['library/user'].vipType,
-  });
   return createMusicSearchQuery({
-    getIdentity,
     subscribeIdentity: changed => {
       const stopTransition = store.subscribeIdentityChanges(changed);
-      const stopProfile = store.watch(getIdentity, changed, {
+      const stopProfile = store.watch(readIdentity, changed, {
         deep: true,
         sync: true,
       });

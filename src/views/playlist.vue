@@ -165,14 +165,19 @@
     </div>
 
     <TrackList
-      :playlist-id="playlist.id"
       :items="filteredTracks"
       type="playlist"
-      :extra-context-menu-item="
-        isUserOwnPlaylist ? ['removeTrackFromPlaylist'] : []
-      "
       @activate="playPlaylist($event.id)"
-    />
+    >
+      <template #context-menu-extra="{ item }">
+        <div
+          v-if="isUserOwnPlaylist"
+          class="item"
+          @click="removeTrackFromPlaylist(item)"
+          >从歌单中删除</div
+        >
+      </template>
+    </TrackList>
 
     <div class="load-more">
       <ButtonTwoTone
@@ -471,6 +476,21 @@ export default {
       const result = await this.$store.dispatch('library/deletePlaylist', id);
       showLibraryChangeFeedback(this.$store, result, `已删除歌单 ${name}`);
       if (result.outcome.status === 'succeeded') this.$router.go(-1);
+    },
+    async removeTrackFromPlaylist(track) {
+      if (!confirm(`确定要从歌单删除 ${track.name}？`)) return;
+      const result = await this.$store.dispatch(
+        'library/removePlaylistTracks',
+        {
+          playlistId: this.playlist.id,
+          trackIds: [track.id],
+        }
+      );
+      showLibraryChangeFeedback(
+        this.$store,
+        result,
+        this.$t('toast.removedFromPlaylist')
+      );
     },
     editPlaylist() {
       nativeAlert('此功能开发中');

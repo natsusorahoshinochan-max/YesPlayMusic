@@ -57,42 +57,28 @@ const themeColorPresets = {
   },
 };
 
-export function changeThemeColor(themeColor, appearance) {
-  if (typeof document === 'undefined') return;
-  const resolvedAppearance =
-    appearance || document.body?.getAttribute('data-theme') || 'light';
-  const resolvedTheme = themeColorPresets[themeColor] ? themeColor : 'default';
-  const preset = themeColorPresets[resolvedTheme] || themeColorPresets.default;
-  const theme = preset[resolvedAppearance] || preset.light || preset;
-  if (!theme) return;
-  const target = document.body || document.documentElement;
+export function applySettingsAppearance(settings) {
+  const useSystemAppearance =
+    settings.appearance === 'auto' || settings.appearance === undefined;
+  const dark = useSystemAppearance
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : settings.appearance === 'dark';
+  const appearance = dark ? 'dark' : 'light';
+  const preset =
+    themeColorPresets[settings.themeColor] || themeColorPresets.default;
+  const theme = preset[appearance];
+  const target = document.body;
+  target.setAttribute('data-theme', appearance);
+  document
+    .querySelector('meta[name="theme-color"]')
+    .setAttribute('content', dark ? '#222' : '#fff');
   target.style.setProperty('--color-primary', theme.primary);
   target.style.setProperty('--color-primary-bg', theme.primaryBg);
   target.style.setProperty(
     '--color-primary-bg-for-transparent',
     theme.primaryBgForTransparent
   );
-  target.style.setProperty(
-    '--color-primary-gradient',
-    theme.primaryGradient || theme.primary
-  );
-}
-
-export function changeAppearance(appearance) {
-  if (appearance === 'auto' || appearance === undefined) {
-    appearance = window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
-  }
-  document.body.setAttribute('data-theme', appearance);
-  document
-    .querySelector('meta[name="theme-color"]')
-    .setAttribute('content', appearance === 'dark' ? '#222' : '#fff');
-}
-
-export function applySettingsAppearance(settings) {
-  changeAppearance(settings.appearance);
-  changeThemeColor(settings.themeColor);
+  target.style.setProperty('--color-primary-gradient', theme.primaryGradient);
 }
 
 export function initializeAppearance(getSettings) {

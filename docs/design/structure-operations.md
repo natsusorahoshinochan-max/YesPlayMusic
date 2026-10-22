@@ -6,7 +6,7 @@
 
 ## 歌曲行与播放入口
 
-`TrackListItem.vue` 接收歌曲，发出无参数的 `activate`。`TrackList.vue` 接收单一 `items` 序列，通过 `trackOf(item)` 取得展示歌曲，激活时交回原条目；普通歌曲列表使用默认恒等函数。待播页面传入附有歌曲详情的队列条目，并将原条目交给 `playQueuedTrack`；云盘页面传入云盘记录，使用其中的 `simpleSong` 展示、`songId` 执行操作。两类页面通过菜单插槽提供自身操作，通用列表不解释条目身份。列表布局类型只参与展示。
+`TrackListItem.vue` 接收歌曲，发出无参数的 `activate`。`TrackList.vue` 接收单一 `items` 序列，通过 `trackOf(item)` 取得展示歌曲，激活时交回原条目；普通歌曲列表使用默认恒等函数。待播页面传入附有歌曲详情的队列条目，并将原条目交给 `playQueuedTrack`；云盘页面传入云盘记录，使用其中的 `simpleSong` 展示、`songId` 执行操作。云盘通过 `context-menu` 提供完整菜单；待播和歌单页面通过 `context-menu-extra` 提供各自删除操作。插槽交回原条目，通用列表不解释条目身份。列表布局类型只参与展示。
 
 歌单、专辑、艺人、音乐库、综合搜索、分类搜索、每日推荐和待播队列页面拥有各自的激活处理。每日推荐通过其 module 播放；其余来源读取、选择归属和音频交接由 [Playback](playback-and-audio-resources.md#playback-的公开-interface) 负责。菜单与收藏调用 [library 完整写操作](library-mutations-and-playlist-detail.md#library-的公开-interface)。
 
@@ -20,7 +20,7 @@
 
 | 所有者 | 持有与接口 | 应用接合 |
 | --- | --- | --- |
-| `src/musicSearch/query.js` | 每个查询的结果、分页、加载任务与采用归属；`replace`、`loadNext`、`dispose` | `src/application/musicSearch.js` 为每个页面创建实例，注入身份读取、订阅和反馈；两个搜索页面负责输入、展示与进度资源释放 |
+| `src/musicSearch/query.js` | 每个查询的结果、分页、加载任务与采用归属；`replace`、`loadNext`、`dispose` | `src/application/musicSearch.js` 为每个页面创建实例，注入身份变化订阅和失败反馈；两个搜索页面负责输入、展示与进度资源释放 |
 | `src/store/modules/dailyRecommendations.js` | 推荐快照、读取状态与进行中的加载；`load`、`play`、`identityChanged` | 卡片和页面读取同一 module 状态；装配注入推荐读取及取得现有 Playback 的函数；播放构造由 module 交给 `playTracks` |
 
 `src/api/others.js` 的 `search({ category, keywords, offset, limit })` 集中解释远端类别、字段、空结果与分页协议，并通过 `getTrackDetail` 补齐歌曲，返回可直接展示的 `{ items, nextOffset }`。`nextOffset` 按原始搜索页数量推进，结束时为 `null`；音乐查询累计结果、保存续读位置并管理加载归属。`loginUsername.vue` 使用 `users` 类别，独立管理公开音乐库身份选择。元数据读取及可播放转换的职责见[Metadata reads](playback-and-audio-resources.md#元数据缓存读取)。
@@ -41,7 +41,7 @@
 
 `src/application/lastfmStorage.js` 独占既有 `lastfm` 保存项的格式与读写。`lastfmExchange.js` 持有当前 renderer 的轮询、storage 与卸载监听；module 管理连接的建立和结束，设置页离开及应用销毁通过 `stopConnecting` 释放资源。
 
-`playbackReporting.js` 从 getter 捕获授权快照，把同一快照交给 `api/lastfm.js` 签名和发送。有效播放事件与单次记录权仍由[Playback 上报交接](playback-and-audio-resources.md#上报事件交接)维护。
+`playbackReporting.js` 从 getter 捕获授权快照，把同一快照交给 `api/lastfm.js` 签名和发送。有效记录的交付由[Playback 上报交接](playback-and-audio-resources.md#上报事件交接)维护。
 
 ## 平台命令
 

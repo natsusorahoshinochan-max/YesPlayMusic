@@ -166,12 +166,11 @@ export default function createSession(
                   ...params,
                   email: email.replace(/\s/g, ''),
                 });
-          if (result?.code === 200) {
+          if (result.code === 200) {
             await enterAccount(context, result.cookie);
-          } else if (result) {
+          } else {
             alert(result.msg ?? result.message ?? '账号或密码错误，请检查');
           }
-          return result;
         } catch (error) {
           alert(`发生错误，请检查你的账号密码是否正确\n${error}`);
         } finally {

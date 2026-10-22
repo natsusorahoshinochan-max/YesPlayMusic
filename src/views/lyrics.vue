@@ -526,7 +526,6 @@ export default {
         this.showToast(locale.t('toast.needToLogin'));
         return;
       }
-      this.$store.dispatch('library/refreshPlaylists');
       this.updateModal({
         modalName: 'addTrackToPlaylistModal',
         key: 'show',

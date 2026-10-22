@@ -1,5 +1,4 @@
 import Vue from 'vue';
-import { createSourceOperations } from './sourceOperations';
 
 const clone = value =>
   value == null ? value : JSON.parse(JSON.stringify(value));
@@ -31,7 +30,6 @@ export function createPlayback({
 } = {}) {
   let disposed = false;
   let operationId = 0;
-  let instanceId = 0;
   let current = null;
   const preparations = new Set();
   let list = [];
@@ -94,25 +92,24 @@ export function createPlayback({
     // when a newer target owns the selection operation.
     if (!instance || !instance.played || instance.released) return;
     const position =
-      type === 'ended' ? instance.durationSeconds : instance.handle.position();
-    let delivering = true;
-    const event = freeze({
-      type,
-      operationId: instance.operationId,
-      instanceId: instance.id,
-      track: clone(instance.track),
-      source: clone(instance.source),
-      position,
-      durationSeconds: instance.durationSeconds,
-      recordOnce() {
-        if (!delivering || instance.recorded || Math.floor(position) < 1)
-          return false;
-        instance.recorded = true;
-        return true;
-      },
-    });
-    safe(onPlaybackEvent, event);
-    delivering = false;
+      type === 'ended'
+        ? instance.durationSeconds
+        : Math.floor(instance.handle.position());
+    if (type !== 'played') {
+      if (instance.recorded || position < 1) return;
+      instance.recorded = true;
+    }
+    safe(
+      onPlaybackEvent,
+      freeze({
+        type,
+        operationId: instance.operationId,
+        track: clone(instance.track),
+        source: clone(instance.source),
+        position,
+        durationSeconds: instance.durationSeconds,
+      })
+    );
   }
   function release(instance) {
     if (!instance || instance.released) return;
@@ -315,7 +312,6 @@ export function createPlayback({
       emit(current, 'before-replace');
       release(current);
       instance = {
-        id: ++instanceId,
         operationId: context.id,
         handle: prepared,
         track: clone(track),
@@ -451,6 +447,36 @@ export function createPlayback({
       return failSelection(context, error);
     }
   }
+  function installQueue(ids, source, startTrackId) {
+    list = Array.from(ids);
+    index = startTrackId == null ? 0 : Math.max(0, list.indexOf(startTrackId));
+    shuffleQueue(startTrackId == null ? null : index);
+    if (state.shuffle && list.length) index = shuffledOrder[0];
+    state.playlistSource = clone(source);
+    state.isPersonalFM = false;
+    publish();
+    return list[index];
+  }
+  function playSource(
+    type,
+    id,
+    { startTrackId, fresh = false } = {},
+    intelligence = false
+  ) {
+    return runSelection(async context => {
+      let ids = await sourceLists[type](id, { fresh });
+      if (!valid(context)) return outcome('superseded');
+      if (intelligence && ids.length) {
+        const seed = ids[Math.floor(Math.random() * ids.length)];
+        ids = await sourceLists.intelligence(id, seed);
+        if (!valid(context)) return outcome('superseded');
+      }
+      const first = installQueue(ids, { type, id }, startTrackId);
+      return ids.length
+        ? select(context, first)
+        : feedback(context, outcome('unavailable', 'empty-queue'));
+    });
+  }
   function runSelection(work) {
     operationId++;
     fmRequest++;
@@ -458,23 +484,7 @@ export function createPlayback({
     state.personalFMNextLoading = false;
     preparations.forEach(controller => controller.abort());
     preparations.clear();
-    const context = {
-      id: operationId,
-      isCurrent: () => valid(context),
-      installQueue(ids, source = {}, startTrackId) {
-        if (!valid(context)) return;
-        list = Array.from(ids);
-        index =
-          startTrackId == null ? 0 : Math.max(0, list.indexOf(startTrackId));
-        shuffleQueue(startTrackId == null ? null : index);
-        if (state.shuffle && list.length) index = shuffledOrder[0];
-        state.playlistSource = clone(source);
-        state.isPersonalFM = false;
-        publish();
-        return list[index];
-      },
-      select: (id, options) => select(context, id, options),
-    };
+    const context = { id: operationId };
     if (disposed) return Promise.resolve(outcome('superseded'));
     return Promise.resolve()
       .then(() => (valid(context) ? work(context) : outcome('superseded')))
@@ -500,7 +510,11 @@ export function createPlayback({
     safe(onProgress, state.progress);
   }, 1000);
   const playback = {
-    ...createSourceOperations({ runSelection, sourceLists, feedback }),
+    playPlaylist: (id, options) => playSource('playlist', id, options),
+    playAlbum: (id, options) => playSource('album', id, options),
+    playArtist: (id, options) => playSource('artist', id, options),
+    playIntelligencePlaylist: (id, options) =>
+      playSource('playlist', id, options, true),
     get state() {
       return holder.snapshot;
     },
@@ -508,9 +522,9 @@ export function createPlayback({
       const copy = Array.from(ids);
       const sourceCopy = clone(source);
       return runSelection(context => {
-        context.installQueue(copy, sourceCopy, startTrackId);
+        const first = installQueue(copy, sourceCopy, startTrackId);
         return list.length
-          ? context.select(list[index])
+          ? select(context, first)
           : feedback(context, outcome('unavailable', 'empty-queue'));
       });
     },
@@ -544,7 +558,7 @@ export function createPlayback({
           if (state.shuffle) shuffledIndex = shuffledOrder.indexOf(index);
         }
         publish();
-        return context.select(id);
+        return select(context, id);
       });
     },
     next({ personalFM: forcePersonalFM = false } = {}) {
@@ -793,7 +807,7 @@ export function createPlayback({
             });
         }
         return saved._enabled && saved._currentTrack?.id
-          ? context.select(saved._currentTrack.id, {
+          ? select(context, saved._currentTrack.id, {
               autoplay: false,
               position,
             })

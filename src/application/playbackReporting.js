@@ -1,5 +1,4 @@
-// Claims belong to the synchronous delivery of an effective Playback event.
-// Requests run independently of the next selection and share the instance claim.
+// Playback delivers eligible records; requests complete independently of selection.
 export function createPlaybackReporting({
   neteaseScrobble,
   lastfmScrobble,
@@ -31,9 +30,7 @@ export function createPlaybackReporting({
         submit(lastfmNowPlaying, params(), authorization);
       return;
     }
-    if (event.type !== 'before-replace' && event.type !== 'ended') return;
-    if (!event.recordOnce()) return;
-    const time = Math.floor(event.position);
+    const time = event.position;
     submit(neteaseScrobble, { id: track.id, sourceid: event.source.id, time });
     const authorization = getLastfmAuthorization();
     if (

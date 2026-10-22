@@ -188,57 +188,62 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
         return write(
           context,
           () => api.deletePlaylist(id),
-          () => [
-            () => updateFavoriteCollection(context, 'playlists', id, false),
-            () => detailChange(context, id, 'deleted'),
-            () => loadPlaylists(context),
-          ]
+          () => {
+            updateFavoriteCollection(context, 'playlists', id, false);
+            return [
+              () => detailChange(context, id, 'deleted'),
+              () => loadPlaylists(context),
+            ];
+          }
         );
       },
       uploadCloudTrack(context, file) {
         return write(
           context,
           () => api.uploadSong(file),
-          ({ track }) => [
-            () => {
-              if (track)
-                setCollection(context, 'cloudDisk', [
-                  track,
-                  ...context.state.collections.cloudDisk.filter(
-                    item => item.songId !== track.songId
-                  ),
-                ]);
-            },
-            () => loadCollection(context, 'cloudDisk', 'cloudDisk', 1000),
-          ]
+          ({ track }) => {
+            if (track)
+              setCollection(context, 'cloudDisk', [
+                track,
+                ...context.state.collections.cloudDisk.filter(
+                  item => item.songId !== track.songId
+                ),
+              ]);
+            return [
+              () => loadCollection(context, 'cloudDisk', 'cloudDisk', 1000),
+            ];
+          }
         );
       },
       deleteCloudTrack(context, id) {
         return write(
           context,
           () => api.cloudDiskTrackDelete(id),
-          () => [
-            () =>
-              setCollection(
-                context,
-                'cloudDisk',
-                context.state.collections.cloudDisk.filter(
-                  track => Number(track.songId) !== Number(id)
-                )
-              ),
-            () => loadCollection(context, 'cloudDisk', 'cloudDisk', 1000),
-          ]
+          () => {
+            setCollection(
+              context,
+              'cloudDisk',
+              context.state.collections.cloudDisk.filter(
+                track => Number(track.songId) !== Number(id)
+              )
+            );
+            return [
+              () => loadCollection(context, 'cloudDisk', 'cloudDisk', 1000),
+            ];
+          }
         );
       },
       setPlaylistFavorite(context, { id, favorite }) {
         return write(
           context,
           () => api.subscribePlaylist({ id, t: favorite ? 1 : 2 }),
-          () => [
-            () => updateFavoriteCollection(context, 'playlists', id, favorite),
-            () => detailChange(context, id, 'favorite', { favorite }),
-            () => loadPlaylists(context),
-          ]
+          () => {
+            updateFavoriteCollection(context, 'playlists', id, favorite);
+            return [
+              () => detailChange(context, id, 'favorite', { favorite }),
+              () => loadPlaylists(context),
+            ];
+          }
         );
       },
       removePlaylistTracks(context, { playlistId, trackIds }) {
@@ -264,23 +269,19 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
               Number(playlistId) === Number(context.state.likedSongPlaylistID)
             ) {
               const removed = new Set(trackIds);
+              setCollection(
+                context,
+                'songs',
+                context.state.collections.songs.filter(id => !removed.has(id))
+              );
+              setCollection(
+                context,
+                'songsWithDetails',
+                context.state.collections.songsWithDetails.filter(
+                  track => !removed.has(track.id)
+                )
+              );
               attempts.push(
-                () =>
-                  setCollection(
-                    context,
-                    'songs',
-                    context.state.collections.songs.filter(
-                      id => !removed.has(id)
-                    )
-                  ),
-                () =>
-                  setCollection(
-                    context,
-                    'songsWithDetails',
-                    context.state.collections.songsWithDetails.filter(
-                      track => !removed.has(track.id)
-                    )
-                  ),
                 () => loadSongs(context),
                 () => loadPreview(context)
               );
@@ -356,30 +357,34 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
         return write(
           context,
           () => api.likeAAlbum({ id, t: favorite ? 1 : 0 }),
-          () => [
-            () => updateFavoriteCollection(context, 'albums', id, favorite),
-            () => loadCollection(context, 'albums', 'likedAlbums', 2000),
-          ]
+          () => {
+            updateFavoriteCollection(context, 'albums', id, favorite);
+            return [
+              () => loadCollection(context, 'albums', 'likedAlbums', 2000),
+            ];
+          }
         );
       },
       setArtistFavorite(context, { id, favorite }) {
         return write(
           context,
           () => api.followAArtist({ id, t: favorite ? 1 : 0 }),
-          () => [
-            () => updateFavoriteCollection(context, 'artists', id, favorite),
-            () => loadCollection(context, 'artists', 'likedArtists', 2000),
-          ]
+          () => {
+            updateFavoriteCollection(context, 'artists', id, favorite);
+            return [
+              () => loadCollection(context, 'artists', 'likedArtists', 2000),
+            ];
+          }
         );
       },
       setMVFavorite(context, { id, favorite }) {
         return write(
           context,
           () => api.likeAMV({ mvid: id, t: favorite ? 1 : 0 }),
-          () => [
-            () => updateFavoriteCollection(context, 'mvs', id, favorite),
-            () => loadCollection(context, 'mvs', 'likedMVs', 1000),
-          ]
+          () => {
+            updateFavoriteCollection(context, 'mvs', id, favorite);
+            return [() => loadCollection(context, 'mvs', 'likedMVs', 1000)];
+          }
         );
       },
       toggleTrackFavorite(context, id) {
@@ -388,6 +393,21 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
           context,
           () => api.likeATrack({ id, like }),
           () => {
+            setCollection(
+              context,
+              'songs',
+              like
+                ? [...context.state.collections.songs, id]
+                : context.state.collections.songs.filter(song => song !== id)
+            );
+            if (!like)
+              setCollection(
+                context,
+                'songsWithDetails',
+                context.state.collections.songsWithDetails.filter(
+                  track => track.id !== id
+                )
+              );
             let playlistReady;
             const identifyPlaylist = () => {
               if (context.state.likedSongPlaylistID)
@@ -399,37 +419,19 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
               return playlistReady;
             };
             return [
-              () =>
-                setCollection(
-                  context,
-                  'songs',
-                  like
-                    ? [...context.state.collections.songs, id]
-                    : context.state.collections.songs.filter(
-                        song => song !== id
-                      )
-                ),
-              () => {
-                if (!like)
-                  setCollection(
-                    context,
-                    'songsWithDetails',
-                    context.state.collections.songsWithDetails.filter(
-                      track => track.id !== id
-                    )
-                  );
-              },
               async () => {
                 await identifyPlaylist();
                 await loadPreview(context);
               },
               async () => {
                 const playlistId = await identifyPlaylist();
-                if (!like)
+                if (like) {
+                  await detailChange(context, playlistId, 'reload');
+                } else {
                   await detailChange(context, playlistId, 'tracks-removed', {
                     trackIds: [id],
                   });
-                await detailChange(context, playlistId, 'reload');
+                }
               },
             ];
           }
@@ -437,11 +439,6 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
       },
       loadApplication: context => loadLibrary(context, false),
       loadPage: context => loadLibrary(context, true),
-      async refreshPlaylists(context) {
-        if (!context.rootGetters['session/hasLibraryIdentity']) return;
-        await loadPlaylists(context);
-        await loadPreview(context);
-      },
     },
   };
 }

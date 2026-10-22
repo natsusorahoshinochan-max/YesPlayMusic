@@ -20,13 +20,13 @@ export default function createPreferences(
 ) {
   const shortcutControl = state => ({
     enabled: state.settings.enableGlobalShortcut !== false,
-    recording: state.shortcutRecording !== null,
+    recording: state.shortcutRecording,
   });
   return {
     namespaced: true,
     state: () => ({
       settings: snapshot.settings,
-      shortcutRecording: null,
+      shortcutRecording: false,
       libraryPlaylistFilter: snapshot.libraryPlaylistFilter,
     }),
     getters: {
@@ -128,10 +128,10 @@ export default function createPreferences(
         await persist();
         await applyShortcuts(shortcutControl(state), false);
       },
-      async beginShortcutRecording({ commit, state }, { id, type }) {
+      async beginShortcutRecording({ commit, state }, type) {
         if (type === 'globalShortcut' && !state.settings.enableGlobalShortcut)
           return false;
-        commit('setShortcutRecording', { id, type });
+        commit('setShortcutRecording', true);
         await applyShortcuts(shortcutControl(state), false);
         return true;
       },
@@ -145,7 +145,7 @@ export default function createPreferences(
       },
       async endShortcutRecording({ commit, state }) {
         if (!state.shortcutRecording) return;
-        commit('setShortcutRecording', null);
+        commit('setShortcutRecording', false);
         await applyShortcuts(shortcutControl(state), false);
       },
       async restoreDefaultShortcuts({ commit, state }) {

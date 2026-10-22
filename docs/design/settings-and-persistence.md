@@ -50,7 +50,7 @@ flowchart TD
 | `setGlobalShortcutsEnabled` | 是否启用 | 保存并结合录制状态应用平台快捷键状态 |
 | `submitProxy` | 完整代理配置 | 保存并应用已提交的代理配置 |
 | `disableProxy` | 无 | 保存关闭状态并关闭代理 |
-| `beginShortcutRecording` | `{ id, type }` | 开始录制的平台控制，返回是否允许开始 |
+| `beginShortcutRecording` | 快捷键类型 `type` | 开始录制的平台控制，返回是否允许开始 |
 | `saveShortcut` | `{ id, type, shortcut }` | 保存快捷键并更新相关平台效果 |
 | `endShortcutRecording` | 无 | 结束录制的平台控制，按当前配置恢复快捷键状态 |
 | `restoreDefaultShortcuts` | 无 | 恢复默认配置并应用菜单与快捷键效果 |
@@ -144,7 +144,7 @@ preferences 完整操作保存成功后，将已保存的设置交给 `sendSetti
 
 ## 快捷键录制
 
-页面负责按键捕获、组合字符串、录制对象和录制状态的展示。module 维护平台控制所需的录制状态，协调以下流程：
+页面负责按键捕获、组合字符串、录制对象和录制状态的展示。module 只维护是否正在录制，协调以下流程：
 
 1. 开始录制时暂停平台全局快捷键。
 2. 保存时更新配置、持久化和菜单；录制期间维持平台暂停。
@@ -165,7 +165,7 @@ preferences 完整操作保存成功后，将已保存的设置交给 `sendSetti
 
 实际 Web、Electron 差异通过 adapter 表达。普通调用者使用相同的 settings interface；in-process 规则直接位于 implementation 内。设置 module 由装配处获得依赖，不自行构造 Player 或导入全局 store singleton。
 
-`src/main.js` 与 `src/application/startup.js` 负责接线和次序：
+`src/main.js` 负责接线和次序：
 
 1. 读取存储，执行配置默认值和已有迁移，创建 store。
 2. 使用规范化语言创建 locale。

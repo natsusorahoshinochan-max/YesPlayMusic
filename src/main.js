@@ -2,7 +2,7 @@ import Vue from 'vue';
 import VueGtag from 'vue-gtag';
 import App from './App.vue';
 import router from './router';
-import store, { createStore } from './store';
+import { createStore } from './store';
 import * as auth from '@/api/auth';
 import { dailyRecommendTracks } from '@/api/playlist';
 import { createLastfmOptions } from '@/application/lastfm';
@@ -17,7 +17,6 @@ import i18n, { initializeLocale } from '@/locale';
 import { createPreferenceEffects } from '@/application/preferenceEffects';
 import { initializeAppearance } from '@/utils/appearance';
 import { configureRequest } from '@/utils/request';
-import { startApplication } from '@/application/startup';
 import { createPlayer } from '@/application/player';
 import '@/assets/icons';
 import '@/utils/filters';
@@ -53,55 +52,62 @@ Vue.config.productionTip = false;
 
 const credentials = createCredentials();
 NProgress.configure({ showSpinner: false, trickleSpeed: 100 });
-startApplication({
-  createStore() {
-    const store = createStore({
-      credentials,
-      dailyRecommendations: { read: dailyRecommendTracks },
-      lastfm: createLastfmOptions(localStorage),
-      session: {
-        auth,
-        ...createSessionEffects({
-          router,
-          alert: nativeAlert,
-          notify: message => store.dispatch('showToast', message),
-        }),
-      },
-      preferences: createPreferenceEffects({
-        getLocale: () => i18n,
-        getPlayer: () => store.state.player,
+(async () => {
+  const store = createStore({
+    credentials,
+    dailyRecommendations: { read: dailyRecommendTracks },
+    lastfm: createLastfmOptions(localStorage),
+    session: {
+      auth,
+      ...createSessionEffects({
+        router,
+        alert: nativeAlert,
+        notify: message => store.dispatch('showToast', message),
       }),
-      library: { api: libraryApi },
+    },
+    preferences: createPreferenceEffects({
+      getLocale: () => i18n,
+      getPlayer: () => store.state.player,
+    }),
+    library: { api: libraryApi },
+  });
+  const getSettings = () => store.getters['preferences/settings'];
+  const getIdentity = () => ({
+    userId: store.getters['library/user'].userId,
+    loginMode: store.state.session.loginMode,
+    hasAccount: store.getters['session/hasAccount'],
+    vipType: store.getters['library/user'].vipType,
+  });
+  initializeLocale(getSettings().lang);
+  configureRequest({
+    getSettings,
+    getCookie: key => credentials.get(key),
+    onSessionInvalid: () => store.dispatch('session/invalidate'),
+    environment: createRequestEnvironment(),
+  });
+  configureMusicData({ getSettings, getIdentity });
+  await store.dispatch('session/restore');
+  await getTrackCache()
+    .initializeTrackCache()
+    .catch(error => {
+      console.debug('[audio cache] initialization failed', error);
     });
-    return store;
-  },
-  async initializeDependencies(store, reads) {
-    configureMusicData(reads);
-    await store.dispatch('session/restore');
-    await getTrackCache()
-      .initializeTrackCache()
-      .catch(error => {
-        console.debug('[audio cache] initialization failed', error);
-      });
-  },
-  initializeLocale,
-  initializeAppearance,
-  configureRequest,
-  requestEnvironment: createRequestEnvironment(),
-  getCookie: key => credentials.get(key),
-  onSessionInvalid: () => store.dispatch('session/invalidate'),
-  createPlayer,
-  mount({ store, i18n }) {
-    store.dispatch('session/refreshDaily');
-    return new Vue({
-      i18n,
-      store,
-      router,
-      beforeDestroy() {
-        store.dispatch('lastfm/stopConnecting');
-        store.state.player.dispose();
-      },
-      render: h => h(App),
-    }).$mount('#app');
-  },
-});
+  store.state.player = createPlayer({ store, getSettings, getIdentity });
+  // Restoration starts before mounting but does not hold the UI behind remote I/O.
+  store.state.player.restoreSaved().catch(error => {
+    console.debug('[playback restore]', error);
+  });
+  await store.dispatch('preferences/applyRestored');
+  initializeAppearance(getSettings);
+  store.dispatch('session/refreshDaily');
+  new Vue({
+    i18n,
+    store,
+    router,
+    beforeDestroy() {
+      store.dispatch('lastfm/stopConnecting');
+      store.state.player.dispose();
+    },
+    render: h => h(App),
+  }).$mount('#app');
+})();

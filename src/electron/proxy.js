@@ -9,7 +9,7 @@ export function restoreProxy(session, store) {
 export function registerProxy(ipcMain, session, store) {
   ipcMain.handle('applyProxy', async (event, config) => {
     const proxyRules =
-      config.protocol === 'noProxy' || !config.server || !config.port
+      config.protocol === 'noProxy'
         ? ''
         : `${config.protocol}://${config.server}:${config.port}`;
     if (store.get('proxy') !== proxyRules) store.set('proxy', proxyRules);

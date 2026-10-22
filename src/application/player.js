@@ -37,13 +37,8 @@ export function createPlaybackFeedback({ notify }) {
 
 export function createPlayer({
   store,
-  getSettings = () => store.getters['preferences/settings'],
-  getIdentity = () => ({
-    userId: store.getters['library/user']?.userId,
-    loginMode: store.state.session?.loginMode,
-    hasAccount: store.getters['session/hasAccount'],
-    vipType: store.getters['library/user'].vipType,
-  }),
+  getSettings,
+  getIdentity,
   storage = localStorage,
   platform: suppliedPlatform,
   platformOptions = {},

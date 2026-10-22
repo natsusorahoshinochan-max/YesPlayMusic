@@ -217,12 +217,12 @@ Playback 的 `archive()` 与 `restore()` 集中定义恢复字段，存档包含
 
 | 位置 | 职责 |
 | --- | --- |
-| `src/playback/index.js`、`sourceOperations.js` | Playback、来源操作与私有队列；操作编号覆盖完整选择流程 |
+| `src/playback/index.js` | Playback、来源操作与私有队列；操作编号覆盖完整选择流程 |
 | `src/playback/audioResources.js`、`audioAdapter.js` | 来源与预取、Howler 与临时地址的独立持有和释放 |
 | `src/audioCache/index.js`、`src/utils/db.js` | 串行缓存提交、真实数据库及下载 adapter；缓存实例由显式配置创建 |
 | `src/api/metadataCache.js` 与各元数据 API | 缓存读取编排与各类型转换 |
 | `src/application/musicData.js` | 绑定应用的设置与身份读取函数，创建音频缓存并连接容量设置 |
-| `src/api/readingContext.js` | 仅保存元数据转换所需的身份读取函数 |
+| `src/api/readingContext.js` | 保存共用身份读取函数，供元数据转换与搜索身份订阅使用 |
 | `src/utils/common.js` 的可播放状态映射 | 通过显式身份资料完成进程内计算 |
 | `src/application/player.js` | 构建唯一 Playback，组合存储、上报、平台输出和外部观察者，建立与释放歌词所有者 |
 | `src/application/playerStorage.js` | JSON 存取、版本迁移与成功保存去重；单独保存采样进度 |
@@ -232,7 +232,7 @@ Playback 的 `archive()` 与 `restore()` 集中定义恢复字段，存档包含
 启动装配的关系为：
 
 1. 恢复 store 与配置，配置请求环境。
-2. `startup` 建立同一组 `getSettings`、`getIdentity`，交给 `configureMusicData` 和 Playback 装配；数据接线先于会话恢复中的读取，缓存初始化进入其提交顺序。音源读取将设置中的音质显式传给 `getMP3`。
+2. `main.js` 建立同一组 `getSettings`、`getIdentity`，交给 `configureMusicData` 和 Playback 装配；数据接线先于会话恢复中的读取，缓存初始化进入其提交顺序。音源读取将设置中的音质显式传给 `getMP3`。
 3. 创建 Playback、音频 adapter 及反馈和桌面输出连接。
 4. 启动播放器恢复；恢复选曲也携带操作归属，后续用户选择可以取代它。
 5. 依照现有应用启动顺序应用恢复设置并挂载页面。
@@ -251,15 +251,15 @@ Playback 的 `dispose()` 供装配使用，释放自身创建的计时器、音�
 | 快捷键、ipcRenderer、既有媒体控制接合 | 调用同一播放方法，`next()` 内部处理模式，`seek()` 替换音频实例访问 |
 | preferenceEffects | 通过 `setReversed(false)` 和 `applyOutputDevice()` 应用播放器效果；通过完整缓存操作清理 |
 | library 桌面收藏同步 | 由应用装配读取 library 与 Playback，交付桌面投影 |
-| application/player 与 startup | 创建实例、连接 adapters、恢复与释放 |
+| application/player 与 main | 创建实例、连接 adapters、恢复与释放 |
 
 所有播放入口持有 `store.state.player` 的同一公开 facade。`window.yesplaymusic.player` 仅输出可序列化的桌面读取投影，原生 `/player` 从该投影读取；输入控制交由平台接合调用 facade。
 
 ### 上报事件交接
 
-Playback 输出 `played`、`before-replace`、`ended` 事件，包含 `operationId`、`instanceId`、歌曲、该实例的来源、有效记录位置、完整秒数及 `recordOnce()`。旧实例在正式交接时输出自己的最终快照；后续过时音频回调由操作与实例双重检查收束。
+Playback 输出 `played`、`before-replace`、`ended` 事件，包含 `operationId`、歌曲、该实例的来源、记录位置和完整秒数。`played` 用于正在播放通知；后两种事件只交付有效记录，Playback 在交付前确定记录秒数并标记该实例已记录。旧实例在正式交接时输出自己的最终快照；后续过时音频回调由操作与实例双重检查收束。
 
-Playback 将自然结束的有效记录位置设为完整秒数，其余事件使用即时位置；`recordOnce()` 集中判断最低记录时长，并只能在同步事件交付期间取得该实例的一次记录权。应用装配先交付生产上报接合，再调用可选观察者。上报接合在发请求前取得记录权，请求独立完成；网易云和 Last.fm 共用该记录权。实际产品条件集中在[需求中的听歌记录与正在播放](../requirements/playback-and-audio-resources-refactoring.md#听歌记录与正在播放)。
+上报接合直接消费有效记录，分别提交网易云和符合 Last.fm 条件的记录，请求独立完成。实例去重留在 Playback 内部，接收方无需领取记录资格。实际产品条件集中在[需求中的听歌记录与正在播放](../requirements/playback-and-audio-resources-refactoring.md#听歌记录与正在播放)。
 
 ## 验证设计
 

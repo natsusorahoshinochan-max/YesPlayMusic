@@ -1339,13 +1339,6 @@ export default {
       return getTrackCache()
         .countDBSize()
         .then(data => {
-          if (data === undefined) {
-            this.tracksCache = {
-              size: '0KB',
-              length: 0,
-            };
-            return;
-          }
           this.tracksCache.size = bytesToSize(data.bytes, this.settings.lang);
           this.tracksCache.length = data.length;
         });
@@ -1393,10 +1386,10 @@ export default {
       return shortcut.replace('CommandOrControl', 'Ctrl');
     },
     async readyToRecordShortcut(id, type) {
-      const allowed = await this.submitPreference('beginShortcutRecording', {
-        id,
-        type,
-      });
+      const allowed = await this.submitPreference(
+        'beginShortcutRecording',
+        type
+      );
       if (!allowed) return;
       this.shortcutInput = { id, type, recording: true };
       this.recordedShortcut = [];

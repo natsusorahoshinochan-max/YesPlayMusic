@@ -9,7 +9,7 @@
 | 位置 | 职责与公开接口 |
 | --- | --- |
 | `src/store/modules/session.js` | 身份查询 `hasAccount`、`hasLibraryIdentity`；`restore`、`loginWithPassword`、`startQrLogin`、`stopQrLogin`、`selectPublicIdentity`、`logout`、`invalidate`、`refreshDaily`；展示查询 `processing`、`qr` |
-| `src/store/modules/library.js` | 资料、喜欢歌单标识、收藏、云盘与历史；查询 `user`、`likedSongPlaylistID`、`collections`、`previewReady`；加载 `loadApplication`、`loadPage`、`refreshPlaylists` |
+| `src/store/modules/library.js` | 资料、喜欢歌单标识、收藏、云盘与历史；查询 `user`、`likedSongPlaylistID`、`collections`、`previewReady`；加载 `loadApplication`、`loadPage` |
 | `src/application/` | 装配认证凭据、请求环境、endpoint 集合、导航和提示效果，连接会话恢复与后续启动依赖 |
 
 session 的工厂接收 credentials、auth、导航、提示、时钟与调度依赖；library 的工厂接收 endpoint 集合。两者不导入全局 store、router 或浏览器存储。endpoint 继续调用 `request(config)`，无需逐一工厂化。
@@ -48,13 +48,13 @@ session 管理登录模式、凭据存在状态、每日刷新日期、登录处
 
 ## 启动与依赖
 
-`src/main.js` 提供应用装配，`src/application/startup.js` 显式规定执行顺序：
+`src/main.js` 集中应用装配与执行顺序：
 
 1. 构造 store，同步读取本地数据、注册模块和安装持久化。模块注册本身不发请求，也不构造播放器。
 2. 从恢复的设置初始化 locale。locale 不在导入时读取 store。
 3. 配置请求环境、凭据、设置查询和会话失效效果。
 4. 执行会话恢复并等待曲目缓存初始化尝试完成，再交给[播放装配](playback-and-audio-resources.md#依赖与启动装配)创建播放器并发起恢复。
-5. 等待恢复设置应用完成，安装外观监听，再进入挂载。挂载函数发起每日凭据刷新并创建 Vue 根实例；App 在创建时调用应用音乐库入口，音乐库页激活时调用页面入口和每日刷新。
+5. 等待恢复设置应用完成，安装外观监听，发起每日凭据刷新并挂载 Vue 根实例；App 在创建时调用应用音乐库入口，音乐库页激活时调用页面入口和每日刷新。
 
 路由守卫、播放器、公共页面及工具使用统一身份 getters。store 通过注入获得认证与 library API；基础构造不静态依赖播放器、混合 common 或 endpoint。
 

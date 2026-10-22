@@ -6,7 +6,6 @@ const emptyResults = () =>
   Object.fromEntries(categories.map(category => [category, []]));
 
 export function createMusicSearchQuery({
-  getIdentity = () => null,
   subscribeIdentity,
   onError = () => {},
 } = {}) {
@@ -18,7 +17,6 @@ export function createMusicSearchQuery({
     get hasMore() {
       return this.nextOffset !== null;
     },
-    error: null,
   });
   let generation = 0;
   let identityGeneration = 0;
@@ -29,8 +27,7 @@ export function createMusicSearchQuery({
     !disposed &&
     job.generation === generation &&
     (job.category !== 'tracks' ||
-      (job.identityGeneration === identityGeneration &&
-        job.identity === JSON.stringify(getIdentity())));
+      job.identityGeneration === identityGeneration);
   function updateLoading() {
     state.loading = [...jobs].some(current);
     if (!state.loading) state.loaded = true;
@@ -45,7 +42,6 @@ export function createMusicSearchQuery({
     const job = {
       generation,
       identityGeneration,
-      identity: JSON.stringify(getIdentity()),
       category,
     };
     jobs.add(job);
@@ -53,9 +49,7 @@ export function createMusicSearchQuery({
     const position = state.nextOffset ?? 0;
     try {
       const isCurrent = () =>
-        current(job) &&
-        job.identityGeneration === identityGeneration &&
-        job.identity === JSON.stringify(getIdentity());
+        current(job) && job.identityGeneration === identityGeneration;
       const { items, nextOffset } = await search(
         {
           keywords: intent.keywords,
@@ -71,10 +65,7 @@ export function createMusicSearchQuery({
         state.nextOffset = nextOffset;
       }
     } catch (error) {
-      if (current(job)) {
-        state.error = error;
-        onError(error);
-      }
+      if (current(job)) onError(error);
     } finally {
       jobs.delete(job);
       if (!disposed && job.generation === generation) updateLoading();
@@ -87,7 +78,6 @@ export function createMusicSearchQuery({
       generation++;
       intent = next;
       state.results = emptyResults();
-      state.error = null;
       state.loaded = false;
       state.loading = false;
       state.nextOffset = null;
@@ -110,7 +100,6 @@ export function createMusicSearchQuery({
         intent?.category === 'overview'
       )
         return Promise.resolve();
-      state.error = null;
       return readPage(intent.category);
     },
     dispose() {

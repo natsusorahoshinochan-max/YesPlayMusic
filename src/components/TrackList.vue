@@ -25,12 +25,6 @@
           <div v-show="isRightClickedTrackLiked" class="item" @click="like">
             {{ $t('contextMenu.removeFromMyLikedSongs') }}
           </div>
-          <div
-            v-if="extraContextMenuItem.includes('removeTrackFromPlaylist')"
-            class="item"
-            @click="removeTrackFromPlaylist"
-            >从歌单中删除</div
-          >
           <div class="item" @click="addTrackToPlaylist">{{
             $t('contextMenu.addToPlaylist')
           }}</div>
@@ -67,10 +61,7 @@ import { mapActions, mapMutations, mapState, mapGetters } from 'vuex';
 import TrackListItem from '@/components/TrackListItem.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
 import locale from '@/locale';
-import {
-  toggleTrackFavoriteWithFeedback,
-  showLibraryChangeFeedback,
-} from '@/utils/libraryOutcome';
+import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 
 export default {
   name: 'TrackList',
@@ -90,10 +81,6 @@ export default {
       type: String,
       default: 'tracklist',
     }, // tracklist | album | playlist | cloudDisk
-    playlistId: {
-      type: Number,
-      default: 0,
-    },
     albumObject: {
       type: Object,
       default: () => {
@@ -102,14 +89,6 @@ export default {
             name: '',
           },
         };
-      },
-    },
-    extraContextMenuItem: {
-      type: Array,
-      default: () => {
-        return [
-          // 'removeTrackFromPlaylist'
-        ];
       },
     },
     columnNumber: {
@@ -188,21 +167,6 @@ export default {
         key: 'selectedTrackID',
         value: this.rightClickedTrack.id,
       });
-    },
-    async removeTrackFromPlaylist() {
-      if (!confirm(`确定要从歌单删除 ${this.rightClickedTrack.name}？`)) return;
-      const result = await this.$store.dispatch(
-        'library/removePlaylistTracks',
-        {
-          playlistId: this.playlistId,
-          trackIds: [this.rightClickedTrack.id],
-        }
-      );
-      showLibraryChangeFeedback(
-        this.$store,
-        result,
-        locale.t('toast.removedFromPlaylist')
-      );
     },
     copyLink() {
       this.$copyText(
