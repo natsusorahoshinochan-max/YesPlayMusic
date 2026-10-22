@@ -3,23 +3,6 @@ import { readIdentity } from './readingContext';
 import { mapTrackPlayableStatus } from '@/utils/common';
 
 /**
- * 获取用户详情
- * 说明 : 登录后调用此接口 , 传入用户 id, 可以获取用户详情
- * - uid : 用户 id
- * @param {number} uid
- */
-export function userDetail(uid) {
-  return request({
-    url: '/user/detail',
-    method: 'get',
-    params: {
-      uid,
-      timestamp: new Date().getTime(),
-    },
-  });
-}
-
-/**
  * 获取账号详情
  * 说明 : 登录后调用此接口 ,可获取用户账号信息
  */
@@ -88,23 +71,6 @@ export function userLikedSongsIDs(uid) {
     method: 'get',
     params: {
       uid,
-      timestamp: new Date().getTime(),
-    },
-  });
-}
-
-/**
- * 每日签到
- * 说明 : 调用此接口可签到获取积分
- * -  type: 签到类型 , 默认 0, 其中 0 为安卓端签到 ,1 为 web/PC 签到
- * @param {number} type
- */
-export function dailySignin(type = 0) {
-  return request({
-    url: '/daily_signin',
-    method: 'post',
-    params: {
-      type,
       timestamp: new Date().getTime(),
     },
   });
@@ -221,20 +187,6 @@ export function cloudDisk(params = {}) {
         )[0],
       })),
     };
-  });
-}
-
-/**
- * 获取云盘歌曲详情（需要登录）
- */
-export function cloudDiskTrackDetail(id) {
-  return request({
-    url: '/user/cloud/detail',
-    method: 'get',
-    params: {
-      timestamp: new Date().getTime(),
-      id,
-    },
   });
 }
 

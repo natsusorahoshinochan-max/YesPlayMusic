@@ -1,4 +1,3 @@
-import defaultShortcuts from '@/utils/shortcuts';
 const { globalShortcut } = require('electron');
 
 const clc = require('cli-color');
@@ -8,10 +7,7 @@ const log = text => {
 
 export function registerGlobalShortcut(win, store) {
   log('registerGlobalShortcut');
-  let shortcuts = store.get('settings.shortcuts');
-  if (shortcuts === undefined) {
-    shortcuts = defaultShortcuts;
-  }
+  const shortcuts = store.get('settings.shortcuts');
 
   globalShortcut.register(
     shortcuts.find(s => s.id === 'play').globalShortcut,

@@ -57,11 +57,6 @@ export default {
           key: 'show',
           value,
         });
-        if (value) {
-          this.$store.commit('enableScrolling', false);
-        } else {
-          this.$store.commit('enableScrolling', true);
-        }
       },
     },
   },

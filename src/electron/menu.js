@@ -1,4 +1,3 @@
-import defaultShortcuts from '@/utils/shortcuts';
 const { app, Menu } = require('electron');
 // import { autoUpdater } from "electron-updater"
 // const version = app.getVersion();
@@ -6,10 +5,7 @@ const { app, Menu } = require('electron');
 const isMac = process.platform === 'darwin';
 
 export function createMenu(win, store) {
-  let shortcuts = store.get('settings.shortcuts');
-  if (shortcuts === undefined) {
-    shortcuts = defaultShortcuts;
-  }
+  const shortcuts = store.get('settings.shortcuts');
 
   let menu = null;
   const template = [

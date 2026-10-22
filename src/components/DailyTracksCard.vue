@@ -11,14 +11,13 @@
         </div>
       </div>
     </div>
-    <button class="play-button" @click.stop="playDailyTracks">
+    <button class="play-button" @click.stop="playDailyTracks()">
       <svg-icon icon-class="play" />
     </button>
   </div>
 </template>
 
 <script>
-import locale from '@/locale';
 import { mapState, mapActions } from 'vuex';
 import sample from 'lodash/sample';
 
@@ -30,9 +29,6 @@ const defaultCovers = [
 
 export default {
   name: 'DailyTracksCard',
-  data() {
-    return { useAnimation: false };
-  },
   computed: {
     ...mapState('dailyRecommendations', { dailyTracks: 'tracks' }),
     coverUrl() {
@@ -45,17 +41,12 @@ export default {
     this.loadDailyTracks();
   },
   methods: {
-    ...mapActions(['showToast']),
-    ...mapActions('dailyRecommendations', { loadDailyTracks: 'load' }),
+    ...mapActions('dailyRecommendations', {
+      loadDailyTracks: 'load',
+      playDailyTracks: 'play',
+    }),
     goToDailyTracks() {
       this.$router.push({ name: 'dailySongs' });
-    },
-    playDailyTracks() {
-      if (!this.$store.getters['session/hasAccount']) {
-        this.showToast(locale.t('toast.needToLogin'));
-        return;
-      }
-      return this.$store.dispatch('dailyRecommendations/play');
     },
   },
 };

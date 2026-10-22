@@ -1,185 +1,182 @@
 <template>
-  <div v-show="show" class="artist-page">
-    <div class="artist-info">
-      <div class="head">
-        <img :src="artist.img1v1Url | resizeImage(1024)" loading="lazy" />
-      </div>
-      <div>
-        <div class="name">{{ artist.name }}</div>
-        <div class="artist">{{ $t('artist.artist') }}</div>
-        <div class="statistics">
-          <a @click="scrollTo('popularTracks')"
-            >{{ artist.musicSize }} {{ $t('common.songs') }}</a
-          >
-          ·
-          <a @click="scrollTo('seeMore', 'start')"
-            >{{ artist.albumSize }} {{ $t('artist.withAlbums') }}</a
-          >
-          ·
-          <a @click="scrollTo('mvs')"
-            >{{ artist.mvSize }} {{ $t('artist.videos') }}</a
-          >
+  <div>
+    <PageLoading :loading="loading" />
+    <div v-show="show" class="artist-page">
+      <div class="artist-info">
+        <div class="head">
+          <img :src="artist.img1v1Url | resizeImage(1024)" loading="lazy" />
         </div>
-        <div class="description" @click="toggleFullDescription">
+        <div>
+          <div class="name">{{ artist.name }}</div>
+          <div class="artist">{{ $t('artist.artist') }}</div>
+          <div class="statistics">
+            <a @click="scrollTo('popularTracks')"
+              >{{ artist.musicSize }} {{ $t('common.songs') }}</a
+            >
+            ·
+            <a @click="scrollTo('seeMore', 'start')"
+              >{{ artist.albumSize }} {{ $t('artist.withAlbums') }}</a
+            >
+            ·
+            <a @click="scrollTo('mvs')"
+              >{{ artist.mvSize }} {{ $t('artist.videos') }}</a
+            >
+          </div>
+          <div class="description" @click="toggleFullDescription">
+            {{ artist.briefDesc }}
+          </div>
+          <div class="buttons">
+            <ButtonTwoTone icon-class="play" @click.native="playPopularSongs()">
+              {{ $t('common.play') }}
+            </ButtonTwoTone>
+            <ButtonTwoTone color="grey" @click.native="followArtist">
+              <span v-if="artist.followed">{{ $t('artist.following') }}</span>
+              <span v-else>{{ $t('artist.follow') }}</span>
+            </ButtonTwoTone>
+            <ButtonTwoTone
+              icon-class="more"
+              :icon-button="true"
+              :horizontal-padding="0"
+              color="grey"
+              @click.native="openMenu"
+            >
+            </ButtonTwoTone>
+          </div>
+        </div>
+      </div>
+      <div v-if="latestRelease !== undefined" class="latest-release">
+        <div class="section-title">{{ $t('artist.latestRelease') }}</div>
+        <div class="release">
+          <div class="container">
+            <Cover
+              :id="latestRelease.id"
+              :image-url="latestRelease.picUrl | resizeImage"
+              type="album"
+              :fixed-size="128"
+              :play-button-size="30"
+            />
+            <div class="info">
+              <div class="name">
+                <router-link :to="`/album/${latestRelease.id}`">{{
+                  latestRelease.name
+                }}</router-link>
+              </div>
+              <div class="date">
+                {{ latestRelease.publishTime | formatDate }}
+              </div>
+              <div class="type">
+                {{ latestRelease.type | formatAlbumType(latestRelease) }} ·
+                {{ latestRelease.size }} {{ $t('common.songs') }}
+              </div>
+            </div>
+          </div>
+          <div v-show="latestMV.id" class="container latest-mv">
+            <div
+              class="cover"
+              @mouseover="mvHover = true"
+              @mouseleave="mvHover = false"
+              @click="goToMv(latestMV.id)"
+            >
+              <img :src="latestMV.coverUrl" loading="lazy" />
+              <transition name="fade">
+                <div
+                  v-show="mvHover"
+                  class="shadow"
+                  :style="{
+                    background: 'url(' + latestMV.coverUrl + ')',
+                  }"
+                ></div>
+              </transition>
+            </div>
+            <div class="info">
+              <div class="name">
+                <router-link :to="'/mv/' + latestMV.id">{{
+                  latestMV.name
+                }}</router-link>
+              </div>
+              <div class="date">
+                {{ latestMV.publishTime | formatDate }}
+              </div>
+              <div class="type">{{ $t('artist.latestMV') }}</div>
+            </div>
+          </div>
+          <div v-show="!latestMV.id"></div>
+        </div>
+      </div>
+      <div id="popularTracks" class="popular-tracks">
+        <div class="section-title">{{ $t('artist.popularSongs') }}</div>
+        <TrackList
+          :items="popularTracks.slice(0, showMorePopTracks ? 24 : 12)"
+          type="tracklist"
+          @activate="player.playArtist(artist.id, { startTrackId: $event.id })"
+        />
+
+        <div id="seeMore" class="show-more">
+          <button @click="showMorePopTracks = !showMorePopTracks">
+            <span v-show="!showMorePopTracks">{{ $t('artist.showMore') }}</span>
+            <span v-show="showMorePopTracks">{{ $t('artist.showLess') }}</span>
+          </button>
+        </div>
+      </div>
+      <div v-if="albums.length !== 0" id="albums" class="albums">
+        <div class="section-title">{{ $t('artist.albums') }}</div>
+        <CoverRow :type="'album'" :items="albums" :sub-text="'releaseYear'" />
+      </div>
+      <div v-if="mvs.length !== 0" id="mvs" class="mvs">
+        <div class="section-title"
+          >MVs
+          <router-link v-show="hasMoreMV" :to="`/artist/${artist.id}/mv`">{{
+            $t('home.seeMore')
+          }}</router-link>
+        </div>
+        <MvRow :mvs="mvs" subtitle="publishTime" />
+      </div>
+      <div v-if="eps.length !== 0" class="eps">
+        <div class="section-title">{{ $t('artist.EPsSingles') }}</div>
+        <CoverRow
+          :type="'album'"
+          :items="eps"
+          :sub-text="'albumType+releaseYear'"
+        />
+      </div>
+
+      <div v-if="similarArtists.length !== 0" class="similar-artists">
+        <div class="section-title">{{ $t('artist.similarArtists') }}</div>
+        <CoverRow
+          type="artist"
+          :column-number="6"
+          gap="36px 28px"
+          :items="similarArtists.slice(0, 12)"
+        />
+      </div>
+
+      <Modal
+        :show="showFullDescription"
+        :close="toggleFullDescription"
+        :show-footer="false"
+        :click-outside-hide="true"
+        :title="$t('artist.artistDesc')"
+      >
+        <p class="description-fulltext">
           {{ artist.briefDesc }}
-        </div>
-        <div class="buttons">
-          <ButtonTwoTone icon-class="play" @click.native="playPopularSongs()">
-            {{ $t('common.play') }}
-          </ButtonTwoTone>
-          <ButtonTwoTone color="grey" @click.native="followArtist">
-            <span v-if="artist.followed">{{ $t('artist.following') }}</span>
-            <span v-else>{{ $t('artist.follow') }}</span>
-          </ButtonTwoTone>
-          <ButtonTwoTone
-            icon-class="more"
-            :icon-button="true"
-            :horizontal-padding="0"
-            color="grey"
-            @click.native="openMenu"
-          >
-          </ButtonTwoTone>
-        </div>
-      </div>
-    </div>
-    <div v-if="latestRelease !== undefined" class="latest-release">
-      <div class="section-title">{{ $t('artist.latestRelease') }}</div>
-      <div class="release">
-        <div class="container">
-          <Cover
-            :id="latestRelease.id"
-            :image-url="latestRelease.picUrl | resizeImage"
-            type="album"
-            :fixed-size="128"
-            :play-button-size="30"
-          />
-          <div class="info">
-            <div class="name">
-              <router-link :to="`/album/${latestRelease.id}`">{{
-                latestRelease.name
-              }}</router-link>
-            </div>
-            <div class="date">
-              {{ latestRelease.publishTime | formatDate }}
-            </div>
-            <div class="type">
-              {{ latestRelease.type | formatAlbumType(latestRelease) }} ·
-              {{ latestRelease.size }} {{ $t('common.songs') }}
-            </div>
-          </div>
-        </div>
-        <div v-show="latestMV.id" class="container latest-mv">
-          <div
-            class="cover"
-            @mouseover="mvHover = true"
-            @mouseleave="mvHover = false"
-            @click="goToMv(latestMV.id)"
-          >
-            <img :src="latestMV.coverUrl" loading="lazy" />
-            <transition name="fade">
-              <div
-                v-show="mvHover"
-                class="shadow"
-                :style="{
-                  background: 'url(' + latestMV.coverUrl + ')',
-                }"
-              ></div>
-            </transition>
-          </div>
-          <div class="info">
-            <div class="name">
-              <router-link :to="'/mv/' + latestMV.id">{{
-                latestMV.name
-              }}</router-link>
-            </div>
-            <div class="date">
-              {{ latestMV.publishTime | formatDate }}
-            </div>
-            <div class="type">{{ $t('artist.latestMV') }}</div>
-          </div>
-        </div>
-        <div v-show="!latestMV.id"></div>
-      </div>
-    </div>
-    <div id="popularTracks" class="popular-tracks">
-      <div class="section-title">{{ $t('artist.popularSongs') }}</div>
-      <TrackList
-        :items="popularTracks.slice(0, showMorePopTracks ? 24 : 12)"
-        type="tracklist"
-        @activate="player.playArtist(artist.id, { startTrackId: $event.id })"
-      />
+        </p>
+      </Modal>
 
-      <div id="seeMore" class="show-more">
-        <button @click="showMorePopTracks = !showMorePopTracks">
-          <span v-show="!showMorePopTracks">{{ $t('artist.showMore') }}</span>
-          <span v-show="showMorePopTracks">{{ $t('artist.showLess') }}</span>
-        </button>
-      </div>
+      <ContextMenu ref="artistMenu">
+        <div class="item" @click="copyUrl(artist.id)">{{
+          $t('contextMenu.copyUrl')
+        }}</div>
+        <div class="item" @click="openInBrowser(artist.id)">{{
+          $t('contextMenu.openInBrowser')
+        }}</div>
+      </ContextMenu>
     </div>
-    <div v-if="albums.length !== 0" id="albums" class="albums">
-      <div class="section-title">{{ $t('artist.albums') }}</div>
-      <CoverRow
-        :type="'album'"
-        :items="albums"
-        :sub-text="'releaseYear'"
-        :show-play-button="true"
-      />
-    </div>
-    <div v-if="mvs.length !== 0" id="mvs" class="mvs">
-      <div class="section-title"
-        >MVs
-        <router-link v-show="hasMoreMV" :to="`/artist/${artist.id}/mv`">{{
-          $t('home.seeMore')
-        }}</router-link>
-      </div>
-      <MvRow :mvs="mvs" subtitle="publishTime" />
-    </div>
-    <div v-if="eps.length !== 0" class="eps">
-      <div class="section-title">{{ $t('artist.EPsSingles') }}</div>
-      <CoverRow
-        :type="'album'"
-        :items="eps"
-        :sub-text="'albumType+releaseYear'"
-        :show-play-button="true"
-      />
-    </div>
-
-    <div v-if="similarArtists.length !== 0" class="similar-artists">
-      <div class="section-title">{{ $t('artist.similarArtists') }}</div>
-      <CoverRow
-        type="artist"
-        :column-number="6"
-        gap="36px 28px"
-        :items="similarArtists.slice(0, 12)"
-      />
-    </div>
-
-    <Modal
-      :show="showFullDescription"
-      :close="toggleFullDescription"
-      :show-footer="false"
-      :click-outside-hide="true"
-      :title="$t('artist.artistDesc')"
-    >
-      <p class="description-fulltext">
-        {{ artist.briefDesc }}
-      </p>
-    </Modal>
-
-    <ContextMenu ref="artistMenu">
-      <div class="item" @click="copyUrl(artist.id)">{{
-        $t('contextMenu.copyUrl')
-      }}</div>
-      <div class="item" @click="openInBrowser(artist.id)">{{
-        $t('contextMenu.openInBrowser')
-      }}</div>
-    </ContextMenu>
   </div>
 </template>
 
 <script>
 import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
-import { mapActions, mapState } from 'vuex';
+import { mapState } from 'vuex';
 import {
   getArtist,
   getArtistAlbum,
@@ -187,8 +184,6 @@ import {
   similarArtists,
 } from '@/api/artist';
 import { getTrackDetail } from '@/api/track';
-import locale from '@/locale';
-import NProgress from 'nprogress';
 
 import ButtonTwoTone from '@/components/ButtonTwoTone.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
@@ -216,6 +211,7 @@ export default {
   },
   data() {
     return {
+      loading: false,
       show: false,
       artist: {
         img1v1Url:
@@ -269,20 +265,20 @@ export default {
     }
   },
   methods: {
-    ...mapActions(['showToast']),
     loadData(id, next = undefined) {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
+      this.loading = true;
       this.show = false;
       this.$parent.$refs.main.scrollTo({ top: 0 });
-      getArtist(id).then(data => {
-        this.artist = data.artist;
-        this.setPopularTracks(data.hotSongs);
-        if (next !== undefined) next();
-        NProgress.done();
-        this.show = true;
-      });
+      getArtist(id)
+        .then(data => {
+          this.artist = data.artist;
+          this.setPopularTracks(data.hotSongs);
+          if (next !== undefined) next();
+          this.show = true;
+        })
+        .finally(() => {
+          this.loading = false;
+        });
       getArtistAlbum({ id: id, limit: 200 }).then(data => {
         this.albumsData = data.hotAlbums;
         this.latestRelease = data.hotAlbums[0];
@@ -299,14 +295,8 @@ export default {
     },
     setPopularTracks(hotSongs) {
       const trackIDs = hotSongs.map(t => t.id);
-      getTrackDetail(trackIDs.join(',')).then(data => {
+      getTrackDetail(trackIDs).then(data => {
         this.popularTracks = data.songs;
-      });
-    },
-    goToAlbum(id) {
-      this.$router.push({
-        name: 'album',
-        params: { id },
       });
     },
     goToMv(id) {
@@ -345,14 +335,10 @@ export default {
       this.$refs.artistMenu.openMenu(e);
     },
     copyUrl(id) {
-      let showToast = this.showToast;
-      this.$copyText(`https://music.163.com/#/artist?id=${id}`)
-        .then(function () {
-          showToast(locale.t('toast.copied'));
-        })
-        .catch(error => {
-          showToast(`${locale.t('toast.copyFailed')}${error}`);
-        });
+      return this.$store.dispatch(
+        'copyText',
+        `https://music.163.com/#/artist?id=${id}`
+      );
     },
     openInBrowser(id) {
       const url = `https://music.163.com/#/artist?id=${id}`;

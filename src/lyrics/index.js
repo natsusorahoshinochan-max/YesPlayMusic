@@ -7,6 +7,8 @@ export function createLyrics({
   getIdentity,
   getLyric,
   getCloudLyric,
+  onContent = () => {},
+  onLine = () => {},
   setInterval: schedule = setInterval,
   clearInterval: cancel = clearInterval,
 }) {
@@ -22,18 +24,13 @@ export function createLyrics({
     romanization: [],
     currentIndex: -1,
     currentLine: '',
-    error: null,
   });
-  let key;
   let track;
-  let identity;
   let disposed = false;
   let clock;
   let demand = 0;
   let request;
   let identityPending = false;
-  const subscribers = new Set();
-  const notify = () => subscribers.forEach(listener => listener(state));
   function position() {
     if (disposed) return;
     const seconds = playback.position();
@@ -44,7 +41,7 @@ export function createLyrics({
     if (index === state.currentIndex) return;
     state.currentIndex = index;
     state.currentLine = state.lyric[index]?.content || '';
-    notify();
+    onLine(state.currentLine);
   }
   function updateClock() {
     const needed =
@@ -66,10 +63,10 @@ export function createLyrics({
       romanization: [],
       currentIndex: -1,
       currentLine: '',
-      error: null,
     });
     updateClock();
-    notify();
+    onLine('');
+    onContent(state);
   }
   const align = (lines, secondary) =>
     lines.map(line => ({
@@ -83,7 +80,7 @@ export function createLyrics({
     if (disposed || !track) return Promise.resolve();
     const generation = state.generation;
     const selectedTrack = track;
-    const selectedIdentity = identity;
+    const selectedIdentity = getIdentity();
     const isCurrent = () => !disposed && generation === state.generation;
     clear('loading');
     request = Promise.resolve()
@@ -130,49 +127,38 @@ export function createLyrics({
         });
         position();
         updateClock();
-        notify();
+        onContent(state);
       })
-      .catch(error => {
+      .catch(() => {
         if (disposed || generation !== state.generation) return;
         clear('failed');
-        state.error = error;
       });
     return request;
+  }
+  function setTrack(next) {
+    if (disposed) return;
+    track = next;
+    state.generation++;
+    state.trackId = identityPending ? null : track?.id ?? null;
+    if (track && !identityPending) load();
+    else clear('idle');
   }
   return Object.freeze({
     state,
     identityChanged() {
       if (disposed) return;
       identityPending = true;
-      key = undefined;
-      track = null;
       state.trackId = null;
       state.generation++;
       clear('idle');
     },
-    sync({ identityReady = false } = {}) {
-      if (disposed) return;
-      if (identityReady) identityPending = false;
-      if (identityPending) return;
-      const nextIdentity = getIdentity();
-      const next = playback.state.sourceInfo
-        ? playback.state.currentTrack
-        : null;
-      const nextKey = JSON.stringify([
-        next?.id,
-        next?.pc,
-        next?.cd,
-        nextIdentity,
-      ]);
-      if (key !== nextKey) {
-        key = nextKey;
-        track = next?.id ? next : null;
-        identity = nextIdentity;
-        state.generation++;
-        state.trackId = track?.id ?? null;
-        clear(track ? 'loading' : 'idle');
-        if (track) load();
-      }
+    identityReady() {
+      if (!identityPending) return;
+      identityPending = false;
+      setTrack(track);
+    },
+    setTrack,
+    playbackChanged() {
       position();
       updateClock();
     },
@@ -196,16 +182,11 @@ export function createLyrics({
         }
       };
     },
-    subscribe(listener) {
-      subscribers.add(listener);
-      return () => subscribers.delete(listener);
-    },
     dispose() {
       disposed = true;
       state.generation++;
       if (clock !== undefined) cancel(clock);
       clock = undefined;
-      subscribers.clear();
     },
   });
 }

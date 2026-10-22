@@ -149,7 +149,6 @@
               v-for="device in allOutputDevices"
               :key="device.deviceId"
               :value="device.deviceId"
-              :selected="device.deviceId == outputDevice"
             >
               {{ $t(device.label) }}
             </option>
@@ -815,7 +814,36 @@ import { getTrackCache } from '@/utils/db';
 import pkg from '../../package.json';
 import cloneDeep from 'lodash/cloneDeep';
 
-const validShortcutCodes = ['=', '-', '~', '[', ']', ';', "'", ',', '.', '/'];
+const shortcutModifierOrder = { Control: 1, Shift: 2, Alt: 3, Command: 4 };
+
+function shortcutKey(event) {
+  if (event.keyCode >= 65 && event.keyCode <= 90)
+    return event.code.replace('Key', '');
+  if (event.keyCode >= 48 && event.keyCode <= 57)
+    return event.code.replace('Digit', '');
+  if (event.keyCode >= 112 && event.keyCode <= 123) return event.code;
+  if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(event.key))
+    return event.code.replace('Arrow', '');
+  if (event.key === 'Meta') return 'Command';
+  if (
+    [
+      'Alt',
+      'Control',
+      'Shift',
+      '=',
+      '-',
+      '~',
+      '[',
+      ']',
+      ';',
+      "'",
+      ',',
+      '.',
+      '/',
+    ].includes(event.key)
+  )
+    return event.key;
+}
 
 export default {
   name: 'Settings',
@@ -869,49 +897,13 @@ export default {
       );
     },
     recordedShortcutComputed() {
-      let shortcut = [];
-      this.recordedShortcut.map(e => {
-        if (e.keyCode >= 65 && e.keyCode <= 90) {
-          // A-Z
-          shortcut.push(e.code.replace('Key', ''));
-        } else if (e.key === 'Meta') {
-          // ⌘ Command on macOS
-          shortcut.push('Command');
-        } else if (['Alt', 'Control', 'Shift'].includes(e.key)) {
-          shortcut.push(e.key);
-        } else if (e.keyCode >= 48 && e.keyCode <= 57) {
-          // 0-9
-          shortcut.push(e.code.replace('Digit', ''));
-        } else if (e.keyCode >= 112 && e.keyCode <= 123) {
-          // F1-F12
-          shortcut.push(e.code);
-        } else if (
-          ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)
-        ) {
-          // Arrows
-          shortcut.push(e.code.replace('Arrow', ''));
-        } else if (validShortcutCodes.includes(e.key)) {
-          shortcut.push(e.key);
-        }
-      });
-      const sortTable = {
-        Control: 1,
-        Shift: 2,
-        Alt: 3,
-        Command: 4,
-      };
-      shortcut = shortcut.sort((a, b) => {
-        if (!sortTable[a] || !sortTable[b]) return 0;
-        if (sortTable[a] - sortTable[b] <= -1) {
-          return -1;
-        } else if (sortTable[a] - sortTable[b] >= 1) {
-          return 1;
-        } else {
-          return 0;
-        }
-      });
-      shortcut = shortcut.join('+');
-      return shortcut;
+      return this.recordedShortcut
+        .map(key => key.accelerator)
+        .sort(
+          (a, b) =>
+            (shortcutModifierOrder[a] || 5) - (shortcutModifierOrder[b] || 5)
+        )
+        .join('+');
     },
 
     lang: {
@@ -1318,11 +1310,9 @@ export default {
           return device.kind == 'audiooutput';
         });
         if (
-          this.allOutputDevices.length > 0 &&
-          this.allOutputDevices[0].label !== ''
+          this.allOutputDevices.length === 0 ||
+          this.allOutputDevices[0].label === ''
         ) {
-          this.withoutAudioPriviledge = false;
-        } else {
           this.allOutputDevices = [
             {
               deviceId: 'default',
@@ -1397,17 +1387,11 @@ export default {
     handleShortcutKeydown(e) {
       if (this.shortcutInput.recording === false) return;
       e.preventDefault();
-      if (this.recordedShortcut.find(s => s.keyCode === e.keyCode)) return;
-      this.recordedShortcut.push(e);
-      if (
-        (e.keyCode >= 65 && e.keyCode <= 90) || // A-Z
-        (e.keyCode >= 48 && e.keyCode <= 57) || // 0-9
-        (e.keyCode >= 112 && e.keyCode <= 123) || // F1-F12
-        ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key) || // Arrows
-        validShortcutCodes.includes(e.key)
-      ) {
-        this.saveShortcut();
-      }
+      if (this.recordedShortcut.some(key => key.keyCode === e.keyCode)) return;
+      const accelerator = shortcutKey(e);
+      if (!accelerator) return;
+      this.recordedShortcut.push({ keyCode: e.keyCode, accelerator });
+      if (!shortcutModifierOrder[accelerator]) this.saveShortcut();
     },
     handleShortcutKeyup(e) {
       if (this.recordedShortcut.find(s => s.keyCode === e.keyCode)) {

@@ -31,7 +31,7 @@ export async function search(
   let items = page;
   if (category === 'tracks' && page.length) {
     const details = await getTrackDetail(
-      page.map(track => track.id).join(','),
+      page.map(track => track.id),
       {
         isCurrent,
       }

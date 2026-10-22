@@ -23,9 +23,11 @@ export function createPlaybackPlatform({
   let disposed = false;
   const session = browserNavigator.mediaSession;
   const listeners = [];
-  let lastState;
+  let track;
+  let playing = false;
+  let liked = false;
+  let metadata;
   let publishedSnapshot;
-  let metadataKey;
   let metadataGeneration = 0;
   let pendingLyrics;
   function cancelLyricsWrite() {
@@ -102,7 +104,7 @@ export function createPlaybackPlatform({
   listen('shuffle', () => playback.toggleShuffle());
   listen('setPosition', (_, position) => playback.seek(position));
   function updatePosition(position) {
-    const duration = lastState?.durationSeconds;
+    const duration = metadata?.length;
     if (session?.setPositionState && duration > 0) {
       session.setPositionState({
         duration,
@@ -111,135 +113,101 @@ export function createPlaybackPlatform({
       });
     }
   }
-  function discord(state, position = playback.position()) {
-    if (
-      settings().enableDiscordRichPresence === false ||
-      !state.currentTrack?.id
-    )
-      return;
+  function discord(position = playback.position()) {
+    if (settings().enableDiscordRichPresence === false || !track) return;
     send(
-      state.playing ? 'playDiscordPresence' : 'pauseDiscordPresence',
-      state.playing
-        ? {
-            ...state.currentTrack,
-            dt: Math.max(0, state.currentTrack.dt - position * 1000),
-          }
-        : state.currentTrack
+      playing ? 'playDiscordPresence' : 'pauseDiscordPresence',
+      playing
+        ? { ...track, dt: Math.max(0, track.dt - position * 1000) }
+        : track
     );
   }
-  function publishMetadata(track, state) {
-    const metadata = {
-      title: track.name,
-      artist: (track.ar || []).map(artist => artist.name).join(','),
-      album: track.al?.name || '',
-      artwork: [224, 512].map(size => ({
-        src: `${track.al?.picUrl || ''}?param=${size}y${size}`,
-        type: 'image/jpg',
-        sizes: `${size}x${size}`,
-      })),
-      length: state.durationSeconds,
-      trackId: state.currentTrackID,
-      url: '/trackid/' + track.id,
-    };
-    if (session && MediaMetadata)
-      session.metadata = new MediaMetadata(metadata);
-    const generation = ++metadataGeneration;
-    cancelLyricsWrite();
-    if (!createMpris || !ipc) return;
-    if (!settings().enableOsdlyricsSupport) {
-      send('metadata', metadata);
-      return;
-    }
-    const content = lyrics?.state;
-    if (
-      !content ||
-      content.trackId !== track.id ||
-      content.status === 'loading' ||
-      content.status === 'idle'
-    )
-      return;
-    pendingLyrics = {
-      metadata,
-      generation,
-      timeout: schedule(
-        () => finishLyricsWrite(generation),
-        lyricsWriteTimeout
-      ),
-    };
-    send('sendLyrics', { track, lyrics: content.raw, requestId: generation });
-  }
-  function reconcileMetadata() {
-    const state = lastState;
-    const key =
-      state?.currentTrack?.id && state.sourceInfo
-        ? JSON.stringify([
-            state.currentTrack,
-            lyrics?.state.generation,
-            lyrics?.state.status,
-          ])
-        : undefined;
-    if (key === metadataKey) return;
-    metadataKey = key;
-    if (key) {
-      publishMetadata(state.currentTrack, state);
-    } else {
-      metadataGeneration++;
-      cancelLyricsWrite();
-    }
-  }
-  let currentLine;
-  const releaseClock = ipc && createTouchBar ? lyrics?.consume() : undefined;
-  const unsubscribeLyrics = lyrics?.subscribe(content => {
-    if (createTouchBar && content.currentLine !== currentLine) {
-      currentLine = content.currentLine;
-      send('updateLyric', { lyric: currentLine });
-    }
-    reconcileMetadata();
-  });
+  const sendPlayer = () =>
+    send('player', { playing, likedCurrentTrack: liked });
+  const releaseClock = ipc && createTouchBar ? lyrics.consume() : undefined;
   listen('saveLyricFinished', (_, requestId) => finishLyricsWrite(requestId));
   return {
-    publish(state, liked = false) {
+    publish(state) {
       if (disposed) return;
-      const previous = lastState;
-      lastState = state;
-      publishedSnapshot = {
-        ...state,
-        likedCurrentTrack: liked,
-        progress: state.progress,
-      };
+      publishedSnapshot = { ...state, likedCurrentTrack: liked };
       publicExport.player = publishedSnapshot;
-      send('player', publishedSnapshot);
-      if (createTray) send('updateTrayLikeState', liked);
-      const changedPlayback =
-        !previous ||
-        previous.playing !== state.playing ||
-        previous.currentTrackID !== state.currentTrackID;
-      // A metadata-ready target can still be waiting on the old audio handle.
-      if (changedPlayback && (!state.playing || state.sourceInfo)) {
-        const track = state.currentTrack;
-        const title =
-          state.playing && track?.id
-            ? `${track.name} · ${track.ar?.[0]?.name || ''} - YesPlayMusic`
-            : 'YesPlayMusic';
-        browserDocument.title = title;
-        onTitle(title);
-        if (createTray) {
-          send('updateTrayTooltip', title);
-          send('updateTrayPlayState', state.playing);
-        }
-        if (session)
-          session.playbackState = state.playing ? 'playing' : 'paused';
-        discord(state, state.progress);
-      }
+    },
+    trackChanged(next, duration) {
+      metadataGeneration++;
+      cancelLyricsWrite();
+      if (!next) return;
+      track = next;
+      metadata = {
+        title: track.name,
+        artist: (track.ar || []).map(artist => artist.name).join(','),
+        album: track.al?.name || '',
+        artwork: [224, 512].map(size => ({
+          src: `${track.al?.picUrl || ''}?param=${size}y${size}`,
+          type: 'image/jpg',
+          sizes: `${size}x${size}`,
+        })),
+        length: duration,
+        trackId: track.id,
+        url: '/trackid/' + track.id,
+      };
+      if (session && MediaMetadata)
+        session.metadata = new MediaMetadata(metadata);
+      if (createMpris && !settings().enableOsdlyricsSupport)
+        send('metadata', metadata);
+    },
+    lyricsChanged(content) {
+      const generation = ++metadataGeneration;
+      cancelLyricsWrite();
       if (
-        createMpris &&
-        (!previous || previous.repeatMode !== state.repeatMode)
+        !createMpris ||
+        !ipc ||
+        !settings().enableOsdlyricsSupport ||
+        content.status === 'loading' ||
+        content.status === 'idle'
       )
-        send('switchRepeatMode', state.repeatMode);
-      if (createMpris && (!previous || previous.shuffle !== state.shuffle))
-        send('switchShuffle', state.shuffle);
-      reconcileMetadata();
-      updatePosition(state.progress);
+        return;
+      pendingLyrics = {
+        metadata,
+        generation,
+        timeout: schedule(
+          () => finishLyricsWrite(generation),
+          lyricsWriteTimeout
+        ),
+      };
+      send('sendLyrics', { track, lyrics: content.raw, requestId: generation });
+    },
+    lineChanged(line) {
+      if (createTouchBar) send('updateLyric', { lyric: line });
+    },
+    playingChanged(value) {
+      if (disposed) return;
+      playing = value;
+      const title =
+        playing && track
+          ? `${track.name} · ${track.ar?.[0]?.name || ''} - YesPlayMusic`
+          : 'YesPlayMusic';
+      browserDocument.title = title;
+      onTitle(title);
+      sendPlayer();
+      if (createTray) {
+        send('updateTrayTooltip', title);
+        send('updateTrayPlayState', playing);
+      }
+      if (session) session.playbackState = playing ? 'playing' : 'paused';
+      discord();
+      updatePosition(playback.position());
+    },
+    likedChanged(value) {
+      liked = value;
+      publishedSnapshot = { ...publishedSnapshot, likedCurrentTrack: liked };
+      publicExport.player = publishedSnapshot;
+      sendPlayer();
+      if (createTray) send('updateTrayLikeState', liked);
+    },
+    modesChanged({ repeatMode, shuffle }) {
+      if (!createMpris) return;
+      send('switchRepeatMode', repeatMode);
+      send('switchShuffle', shuffle);
     },
     progress(position, detail = {}) {
       if (disposed) return;
@@ -251,15 +219,13 @@ export function createPlaybackPlatform({
       updatePosition(position);
       if (detail.seeked) {
         send('seeked', position);
-        if (lastState?.playing && lastState.sourceInfo)
-          discord(lastState, position);
+        if (playing) discord(position);
       }
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       metadataGeneration++;
-      unsubscribeLyrics?.();
       releaseClock?.();
       browserWindow.removeEventListener('keydown', keydown);
       cancelLyricsWrite();

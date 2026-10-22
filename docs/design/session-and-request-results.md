@@ -1,5 +1,7 @@
 # 会话与请求结果：结构设计
 
+**Last Updated:** 2026-10-22
+
 本文描述 [spec #1](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/1) 对应的已实现结构。职责与交付范围见[代码结构重构需求](../requirements/session-and-request-results-refactoring.md)；待验证会话、完整异步结果隔离等另见[行为完善需求](../requirements/session-behavior-improvements.md)。
 
 ## 模块与公开接口
@@ -12,7 +14,7 @@
 | `src/store/modules/library.js` | 资料、喜欢歌单标识、收藏、云盘与历史；查询 `user`、`likedSongPlaylistID`、`collections`、`previewReady`；加载 `loadApplication`、`loadPage` |
 | `src/application/` | 装配认证凭据、请求环境、endpoint 集合、导航和提示效果，连接会话恢复与后续启动依赖 |
 
-session 的工厂接收 credentials、auth、导航、提示、时钟与调度依赖；library 的工厂接收 endpoint 集合。两者不导入全局 store、router 或浏览器存储。endpoint 继续调用 `request(config)`，无需逐一工厂化。
+session 的工厂接收必需的 credentials、auth、身份交接、导航与提示依赖，时钟和调度使用平台默认值；library 的工厂接收必需的 endpoint 集合。两者不导入全局 store、router 或浏览器存储。endpoint 继续调用 `request(config)`，无需逐一工厂化。
 
 音乐库写操作与当前歌单详情的接口及协作由[音乐库变更与歌单详情设计](library-mutations-and-playlist-detail.md)维护；设置接口、默认值、迁移和持久化由[设置操作与持久化设计](settings-and-persistence.md)维护。播放器的公开状态与应用接合由[播放与音频资源设计](playback-and-audio-resources.md)维护。
 
@@ -32,7 +34,9 @@ App 调用 `library/loadApplication`，音乐库页调用 `library/loadPage`，�
 
 两个入口返回的 Promise 都等待歌单及其预览链：歌单确定喜欢歌单标识，歌单详情提供曲目 ID，随后获取前 12 首的详情，最后设置 `previewReady`。公开身份的歌曲 ID 来自公开歌单。专辑等独立集合不阻塞该预览链，其失败通过提示反馈。
 
-音乐库页已有 `previewReady` 时立即展示并刷新；否则等待页面入口成功后展示。`previewReady` 可以表达空歌单已经完成加载，不能用详情数组是否为空替代。页面保留自身进度条和加载失败展示的收尾。
+音乐库页已有 `previewReady` 时立即展示并刷新；否则等待页面入口成功后展示。`previewReady` 可以表达空歌单已经完成加载，不能用详情数组是否为空替代。页面保留自身加载状态和失败展示，通过[页面加载组件](structure-operations.md#页面加载与复制反馈)呈现等待过程。
+
+喜欢歌单身份由 library 的 `likedSongPlaylistID` getter 提供。音乐库页使用该 ID 播放喜欢歌曲和心动模式，并从普通歌单展示中排除该 ID。
 
 ## 请求与环境适配
 

@@ -2,7 +2,6 @@
   <div
     class="track"
     :class="trackClass"
-    :style="trackStyle"
     :title="showUnavailableSongInGreyStyle ? track.reason : ''"
     @click.stop
     @dblclick="activate"
@@ -47,7 +46,7 @@
       <div class="container">
         <div class="title">
           {{ track.name }}
-          <span v-if="isSubTitle" :title="subTitle" class="sub-title">
+          <span v-if="subTitle" :title="subTitle" class="sub-title">
             ({{ subTitle }})
           </span>
           <span v-if="isAlbum" class="featured">
@@ -104,7 +103,6 @@
 import { toggleTrackFavoriteWithFeedback } from '@/utils/libraryOutcome';
 import ArtistsInLine from '@/components/ArtistsInLine.vue';
 import ExplicitSymbol from '@/components/ExplicitSymbol.vue';
-import { mapGetters } from 'vuex';
 
 export default {
   name: 'TrackListItem',
@@ -125,12 +123,10 @@ export default {
   },
 
   data() {
-    return { hover: false, trackStyle: {} };
+    return { hover: false };
   },
 
   computed: {
-    ...mapGetters({ settings: 'preferences/settings' }),
-
     playable() {
       return this.track.playable;
     },
@@ -159,21 +155,11 @@ export default {
       if (this.$store.getters['preferences/settings'].subTitleDefault) {
         return this.track?.alia?.length > 0 ? this.track.alia[0] : tn;
       } else {
-        return tn === undefined ? this.track.alia[0] : tn;
+        return tn === undefined ? this.track.alia?.[0] : tn;
       }
     },
     isAlbum() {
       return this.type === 'album';
-    },
-    isSubTitle() {
-      return (
-        (this.track?.tns?.length > 0 &&
-          this.track.name !== this.track.tns[0]) ||
-        this.track.alia?.length > 0
-      );
-    },
-    isPlaylist() {
-      return this.type === 'playlist';
     },
     isPlaying() {
       return (
@@ -185,8 +171,7 @@ export default {
       let trackClass = [this.type];
       if (!this.playable && this.showUnavailableSongInGreyStyle)
         trackClass.push('disable');
-      if (this.isPlaying && this.highlightPlayingTrack)
-        trackClass.push('playing');
+      if (this.isPlaying) trackClass.push('playing');
       if (this.focus) trackClass.push('focus');
       return trackClass;
     },

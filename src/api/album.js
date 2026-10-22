@@ -9,16 +9,9 @@ import { cacheAlbum, getAlbumFromCache } from '@/utils/db';
  * 说明 : 调用此接口 , 传入专辑 id, 可获得专辑内容
  * @param {number} id
  */
-export function getAlbum(id) {
-  const convert = data => ({
-    ...data,
-    songs: mapTrackPlayableStatus(data.songs, [], readIdentity()),
-  });
-  return readMetadata({
-    readCache: async () => {
-      const cached = await getAlbumFromCache(id);
-      return cached == null ? cached : convert(cached);
-    },
+export async function getAlbum(id) {
+  const data = await readMetadata({
+    readCache: () => getAlbumFromCache(id),
     fetchLatest: async () => {
       const data = await request({
         url: '/album',
@@ -26,9 +19,13 @@ export function getAlbum(id) {
         params: { id },
       });
       await cacheAlbum(id, data);
-      return convert(data);
+      return data;
     },
   });
+  return {
+    ...data,
+    songs: mapTrackPlayableStatus(data.songs, [], readIdentity()),
+  };
 }
 
 /**

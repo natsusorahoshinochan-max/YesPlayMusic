@@ -36,7 +36,7 @@ export default {
       isOnDrag: false,
       onDragClientY: 0,
       positions: {
-        home: { scrollTop: 0, params: {} },
+        home: { scrollTop: 0 },
       },
     };
   },
@@ -79,7 +79,7 @@ export default {
 
       const route = this.$route;
       if (route.meta.savePosition) {
-        this.positions[route.name] = { scrollTop, params: route.params };
+        this.positions[route.name] = { scrollTop };
       }
     },
     handleMouseenter() {

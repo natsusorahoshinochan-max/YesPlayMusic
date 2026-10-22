@@ -39,6 +39,7 @@
 
 <script>
 import Cover from '@/components/Cover.vue';
+import { formatAlbumType } from '@/utils/filters';
 import ExplicitSymbol from '@/components/ExplicitSymbol.vue';
 
 export default {
@@ -80,15 +81,9 @@ export default {
           return `<a href="/artist/${item.artists[0].id}">${item.artists[0].name}</a>`;
       }
       if (this.subText === 'albumType+releaseYear') {
-        let albumType = item.type;
-        if (item.type === 'EP/Single') {
-          albumType = item.size === 1 ? 'Single' : 'EP';
-        } else if (item.type === 'Single') {
-          albumType = 'Single';
-        } else if (item.type === '专辑') {
-          albumType = 'Album';
-        }
-        return `${albumType} · ${new Date(item.publishTime).getFullYear()}`;
+        return `${formatAlbumType(item.type, item)} · ${new Date(
+          item.publishTime
+        ).getFullYear()}`;
       }
       if (this.subText === 'appleMusic') return 'by Apple Music';
     },

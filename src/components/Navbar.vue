@@ -97,7 +97,6 @@ export default {
   data() {
     return {
       inputFocus: false,
-      langs: ['zh-CN', 'zh-TW', 'en', 'tr'],
       keywords: '',
       enableWin32Titlebar: false,
       enableLinuxTitlebar: false,

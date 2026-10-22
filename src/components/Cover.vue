@@ -37,11 +37,8 @@ export default {
     fixedSize: { type: Number, default: 0 },
     playButtonSize: { type: Number, default: 22 },
     coverHover: { type: Boolean, default: true },
-    alwaysShowPlayButton: { type: Boolean, default: true },
     alwaysShowShadow: { type: Boolean, default: false },
     clickCoverToPlay: { type: Boolean, default: false },
-    shadowMargin: { type: Number, default: 12 },
-    radius: { type: Number, default: 12 },
   },
   data() {
     return {

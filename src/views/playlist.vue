@@ -1,55 +1,117 @@
 <template>
-  <div v-if="playlist" class="playlist">
-    <div
-      v-if="specialPlaylistInfo === undefined && !isLikeSongsPage"
-      class="playlist-info"
-    >
-      <Cover
-        :id="playlist.id"
-        :image-url="playlist.coverImgUrl | resizeImage(1024)"
-        :show-play-button="true"
-        :always-show-shadow="true"
-        :click-cover-to-play="true"
-        :fixed-size="288"
-        type="playlist"
-        :cover-hover="false"
-        :play-button-size="18"
-        @click.right.native="openMenu"
-      />
-      <div class="info">
-        <div class="title" @click.right="openMenu"
-          ><span v-if="playlist.privacy === 10" class="lock-icon">
-            <svg-icon icon-class="lock" /></span
-          >{{ playlist.name }}</div
+  <div>
+    <PageLoading :loading="loading" />
+    <div v-if="playlist" class="playlist">
+      <div
+        v-if="specialPlaylistInfo === undefined && !isLikeSongsPage"
+        class="playlist-info"
+      >
+        <Cover
+          :id="playlist.id"
+          :image-url="playlist.coverImgUrl | resizeImage(1024)"
+          :always-show-shadow="true"
+          :click-cover-to-play="true"
+          :fixed-size="288"
+          type="playlist"
+          :cover-hover="false"
+          :play-button-size="18"
+          @click.right.native="openMenu"
+        />
+        <div class="info">
+          <div class="title" @click.right="openMenu"
+            ><span v-if="playlist.privacy === 10" class="lock-icon">
+              <svg-icon icon-class="lock" /></span
+            >{{ playlist.name }}</div
+          >
+          <div class="artist">
+            Playlist by
+            <span
+              v-if="
+                [
+                  5277771961, 5277965913, 5277969451, 5277778542, 5278068783,
+                ].includes(playlist.id)
+              "
+              style="font-weight: 600"
+              >Apple Music</span
+            >
+            <a
+              v-else
+              :href="`https://music.163.com/#/user/home?id=${playlist.creator.userId}`"
+              target="blank"
+              >{{ playlist.creator.nickname }}</a
+            >
+          </div>
+          <div class="date-and-count">
+            {{ $t('playlist.updatedAt') }}
+            {{ playlist.updateTime | formatDate }} · {{ playlist.trackCount }}
+            {{ $t('common.songs') }}
+          </div>
+          <div class="description" @click="toggleFullDescription">
+            {{ playlist.description }}
+          </div>
+          <div class="buttons">
+            <ButtonTwoTone icon-class="play" @click.native="playPlaylist()">
+              {{ $t('common.play') }}
+            </ButtonTwoTone>
+            <ButtonTwoTone
+              v-if="playlist.creator.userId !== user.userId"
+              :icon-class="playlist.subscribed ? 'heart-solid' : 'heart'"
+              :icon-button="true"
+              :horizontal-padding="0"
+              :color="playlist.subscribed ? 'blue' : 'grey'"
+              :text-color="playlist.subscribed ? '#335eea' : ''"
+              :background-color="
+                playlist.subscribed ? 'var(--color-secondary-bg)' : ''
+              "
+              @click.native="likePlaylist"
+            >
+            </ButtonTwoTone>
+            <ButtonTwoTone
+              icon-class="more"
+              :icon-button="true"
+              :horizontal-padding="0"
+              color="grey"
+              @click.native="openMenu"
+            >
+            </ButtonTwoTone>
+          </div>
+        </div>
+        <div v-if="displaySearchInPlaylist" class="search-box">
+          <div class="container" :class="{ active: inputFocus }">
+            <svg-icon icon-class="search" />
+            <div class="input">
+              <input
+                v-model.trim="inputSearchKeyWords"
+                v-focus
+                :placeholder="inputFocus ? '' : $t('playlist.search')"
+                @input="inputDebounce()"
+                @focus="inputFocus = true"
+                @blur="inputFocus = false"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="specialPlaylistInfo !== undefined" class="special-playlist">
+        <div
+          class="title"
+          :class="specialPlaylistInfo.gradient"
+          @click.right="openMenu"
         >
-        <div class="artist">
-          Playlist by
-          <span
-            v-if="
-              [
-                5277771961, 5277965913, 5277969451, 5277778542, 5278068783,
-              ].includes(playlist.id)
-            "
-            style="font-weight: 600"
-            >Apple Music</span
-          >
-          <a
-            v-else
-            :href="`https://music.163.com/#/user/home?id=${playlist.creator.userId}`"
-            target="blank"
-            >{{ playlist.creator.nickname }}</a
-          >
+          <!-- <img :src="playlist.coverImgUrl | resizeImage" /> -->
+          {{ specialPlaylistInfo.name }}
         </div>
-        <div class="date-and-count">
-          {{ $t('playlist.updatedAt') }}
-          {{ playlist.updateTime | formatDate }} · {{ playlist.trackCount }}
-          {{ $t('common.songs') }}
+        <div class="subtitle"
+          >{{ playlist.englishTitle }} · {{ playlist.updateFrequency }}
         </div>
-        <div class="description" @click="toggleFullDescription">
-          {{ playlist.description }}
-        </div>
+
         <div class="buttons">
-          <ButtonTwoTone icon-class="play" @click.native="playPlaylist()">
+          <ButtonTwoTone
+            class="play-button"
+            icon-class="play"
+            color="grey"
+            @click.native="playPlaylist()"
+          >
             {{ $t('common.play') }}
           </ButtonTwoTone>
           <ButtonTwoTone
@@ -75,158 +137,97 @@
           </ButtonTwoTone>
         </div>
       </div>
-      <div v-if="displaySearchInPlaylist" class="search-box">
-        <div class="container" :class="{ active: inputFocus }">
-          <svg-icon icon-class="search" />
-          <div class="input">
-            <input
-              v-model.trim="inputSearchKeyWords"
-              v-focus
-              :placeholder="inputFocus ? '' : $t('playlist.search')"
-              @input="inputDebounce()"
-              @focus="inputFocus = true"
-              @blur="inputFocus = false"
-            />
+
+      <div v-if="isLikeSongsPage" class="user-info">
+        <h1>
+          <img
+            class="avatar"
+            :src="user.avatarUrl | resizeImage"
+            loading="lazy"
+          />
+          {{ user.nickname }}{{ $t('library.sLikedSongs') }}
+        </h1>
+        <div class="search-box-likepage" @click="searchInPlaylist()">
+          <div class="container" :class="{ active: inputFocus }">
+            <svg-icon icon-class="search" />
+            <div class="input" :style="{ width: searchInputWidth }">
+              <input
+                v-if="displaySearchInPlaylist"
+                v-model.trim="inputSearchKeyWords"
+                v-focus
+                :placeholder="inputFocus ? '' : $t('playlist.search')"
+                @input="inputDebounce()"
+                @focus="inputFocus = true"
+                @blur="inputFocus = false"
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div v-if="specialPlaylistInfo !== undefined" class="special-playlist">
-      <div
-        class="title"
-        :class="specialPlaylistInfo.gradient"
-        @click.right="openMenu"
+
+      <TrackList
+        :items="filteredTracks"
+        type="playlist"
+        @activate="playPlaylist($event.id)"
       >
-        <!-- <img :src="playlist.coverImgUrl | resizeImage" /> -->
-        {{ specialPlaylistInfo.name }}
-      </div>
-      <div class="subtitle"
-        >{{ playlist.englishTitle }} · {{ playlist.updateFrequency }}
-      </div>
+        <template #context-menu-extra="{ item }">
+          <div
+            v-if="isUserOwnPlaylist"
+            class="item"
+            @click="removeTrackFromPlaylist(item)"
+            >从歌单中删除</div
+          >
+        </template>
+      </TrackList>
 
-      <div class="buttons">
+      <div class="load-more">
         <ButtonTwoTone
-          class="play-button"
-          icon-class="play"
+          v-show="hasMore"
           color="grey"
-          @click.native="playPlaylist()"
+          :loading="loadingMore"
+          @click.native="loadMore(100)"
+          >{{ $t('explore.loadMore') }}</ButtonTwoTone
         >
-          {{ $t('common.play') }}
-        </ButtonTwoTone>
-        <ButtonTwoTone
-          v-if="playlist.creator.userId !== user.userId"
-          :icon-class="playlist.subscribed ? 'heart-solid' : 'heart'"
-          :icon-button="true"
-          :horizontal-padding="0"
-          :color="playlist.subscribed ? 'blue' : 'grey'"
-          :text-color="playlist.subscribed ? '#335eea' : ''"
-          :background-color="
-            playlist.subscribed ? 'var(--color-secondary-bg)' : ''
-          "
-          @click.native="likePlaylist"
-        >
-        </ButtonTwoTone>
-        <ButtonTwoTone
-          icon-class="more"
-          :icon-button="true"
-          :horizontal-padding="0"
-          color="grey"
-          @click.native="openMenu"
-        >
-        </ButtonTwoTone>
       </div>
-    </div>
 
-    <div v-if="isLikeSongsPage" class="user-info">
-      <h1>
-        <img
-          class="avatar"
-          :src="user.avatarUrl | resizeImage"
-          loading="lazy"
-        />
-        {{ user.nickname }}{{ $t('library.sLikedSongs') }}
-      </h1>
-      <div class="search-box-likepage" @click="searchInPlaylist()">
-        <div class="container" :class="{ active: inputFocus }">
-          <svg-icon icon-class="search" />
-          <div class="input" :style="{ width: searchInputWidth }">
-            <input
-              v-if="displaySearchInPlaylist"
-              v-model.trim="inputSearchKeyWords"
-              v-focus
-              :placeholder="inputFocus ? '' : $t('playlist.search')"
-              @input="inputDebounce()"
-              @focus="inputFocus = true"
-              @blur="inputFocus = false"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+      <Modal
+        :show="showFullDescription"
+        :close="toggleFullDescription"
+        :show-footer="false"
+        :click-outside-hide="true"
+        title="歌单介绍"
+        >{{ playlist.description }}</Modal
+      >
 
-    <TrackList
-      :items="filteredTracks"
-      type="playlist"
-      @activate="playPlaylist($event.id)"
-    >
-      <template #context-menu-extra="{ item }">
+      <ContextMenu ref="playlistMenu">
+        <!-- <div class="item">{{ $t('contextMenu.addToQueue') }}</div> -->
+        <div class="item" @click="likePlaylist(true)">{{
+          playlist.subscribed
+            ? $t('contextMenu.removeFromLibrary')
+            : $t('contextMenu.saveToLibrary')
+        }}</div>
+        <div class="item" @click="searchInPlaylist()">{{
+          $t('contextMenu.searchInPlaylist')
+        }}</div>
         <div
-          v-if="isUserOwnPlaylist"
+          v-if="playlist.creator.userId === user.userId"
           class="item"
-          @click="removeTrackFromPlaylist(item)"
-          >从歌单中删除</div
+          @click="editPlaylist"
+          >编辑歌单信息</div
         >
-      </template>
-    </TrackList>
-
-    <div class="load-more">
-      <ButtonTwoTone
-        v-show="hasMore"
-        color="grey"
-        :loading="loadingMore"
-        @click.native="loadMore(100)"
-        >{{ $t('explore.loadMore') }}</ButtonTwoTone
-      >
+        <div
+          v-if="playlist.creator.userId === user.userId"
+          class="item"
+          @click="deletePlaylist"
+          >删除歌单</div
+        >
+      </ContextMenu>
     </div>
-
-    <Modal
-      :show="showFullDescription"
-      :close="toggleFullDescription"
-      :show-footer="false"
-      :click-outside-hide="true"
-      title="歌单介绍"
-      >{{ playlist.description }}</Modal
-    >
-
-    <ContextMenu ref="playlistMenu">
-      <!-- <div class="item">{{ $t('contextMenu.addToQueue') }}</div> -->
-      <div class="item" @click="likePlaylist(true)">{{
-        playlist.subscribed
-          ? $t('contextMenu.removeFromLibrary')
-          : $t('contextMenu.saveToLibrary')
-      }}</div>
-      <div class="item" @click="searchInPlaylist()">{{
-        $t('contextMenu.searchInPlaylist')
-      }}</div>
-      <div
-        v-if="playlist.creator.userId === user.userId"
-        class="item"
-        @click="editPlaylist"
-        >编辑歌单信息</div
-      >
-      <div
-        v-if="playlist.creator.userId === user.userId"
-        class="item"
-        @click="deletePlaylist"
-        >删除歌单</div
-      >
-    </ContextMenu>
   </div>
 </template>
 
 <script>
 import { mapActions, mapState, mapGetters } from 'vuex';
-import NProgress from 'nprogress';
 import nativeAlert from '@/utils/nativeAlert';
 import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 
@@ -345,6 +346,7 @@ export default {
   },
   data() {
     return {
+      loading: false,
       showFullDescription: false,
       displaySearchInPlaylist: false, // 是否显示搜索框
       searchKeyWords: '', // 搜索使用的关键字
@@ -357,6 +359,7 @@ export default {
   computed: {
     ...mapGetters({
       current: 'playlistDetail/current',
+      hasMore: 'playlistDetail/hasMore',
       user: 'library/user',
       likedSongPlaylistID: 'library/likedSongPlaylistID',
     }),
@@ -369,9 +372,6 @@ export default {
     },
     loadingMore() {
       return this.current?.loadingMore || false;
-    },
-    hasMore() {
-      return this.current?.hasMore || false;
     },
     targetPlaylistId() {
       return this.isLikeSongsPage
@@ -422,7 +422,6 @@ export default {
   beforeDestroy() {
     clearTimeout(this.debounceTimeout);
     this.$store.dispatch('playlistDetail/close');
-    NProgress.done();
   },
   methods: {
     ...mapActions(['showToast']),
@@ -451,13 +450,13 @@ export default {
       this.searchKeyWords = '';
       this.inputSearchKeyWords = '';
       if (!id) return this.$store.dispatch('playlistDetail/close');
-      NProgress.start();
+      this.loading = true;
       try {
         await this.$store.dispatch('playlistDetail/open', id);
       } catch (error) {
         this.showToast('歌单加载失败');
       } finally {
-        NProgress.done();
+        this.loading = false;
       }
     },
     async loadMore(count = 100) {

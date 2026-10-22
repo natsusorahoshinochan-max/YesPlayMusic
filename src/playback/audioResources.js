@@ -1,5 +1,3 @@
-import { decode } from '@/utils/base64';
-
 export function createAudioResources({
   cache,
   getMP3,
@@ -9,10 +7,10 @@ export function createAudioResources({
   settings = () => ({}),
   onBackgroundError = error => console.debug('[audio resources]', error),
 }) {
-  const cacheInBackground = (track, url, bitRate, from) => {
+  const cacheInBackground = (track, resource) => {
     if (!settings().automaticallyCacheSongs) return;
     Promise.resolve()
-      .then(() => cache.cacheTrackSource(track, url, bitRate, from))
+      .then(() => cache.cacheTrackSource(track, resource))
       .catch(onBackgroundError);
   };
   const resolveFallback = async track => {
@@ -34,19 +32,9 @@ export function createAudioResources({
         },
       }
     );
-    if (!result?.url) return null;
-    const from = `unm:${result.source}`;
-    const bytes = result.source === 'bilibili';
-    cacheInBackground(
-      track,
-      bytes ? `data:application/octet-stream;base64,${result.url}` : result.url,
-      128000,
-      from
-    );
-    const sourceInfo = { from, bitRate: 128000, cached: false };
-    return bytes
-      ? { kind: 'bytes', bytes: decode(result.url), sourceInfo }
-      : { kind: 'url', url: result.url, sourceInfo };
+    if (result === null) return null;
+    cacheInBackground(track, result);
+    return result;
   };
   const resources = {
     async resolve(track) {
@@ -70,12 +58,13 @@ export function createAudioResources({
       if (!entry?.url || entry.freeTrialInfo !== null)
         return resolveFallback(track);
       const url = entry.url.replace(/^http:/, 'https:');
-      cacheInBackground(track, url, entry.br, 'netease');
-      return {
+      const resource = {
         kind: 'url',
         url,
         sourceInfo: { from: 'netease', bitRate: entry.br, cached: false },
       };
+      cacheInBackground(track, resource);
+      return resource;
     },
     async prefetch(track) {
       try {

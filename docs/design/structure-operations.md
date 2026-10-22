@@ -1,6 +1,6 @@
 # 完整操作：职责与应用接合
 
-**Last Updated:** 2026-10-20
+**Last Updated:** 2026-10-22
 
 本文维护歌曲行、窗口、音乐搜索、每日推荐、歌词与 Last.fm 的职责和生命周期接合。目标行为与验收条件集中在 [Spec #26](https://github.com/natsusorahoshinochan-max/YesPlayMusic/issues/26)。
 
@@ -14,26 +14,36 @@
 
 `src/electron/windowOperations.js` 的 `close`、`quit` 拥有关闭政策、当前询问及退出协调。`background.js` 构造唯一实例，绑定原生窗口事件；`ipcMain.js`、托盘和 MPRIS 转交意图，Electron 菜单的退出角色通过 `before-quit` 进入同一协调。
 
+`WindowControls.vue` 统一最小化、最大化和关闭命令及最大化状态接收；Windows 与 Linux 标题栏负责各自布局并使用该组件。
+
 记忆选项由主进程 adapter 发送给 renderer，`ipcRenderer.js` 等待 `preferences/setPreference` 完成后确认；主进程再继续执行已选择的窗口动作。主进程 adapter 按发送方与 `requestId` 配对确认，负责在操作完成、发送失败、renderer 崩溃、主 frame 跨文档导航或窗口销毁造成上下文丢失，以及等待超时时结束等待并释放监听与计时器。设置保存职责仍在[设置操作与持久化](settings-and-persistence.md#electron-设置应用)。原生运行验证入口见[窗口关闭操作说明](../operations/native-window-close.md)。
 
 ## 音乐搜索与每日推荐
 
 | 所有者 | 持有与接口 | 应用接合 |
 | --- | --- | --- |
-| `src/musicSearch/query.js` | 每个查询的结果、分页、加载任务与采用归属；`replace`、`loadNext`、`dispose` | `src/application/musicSearch.js` 为每个页面创建实例，注入身份变化订阅和失败反馈；两个搜索页面负责输入、展示与进度资源释放 |
+| `src/musicSearch/query.js` | 每个查询的结果、分页、加载任务与采用归属；`replace`、`loadNext`、`dispose` | `src/application/musicSearch.js` 为每个页面创建实例，注入身份变化订阅和失败反馈；两个搜索页面负责输入与展示 |
 | `src/store/modules/dailyRecommendations.js` | 推荐快照、读取状态与进行中的加载；`load`、`play`、`identityChanged` | 卡片和页面读取同一 module 状态；装配注入推荐读取及取得现有 Playback 的函数；播放构造由 module 交给 `playTracks` |
 
 `src/api/others.js` 的 `search({ category, keywords, offset, limit })` 集中解释远端类别、字段、空结果与分页协议，并通过 `getTrackDetail` 补齐歌曲，返回可直接展示的 `{ items, nextOffset }`。`nextOffset` 按原始搜索页数量推进，结束时为 `null`；音乐查询累计结果、保存续读位置并管理加载归属。`loginUsername.vue` 使用 `users` 类别，独立管理公开音乐库身份选择。元数据读取及可播放转换的职责见[Metadata reads](playback-and-audio-resources.md#元数据缓存读取)。
 
+每日推荐的 `play` 统一检查账号权限并提供登录提示；卡片与页面直接提交播放意图。
+
+## 页面加载与复制反馈
+
+`PageLoading.vue` 根据所属页面的 `loading` 渲染进度条，延迟显示由 CSS 动画完成。页面持有各自请求的加载状态，完成后移除自己的进度展示；搜索页面直接读取查询的加载状态。
+
+`copyText` action 执行剪贴板写入和成功或失败提示。专辑、歌手、MV 与歌曲菜单提供待复制链接。
+
 ## 歌词内容与平台发布
 
-`src/lyrics/index.js` 拥有当前曲目的歌词读取选择、内容对齐、原始歌词、当前行和按消费需求运行的时钟，公开 `state`、`sync`、`position`、`retry`、`consume`、`subscribe` 与释放操作。具体缓存/远端读取仍由元数据 API 执行，云盘缓存以用户与歌曲共同定位。
+`src/lyrics/index.js` 拥有当前曲目的歌词读取选择、内容对齐、原始歌词、当前行和按消费需求运行的时钟。页面读取 `state`，通过 `retry`、`consume` 与释放函数管理自身需求；应用通过 `setTrack`、`playbackChanged`、`position` 和身份交接方法驱动该所有者。具体缓存/远端读取仍由元数据 API 执行，云盘缓存以用户与歌曲共同定位。
 
-`src/application/player.js` 建立该所有者并通过 `player.lyrics` 交给消费者，连接 Playback 状态、seek/位置及身份变化。页面的 `consume` 返回释放函数；歌词页面负责显示与滚动，Touch Bar adapter 独立持有当前行消费需求。`playbackPlatform.js` 消费同一内容：Touch Bar 发布当前行，Linux adapter 拥有原始歌词写入、带代次确认、超时收尾和元数据发布的交接。
+`src/application/player.js` 建立该所有者并通过 `player.lyrics` 交给消费者，将 [Playback 专用输出](playback-and-audio-resources.md#恢复数据桌面状态与应用反馈)分别接到曲目、播放状态和位置入口。歌词页面负责显示与滚动，Touch Bar adapter 独立持有当前行消费需求。`onContent` 将歌词内容交给平台，`onLine` 只交付当前行。
 
 应用释放播放器时，`player.js` 依次释放身份订阅、歌词、平台 adapter 与 Playback。页面离开只释放自身需求和界面资源。
 
-平台的歌曲状态与歌词内容通知共用一个元数据发布判断，以当前歌曲和歌词内容的代次、状态识别变化并管理写词交接。当前行变化只更新 Touch Bar，沿用进行中的写词等待。
+`playbackPlatform.js` 在歌曲交接时建立媒体元数据；Linux OSD 启用时，等待歌词内容完成，再执行原始歌词写入与元数据发布。写词等待通过代次确认和超时收尾，新的歌曲或内容替换旧等待。当前行变化只更新 Touch Bar。
 
 ## Last.fm 授权与上报
 

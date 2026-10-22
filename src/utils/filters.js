@@ -47,7 +47,7 @@ Vue.filter('formatDate', (timestamp, format = 'MMM D, YYYY') => {
   return dayjs(timestamp).format(format);
 });
 
-Vue.filter('formatAlbumType', (type, album) => {
+export function formatAlbumType(type, album) {
   if (!type) return '';
   if (type === 'EP/Single') {
     return album.size === 1 ? 'Single' : 'EP';
@@ -58,7 +58,9 @@ Vue.filter('formatAlbumType', (type, album) => {
   } else {
     return type;
   }
-});
+}
+
+Vue.filter('formatAlbumType', formatAlbumType);
 
 Vue.filter('resizeImage', (imgUrl, size = 512) => {
   if (!imgUrl) return '';

@@ -1,71 +1,71 @@
 <template>
-  <div class="explore-page">
-    <h1>{{ $t('explore.explore') }}</h1>
-    <div class="buttons">
-      <div
-        v-for="category in settings.enabledPlaylistCategories"
-        :key="category"
-        class="button"
-        :class="{ active: category === activeCategory && !showCatOptions }"
-        @click="goToCategory(category)"
-      >
-        {{ category }}
-      </div>
-      <div
-        class="button more"
-        :class="{ active: showCatOptions }"
-        @click="showCatOptions = !showCatOptions"
-      >
-        <svg-icon icon-class="more"></svg-icon>
-      </div>
-    </div>
-
-    <div v-show="showCatOptions" class="panel">
-      <div v-for="bigCat in allBigCats" :key="bigCat" class="big-cat">
-        <div class="name">{{ bigCat }}</div>
-        <div class="cats">
-          <div
-            v-for="cat in getCatsByBigCat(bigCat)"
-            :key="cat.name"
-            class="cat"
-            :class="{
-              active: settings.enabledPlaylistCategories.includes(cat.name),
-            }"
-            @click="toggleCat(cat.name)"
-            ><span>{{ cat.name }}</span></div
-          >
+  <div>
+    <PageLoading :loading="loadingMore && !show" />
+    <div class="explore-page">
+      <h1>{{ $t('explore.explore') }}</h1>
+      <div class="buttons">
+        <div
+          v-for="category in settings.enabledPlaylistCategories"
+          :key="category"
+          class="button"
+          :class="{ active: category === activeCategory && !showCatOptions }"
+          @click="goToCategory(category)"
+        >
+          {{ category }}
+        </div>
+        <div
+          class="button more"
+          :class="{ active: showCatOptions }"
+          @click="showCatOptions = !showCatOptions"
+        >
+          <svg-icon icon-class="more"></svg-icon>
         </div>
       </div>
-    </div>
 
-    <div class="playlists">
-      <CoverRow
-        type="playlist"
-        :items="playlists"
-        :sub-text="subText"
-        :show-play-button="true"
-        :show-play-count="activeCategory !== '排行榜' ? true : false"
-        :image-size="activeCategory !== '排行榜' ? 512 : 1024"
-      />
-    </div>
-    <div
-      v-show="['推荐歌单', '排行榜'].includes(activeCategory) === false"
-      class="load-more"
-    >
-      <ButtonTwoTone
-        v-show="showLoadMoreButton && hasMore"
-        color="grey"
-        :loading="loadingMore"
-        @click.native="getPlaylist"
-        >{{ $t('explore.loadMore') }}</ButtonTwoTone
+      <div v-show="showCatOptions" class="panel">
+        <div v-for="bigCat in allBigCats" :key="bigCat" class="big-cat">
+          <div class="name">{{ bigCat }}</div>
+          <div class="cats">
+            <div
+              v-for="cat in getCatsByBigCat(bigCat)"
+              :key="cat.name"
+              class="cat"
+              :class="{
+                active: settings.enabledPlaylistCategories.includes(cat.name),
+              }"
+              @click="toggleCat(cat.name)"
+              ><span>{{ cat.name }}</span></div
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="playlists">
+        <CoverRow
+          type="playlist"
+          :items="playlists"
+          :sub-text="subText"
+          :show-play-count="activeCategory !== '排行榜' ? true : false"
+        />
+      </div>
+      <div
+        v-show="['推荐歌单', '排行榜'].includes(activeCategory) === false"
+        class="load-more"
       >
+        <ButtonTwoTone
+          v-show="showLoadMoreButton && hasMore"
+          color="grey"
+          :loading="loadingMore"
+          @click.native="getPlaylist"
+          >{{ $t('explore.loadMore') }}</ButtonTwoTone
+        >
+      </div>
     </div>
   </div>
 </template>
 
 <script>
 import { mapActions, mapGetters } from 'vuex';
-import NProgress from 'nprogress';
 import { topPlaylist, highQualityPlaylist, toplists } from '@/api/playlist';
 import { playlistCategories } from '@/utils/staticData';
 import { getRecommendPlayList } from '@/utils/playList';
@@ -85,7 +85,6 @@ export default {
     this.showLoadMoreButton = false;
     this.hasMore = true;
     this.playlists = [];
-    this.offset = 1;
     this.activeCategory = to.query.category;
     this.getPlaylist();
     next();
@@ -118,9 +117,6 @@ export default {
   methods: {
     ...mapActions('preferences', ['togglePlaylistCategory']),
     loadData() {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
       const queryCategory = this.$route.query.category;
       if (queryCategory === undefined) {
         this.playlists = [];
@@ -136,26 +132,27 @@ export default {
     },
     updatePlaylist(playlists) {
       this.playlists.push(...playlists);
-      this.loadingMore = false;
       this.showLoadMoreButton = true;
-      NProgress.done();
       this.show = true;
     },
-    getPlaylist() {
+    async getPlaylist() {
       this.loadingMore = true;
-      if (this.activeCategory === '推荐歌单') {
-        return this.getRecommendPlayList();
+      try {
+        if (this.activeCategory === '推荐歌单') {
+          await this.getRecommendPlayList();
+        } else if (this.activeCategory === '精品歌单') {
+          await this.getHighQualityPlaylist();
+        } else if (this.activeCategory === '排行榜') {
+          await this.getTopLists();
+        } else {
+          await this.getTopPlayList();
+        }
+      } finally {
+        this.loadingMore = false;
       }
-      if (this.activeCategory === '精品歌单') {
-        return this.getHighQualityPlaylist();
-      }
-      if (this.activeCategory === '排行榜') {
-        return this.getTopLists();
-      }
-      return this.getTopPlayList();
     },
     getRecommendPlayList() {
-      getRecommendPlayList(100, true).then(list => {
+      return getRecommendPlayList(100, true).then(list => {
         this.playlists = [];
         this.updatePlaylist(list);
       });
@@ -164,19 +161,19 @@ export default {
       let playlists = this.playlists;
       let before =
         playlists.length !== 0 ? playlists[playlists.length - 1].updateTime : 0;
-      highQualityPlaylist({ limit: 50, before }).then(data => {
+      return highQualityPlaylist({ limit: 50, before }).then(data => {
         this.updatePlaylist(data.playlists);
         this.hasMore = data.more;
       });
     },
     getTopLists() {
-      toplists().then(data => {
+      return toplists().then(data => {
         this.playlists = [];
         this.updatePlaylist(data.list);
       });
     },
     getTopPlayList() {
-      topPlaylist({
+      return topPlaylist({
         cat: this.activeCategory,
         offset: this.playlists.length,
       }).then(data => {

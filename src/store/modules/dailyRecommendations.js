@@ -1,25 +1,24 @@
+import locale from '@/locale';
+
 export default function createDailyRecommendations({ read, getPlayback }) {
   let pending;
   return {
     namespaced: true,
-    state: () => ({ tracks: [], status: 'idle', error: null }),
+    state: () => ({ tracks: [], status: 'idle' }),
     mutations: {
       reset(state) {
         state.tracks = [];
         state.status = 'idle';
-        state.error = null;
       },
       loading(state) {
         state.status = 'loading';
-        state.error = null;
       },
       loaded(state, tracks) {
         state.tracks = tracks;
         state.status = 'loaded';
       },
-      failed(state, error) {
+      failed(state) {
         state.status = 'error';
-        state.error = error;
       },
     },
     actions: {
@@ -41,21 +40,21 @@ export default function createDailyRecommendations({ read, getPlayback }) {
             if (!isCurrent()) return;
             commit('loaded', result.data.dailySongs);
           })
-          .catch(error => {
-            if (isCurrent()) commit('failed', error);
+          .catch(() => {
+            if (isCurrent()) commit('failed');
           })
           .finally(() => {
             if (isCurrent()) pending = null;
           });
         return operation.promise;
       },
-      play({ state, rootGetters }, startTrackId) {
-        if (
-          !rootGetters['session/hasAccount'] ||
-          state.status !== 'loaded' ||
-          !state.tracks.length
-        )
-          return;
+      play({ state, rootGetters, dispatch }, startTrackId) {
+        if (!rootGetters['session/hasAccount']) {
+          return dispatch('showToast', locale.t('toast.needToLogin'), {
+            root: true,
+          });
+        }
+        if (state.status !== 'loaded' || !state.tracks.length) return;
         return getPlayback().playTracks(
           state.tracks.map(track => track.id),
           {

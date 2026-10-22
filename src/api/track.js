@@ -29,26 +29,18 @@ export function getMP3(id, { quality } = {}) {
 
 /**
  * 获取歌曲详情
- * 说明 : 调用此接口 , 传入音乐 id(支持多个 id, 用 , 隔开), 可获得歌曲详情(注意:歌曲封面现在需要通过专辑内容接口获取)
- * @param {string} ids - 音乐 id, 例如 ids=405998841,33894312
+ * 说明 : 按传入的音乐 ID 顺序返回可取得的歌曲详情。
+ * @param {number[]} ids - 音乐 ID 集合
  */
-export function getTrackDetail(ids, { isCurrent } = {}) {
-  const idsInArray = String(ids).split(',');
-  const convert = data => ({
-    ...data,
-    songs: mapTrackPlayableStatus(data.songs, data.privileges, readIdentity()),
-  });
-  return readMetadata({
-    readCache: async () => {
-      const cached = await getTrackDetailFromCache(idsInArray);
-      return cached == null ? cached : convert(cached);
-    },
+export async function getTrackDetail(ids, { isCurrent } = {}) {
+  const data = await readMetadata({
+    readCache: () => getTrackDetailFromCache(ids),
     fetchLatest: async () => {
       const data = await request({
         url: '/song/detail',
         isCurrent,
         method: 'get',
-        params: { ids },
+        params: { ids: ids.join(',') },
       });
       await Promise.all(
         data.songs.map(song =>
@@ -58,12 +50,16 @@ export function getTrackDetail(ids, { isCurrent } = {}) {
           )
         )
       );
-      const songs = idsInArray
-        .map(id => data.songs.find(song => String(song.id) === id))
-        .filter(Boolean);
-      return convert({ ...data, songs });
+      return data;
     },
   });
+  const songs = ids
+    .map(id => data.songs.find(song => song.id === id))
+    .filter(Boolean);
+  return {
+    ...data,
+    songs: mapTrackPlayableStatus(songs, data.privileges, readIdentity()),
+  };
 }
 
 /**
@@ -109,21 +105,6 @@ export function getCloudLyric(songId, userId, { isCurrent } = {}) {
       });
       await cacheLyric(cacheKey, result);
       return result;
-    },
-  });
-}
-
-/**
- * 新歌速递
- * 说明 : 调用此接口 , 可获取新歌速递
- * @param {number} type - 地区类型 id, 对应以下: 全部:0 华语:7 欧美:96 日本:8 韩国:16
- */
-export function topSong(type) {
-  return request({
-    url: '/top/song',
-    method: 'get',
-    params: {
-      type,
     },
   });
 }

@@ -4,11 +4,11 @@ export default function createSession(
   snapshot,
   {
     credentials,
-    identityChanged = () => {},
-    auth = {},
-    navigate = () => {},
-    notify = () => {},
-    alert = () => {},
+    identityChanged,
+    auth,
+    navigate,
+    notify,
+    alert,
     now = () => new Date(),
     time = {
       schedule: (callback, delay) => setTimeout(callback, delay),
@@ -190,8 +190,7 @@ export default function createSession(
       async refreshDaily({ state, getters, commit }) {
         if (
           !getters.hasAccount ||
-          state.lastRefreshCookieDate === now().getDate() ||
-          !auth.refreshCookie
+          state.lastRefreshCookieDate === now().getDate()
         )
           return;
         try {
@@ -208,7 +207,7 @@ export default function createSession(
       },
       async logout(context) {
         try {
-          if (auth.logout) Promise.resolve(auth.logout()).catch(() => {});
+          auth.logout().catch(() => {});
         } catch {
           // Local exit remains available when the remote service cannot respond.
         }

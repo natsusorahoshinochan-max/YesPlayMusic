@@ -39,8 +39,6 @@
 </template>
 
 <script>
-import NProgress from 'nprogress';
-
 import SvgIcon from '@/components/SvgIcon.vue';
 
 export default {
@@ -52,9 +50,6 @@ export default {
     return {
       activeCard: 0,
     };
-  },
-  created() {
-    NProgress.done();
   },
   methods: {
     goTo(path) {

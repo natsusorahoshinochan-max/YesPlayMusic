@@ -57,7 +57,6 @@ export function createPlayer({
     store.getters['library/collections'].songs.includes(
       playback.state.currentTrackID
     );
-  const publish = () => platform?.publish(playback.state, liked());
   const settings = getSettings;
   const ipcRenderer =
     process.env.IS_ELECTRON === true
@@ -89,7 +88,7 @@ export function createPlayer({
       },
     },
     getTrack: async id => {
-      const result = await getTrackDetail(id);
+      const result = await getTrackDetail([id]);
       return result.songs[0];
     },
     personalFM: {
@@ -118,12 +117,25 @@ export function createPlayer({
     }),
     ...overrides,
     onStateChange(state) {
-      if (!disposed) {
-        persistence.save(playback.archive());
-        lyrics?.sync();
-        publish();
-      }
+      if (!disposed) platform?.publish(state);
       if (onStateChange) onStateChange(state);
+    },
+    onArchive(archive) {
+      if (!disposed) persistence.save(archive);
+    },
+    onTrackChange(track, duration) {
+      if (disposed) return;
+      platform?.trackChanged(track, duration);
+      lyrics?.setTrack(track);
+      if (track) platform?.likedChanged(liked());
+    },
+    onPlayingChange(playing) {
+      if (disposed) return;
+      lyrics?.playbackChanged();
+      platform?.playingChanged(playing);
+    },
+    onModesChange(modes) {
+      if (!disposed) platform?.modesChanged(modes);
     },
     onProgress(position, detail) {
       if (!disposed) {
@@ -144,15 +156,16 @@ export function createPlayer({
     getLyric,
     getCloudLyric,
     ...lyricsOptions,
+    onContent: content => platform?.lyricsChanged(content),
+    onLine: line => platform?.lineChanged(line),
   });
   const unsubscribe = store.subscribe(mutation => {
+    if (mutation.type === 'library/setUser') lyrics.identityReady();
     if (
-      mutation.type.startsWith('session/') ||
-      mutation.type.startsWith('library/')
-    ) {
-      lyrics.sync({ identityReady: mutation.type === 'library/setUser' });
-      publish();
-    }
+      mutation.type === 'library/setCollection' &&
+      mutation.payload.name === 'songs'
+    )
+      platform?.likedChanged(liked());
   });
   const player = Object.freeze({
     ...playback,
@@ -188,6 +201,9 @@ export function createPlayer({
       ...platformOptions,
     });
   }
-  publish();
+  platform?.publish(playback.state);
+  platform?.likedChanged(liked());
+  platform?.playingChanged(false);
+  platform?.modesChanged(playback.state);
   return player;
 }

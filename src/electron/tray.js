@@ -107,178 +107,39 @@ function createMenuTemplate(win, store, windowOperations) {
   ];
 }
 
-// linux下托盘的实现方式比较迷惑
-// right-click无法在linux下使用
-// click在默认行为下会弹出一个contextMenu，里面的唯一选项才会调用click事件
-// setContextMenu应该是目前唯一能在linux下使用托盘菜单api
-// 但是无法区分鼠标左右键
-
-// 发现openSUSE KDE环境可以区分鼠标左右键
-// 添加左键支持
-// 2022.05.17
-class YPMTrayLinuxImpl {
-  constructor(tray, win, emitter, store, windowOperations) {
-    this.tray = tray;
-    this.win = win;
-    this.emitter = emitter;
-    this.store = store;
-    this.windowOperations = windowOperations;
-    this.template = undefined;
-    this.initTemplate();
-    this.contextMenu = Menu.buildFromTemplate(this.template);
-
-    this.tray.setContextMenu(this.contextMenu);
-    this.handleEvents();
-  }
-
-  initTemplate() {
-    //在linux下，鼠标左右键都会呼出contextMenu
-    //所以此处单独为linux添加一个 显示主面板 选项
-    this.template = [
-      {
-        label: '显示主面板',
-        click: () => {
-          this.win.show();
-        },
-      },
-      {
-        type: 'separator',
-      },
-    ].concat(createMenuTemplate(this.win, this.store, this.windowOperations));
-  }
-
-  handleEvents() {
-    this.tray.on('click', () => {
-      this.win.show();
-    });
-
-    this.emitter.on('updateTooltip', title => this.tray.setToolTip(title));
-    this.emitter.on('updatePlayState', isPlaying => {
-      this.contextMenu.getMenuItemById('play').visible = !isPlaying;
-      this.contextMenu.getMenuItemById('pause').visible = isPlaying;
-      this.tray.setContextMenu(this.contextMenu);
-    });
-    this.emitter.on('updateLikeState', isLiked => {
-      this.contextMenu.getMenuItemById('like').visible = !isLiked;
-      this.contextMenu.getMenuItemById('unlike').visible = isLiked;
-      this.tray.setContextMenu(this.contextMenu);
-    });
-    this.emitter.on('updateIcon', () => {
-      this.updateIcon();
-    });
-  }
-
-  updateIcon() {
-    let trayIconSetting = this.store.get('settings.trayIconTheme') || 'auto';
-    let iconTheme;
-    if (trayIconSetting === 'auto') {
-      iconTheme = nativeTheme.shouldUseDarkColors ? 'light' : 'dark';
-    } else {
-      iconTheme = trayIconSetting;
-    }
-
-    let icon = nativeImage
-      .createFromPath(path.join(__static, `img/icons/menu-${iconTheme}@88.png`))
-      .resize({
-        height: 20,
-        width: 20,
-      });
-
-    this.tray.setImage(icon);
-  }
-}
-
-class YPMTrayWindowsImpl {
-  constructor(tray, win, emitter, store, windowOperations) {
-    this.tray = tray;
-    this.win = win;
-    this.emitter = emitter;
-    this.store = store;
-    this.windowOperations = windowOperations;
-    this.template = createMenuTemplate(win, store, windowOperations);
-    this.contextMenu = Menu.buildFromTemplate(this.template);
-
-    this.isPlaying = false;
-    this.curDisplayPlaying = false;
-
-    this.isLiked = false;
-    this.curDisplayLiked = false;
-
-    this.handleEvents();
-  }
-
-  handleEvents() {
-    this.tray.on('click', () => {
-      this.win.show();
-    });
-
-    this.tray.on('right-click', () => {
-      if (this.isPlaying !== this.curDisplayPlaying) {
-        this.curDisplayPlaying = this.isPlaying;
-        this.contextMenu.getMenuItemById('play').visible = !this.isPlaying;
-        this.contextMenu.getMenuItemById('pause').visible = this.isPlaying;
-      }
-
-      if (this.isLiked !== this.curDisplayLiked) {
-        this.curDisplayLiked = this.isLiked;
-        this.contextMenu.getMenuItemById('like').visible = !this.isLiked;
-        this.contextMenu.getMenuItemById('unlike').visible = this.isLiked;
-      }
-
-      this.tray.popUpContextMenu(this.contextMenu);
-    });
-
-    this.emitter.on('updateTooltip', title => this.tray.setToolTip(title));
-    this.emitter.on(
-      'updatePlayState',
-      isPlaying => (this.isPlaying = isPlaying)
-    );
-    this.emitter.on('updateLikeState', isLiked => (this.isLiked = isLiked));
-    this.emitter.on('updateIcon', () => {
-      this.updateIcon();
-    });
-  }
-
-  updateIcon() {
-    let trayIconSetting = this.store.get('settings.trayIconTheme') || 'auto';
-    let iconTheme;
-    if (trayIconSetting === 'auto') {
-      iconTheme = nativeTheme.shouldUseDarkColors ? 'light' : 'dark';
-    } else {
-      iconTheme = trayIconSetting;
-    }
-
-    let icon = nativeImage
-      .createFromPath(path.join(__static, `img/icons/menu-${iconTheme}@88.png`))
-      .resize({
-        height: 20,
-        width: 20,
-      });
-
-    this.tray.setImage(icon);
-  }
+function createTrayImage(store) {
+  const iconTheme = getTrayIconTheme(store);
+  return nativeImage
+    .createFromPath(path.join(__static, `img/icons/menu-${iconTheme}@88.png`))
+    .resize({ height: 20, width: 20 });
 }
 
 export function createTray(win, eventEmitter, store, windowOperations) {
-  let trayIconSetting = store.get('settings.trayIconTheme') || 'auto';
-  let iconTheme;
-  if (trayIconSetting === 'auto') {
-    iconTheme = nativeTheme.shouldUseDarkColors ? 'light' : 'dark';
-  } else {
-    iconTheme = trayIconSetting;
-  }
-
-  let icon = nativeImage
-    .createFromPath(path.join(__static, `img/icons/menu-${iconTheme}@88.png`))
-    .resize({
-      height: 20,
-      width: 20,
-    });
-
-  let tray = new Tray(icon);
+  const tray = new Tray(createTrayImage(store));
   tray.setToolTip('YesPlayMusic');
+  const template = createMenuTemplate(win, store, windowOperations);
+  if (isLinux) {
+    template.unshift(
+      { label: '显示主面板', click: () => win.show() },
+      { type: 'separator' }
+    );
+  }
+  const contextMenu = Menu.buildFromTemplate(template);
+  if (isLinux) tray.setContextMenu(contextMenu);
+  else tray.on('right-click', () => tray.popUpContextMenu(contextMenu));
+  tray.on('click', () => win.show());
 
-  return isLinux
-    ? new YPMTrayLinuxImpl(tray, win, eventEmitter, store, windowOperations)
-    : new YPMTrayWindowsImpl(tray, win, eventEmitter, store, windowOperations);
+  eventEmitter.on('updateTooltip', title => tray.setToolTip(title));
+  eventEmitter.on('updatePlayState', isPlaying => {
+    contextMenu.getMenuItemById('play').visible = !isPlaying;
+    contextMenu.getMenuItemById('pause').visible = isPlaying;
+    if (isLinux) tray.setContextMenu(contextMenu);
+  });
+  eventEmitter.on('updateLikeState', isLiked => {
+    contextMenu.getMenuItemById('like').visible = !isLiked;
+    contextMenu.getMenuItemById('unlike').visible = isLiked;
+    if (isLinux) tray.setContextMenu(contextMenu);
+  });
+  eventEmitter.on('updateIcon', () => tray.setImage(createTrayImage(store)));
+  return tray;
 }

@@ -51,8 +51,12 @@ export function createAudioCache({
         return { ...size };
       });
     },
-    async cacheTrackSource(track, url, bitRate, from = 'netease') {
-      const source = await download(url);
+    async cacheTrackSource(track, resource) {
+      const source =
+        resource.kind === 'bytes'
+          ? resource.bytes
+          : await download(resource.url);
+      const { bitRate, from } = resource.sourceInfo;
       return enqueue(async () => {
         const next = await db.transaction('rw', db.trackSources, async () => {
           const total = { ...(size || (await scan())) };
@@ -62,9 +66,6 @@ export function createAudioCache({
             source,
             bitRate,
             from,
-            name: track.name,
-            artist:
-              track.ar?.[0]?.name || track.artists?.[0]?.name || 'Unknown',
             createTime: Date.now(),
           });
           total.bytes += source.byteLength - byteSize(old);
@@ -73,7 +74,6 @@ export function createAudioCache({
           return total;
         });
         size = next;
-        return { trackID: track.id, source, bitRate };
       });
     },
     getTrackSource(id) {

@@ -57,8 +57,4 @@ let localStorage = {
   },
 };
 
-if (process.env.IS_ELECTRON === true) {
-  localStorage.settings.automaticallyCacheSongs = true;
-}
-
 export default localStorage;

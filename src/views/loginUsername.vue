@@ -53,7 +53,6 @@
 </template>
 
 <script>
-import NProgress from 'nprogress';
 import { search } from '@/api/others';
 import { throttle } from '@/utils/common';
 
@@ -70,9 +69,6 @@ export default {
       result: [],
       activeUser: {},
     };
-  },
-  created() {
-    NProgress.done();
   },
   methods: {
     search() {

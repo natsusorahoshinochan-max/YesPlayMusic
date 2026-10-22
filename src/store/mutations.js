@@ -14,8 +14,8 @@ export default {
   toggleLyrics(state) {
     state.showLyrics = !state.showLyrics;
   },
-  enableScrolling(state, status = null) {
-    state.enableScrolling = status ? status : !state.enableScrolling;
+  enableScrolling(state, status) {
+    state.enableScrolling = status;
   },
   updateTitle(state, title) {
     state.title = title;

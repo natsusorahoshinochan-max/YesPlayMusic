@@ -22,8 +22,7 @@ import '@/assets/icons';
 import '@/utils/filters';
 import './registerServiceWorker';
 import '@/assets/css/global.scss';
-import NProgress from 'nprogress';
-import '@/assets/css/nprogress.css';
+import PageLoading from '@/components/PageLoading.vue';
 
 window.resetApp = () => {
   localStorage.clear();
@@ -51,7 +50,7 @@ Vue.use(
 Vue.config.productionTip = false;
 
 const credentials = createCredentials();
-NProgress.configure({ showSpinner: false, trickleSpeed: 100 });
+Vue.component('PageLoading', PageLoading);
 (async () => {
   const store = createStore({
     credentials,

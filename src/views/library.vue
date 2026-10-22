@@ -1,230 +1,229 @@
 <template>
-  <div v-show="show" ref="library">
-    <h1>
-      <img
-        class="avatar"
-        :src="user.avatarUrl | resizeImage"
-        loading="lazy"
-      />{{ user.nickname }}{{ $t('library.sLibrary') }}
-    </h1>
-    <div class="section-one">
-      <div class="liked-songs" @click="goToLikedSongsList">
-        <div class="top">
-          <p>
-            <span
-              v-for="(line, index) in pickedLyric"
-              v-show="line !== ''"
-              :key="`${line}${index}`"
-              >{{ line }}<br
-            /></span>
-          </p>
-        </div>
-        <div class="bottom">
-          <div class="titles">
-            <div class="title">{{ $t('library.likedSongs') }}</div>
-            <div class="sub-title">
-              {{ liked.songs.length }} {{ $t('common.songs') }}
+  <div>
+    <PageLoading :loading="loading" />
+    <div v-show="show" ref="library">
+      <h1>
+        <img
+          class="avatar"
+          :src="user.avatarUrl | resizeImage"
+          loading="lazy"
+        />{{ user.nickname }}{{ $t('library.sLibrary') }}
+      </h1>
+      <div class="section-one">
+        <div class="liked-songs" @click="goToLikedSongsList">
+          <div class="top">
+            <p>
+              <span
+                v-for="(line, index) in pickedLyric"
+                v-show="line !== ''"
+                :key="`${line}${index}`"
+                >{{ line }}<br
+              /></span>
+            </p>
+          </div>
+          <div class="bottom">
+            <div class="titles">
+              <div class="title">{{ $t('library.likedSongs') }}</div>
+              <div class="sub-title">
+                {{ liked.songs.length }} {{ $t('common.songs') }}
+              </div>
             </div>
-          </div>
-          <button @click.stop="openPlayModeTabMenu">
-            <svg-icon icon-class="play" />
-          </button>
-        </div>
-      </div>
-      <div class="songs">
-        <TrackList
-          :items="liked.songsWithDetails"
-          :column-number="3"
-          type="tracklist"
-          @activate="playLikedSongs($event.id)"
-        />
-      </div>
-    </div>
-
-    <div class="section-two">
-      <div class="tabs-row">
-        <div class="tabs">
-          <div
-            class="tab dropdown"
-            :class="{ active: currentTab === 'playlists' }"
-            @click="updateCurrentTab('playlists')"
-          >
-            <span class="text">{{
-              {
-                all: $t('contextMenu.allPlaylists'),
-                mine: $t('contextMenu.minePlaylists'),
-                liked: $t('contextMenu.likedPlaylists'),
-              }[playlistFilter]
-            }}</span>
-            <span class="icon" @click.stop="openPlaylistTabMenu"
-              ><svg-icon icon-class="dropdown"
-            /></span>
-          </div>
-          <div
-            class="tab"
-            :class="{ active: currentTab === 'albums' }"
-            @click="updateCurrentTab('albums')"
-          >
-            {{ $t('library.albums') }}
-          </div>
-          <div
-            class="tab"
-            :class="{ active: currentTab === 'artists' }"
-            @click="updateCurrentTab('artists')"
-          >
-            {{ $t('library.artists') }}
-          </div>
-          <div
-            class="tab"
-            :class="{ active: currentTab === 'mvs' }"
-            @click="updateCurrentTab('mvs')"
-          >
-            {{ $t('library.mvs') }}
-          </div>
-          <div
-            class="tab"
-            :class="{ active: currentTab === 'cloudDisk' }"
-            @click="updateCurrentTab('cloudDisk')"
-          >
-            {{ $t('library.cloudDisk') }}
-          </div>
-          <div
-            class="tab"
-            :class="{ active: currentTab === 'playHistory' }"
-            @click="updateCurrentTab('playHistory')"
-          >
-            {{ $t('library.playHistory.title') }}
+            <button @click.stop="openPlayModeTabMenu">
+              <svg-icon icon-class="play" />
+            </button>
           </div>
         </div>
-        <button
-          v-show="currentTab === 'playlists'"
-          class="tab-button"
-          @click="openAddPlaylistModal"
-          ><svg-icon icon-class="plus" />{{ $t('library.newPlayList') }}
-        </button>
-        <button
-          v-show="currentTab === 'cloudDisk'"
-          class="tab-button"
-          @click="selectUploadFiles"
-          ><svg-icon icon-class="arrow-up-alt" />{{ $t('library.uploadSongs') }}
-        </button>
-      </div>
-
-      <div v-show="currentTab === 'playlists'">
-        <div v-if="liked.playlists.length > 1">
-          <CoverRow
-            :items="filterPlaylists"
-            type="playlist"
-            sub-text="creator"
-            :show-play-button="true"
+        <div class="songs">
+          <TrackList
+            :items="liked.songsWithDetails"
+            :column-number="3"
+            type="tracklist"
+            @activate="playLikedSongs($event.id)"
           />
         </div>
       </div>
 
-      <div v-show="currentTab === 'albums'">
-        <CoverRow
-          :items="liked.albums"
-          type="album"
-          sub-text="artist"
-          :show-play-button="true"
-        />
-      </div>
-
-      <div v-show="currentTab === 'artists'">
-        <CoverRow
-          :items="liked.artists"
-          type="artist"
-          :show-play-button="true"
-        />
-      </div>
-
-      <div v-show="currentTab === 'mvs'">
-        <MvRow :mvs="liked.mvs" />
-      </div>
-
-      <div v-show="currentTab === 'cloudDisk'">
-        <TrackList
-          :items="liked.cloudDisk"
-          :track-of="record => record.simpleSong"
-          :column-number="3"
-          type="cloudDisk"
-          @activate="playCloudTrack"
-        >
-          <template #context-menu="{ item }">
+      <div class="section-two">
+        <div class="tabs-row">
+          <div class="tabs">
             <div
-              class="item"
-              @click="
-                $store.state.player.enqueueNext(item.songId, { playNow: true })
-              "
-              >{{ $t('contextMenu.play') }}</div
+              class="tab dropdown"
+              :class="{ active: currentTab === 'playlists' }"
+              @click="updateCurrentTab('playlists')"
             >
+              <span class="text">{{
+                {
+                  all: $t('contextMenu.allPlaylists'),
+                  mine: $t('contextMenu.minePlaylists'),
+                  liked: $t('contextMenu.likedPlaylists'),
+                }[playlistFilter]
+              }}</span>
+              <span class="icon" @click.stop="openPlaylistTabMenu"
+                ><svg-icon icon-class="dropdown"
+              /></span>
+            </div>
             <div
-              class="item"
-              @click="$store.state.player.enqueueNext(item.songId)"
-              >{{ $t('contextMenu.addToQueue') }}</div
+              class="tab"
+              :class="{ active: currentTab === 'albums' }"
+              @click="updateCurrentTab('albums')"
             >
-            <div class="item" @click="removeCloudTrack(item)">从云盘中删除</div>
-          </template>
-        </TrackList>
+              {{ $t('library.albums') }}
+            </div>
+            <div
+              class="tab"
+              :class="{ active: currentTab === 'artists' }"
+              @click="updateCurrentTab('artists')"
+            >
+              {{ $t('library.artists') }}
+            </div>
+            <div
+              class="tab"
+              :class="{ active: currentTab === 'mvs' }"
+              @click="updateCurrentTab('mvs')"
+            >
+              {{ $t('library.mvs') }}
+            </div>
+            <div
+              class="tab"
+              :class="{ active: currentTab === 'cloudDisk' }"
+              @click="updateCurrentTab('cloudDisk')"
+            >
+              {{ $t('library.cloudDisk') }}
+            </div>
+            <div
+              class="tab"
+              :class="{ active: currentTab === 'playHistory' }"
+              @click="updateCurrentTab('playHistory')"
+            >
+              {{ $t('library.playHistory.title') }}
+            </div>
+          </div>
+          <button
+            v-show="currentTab === 'playlists'"
+            class="tab-button"
+            @click="openAddPlaylistModal"
+            ><svg-icon icon-class="plus" />{{ $t('library.newPlayList') }}
+          </button>
+          <button
+            v-show="currentTab === 'cloudDisk'"
+            class="tab-button"
+            @click="selectUploadFiles"
+            ><svg-icon icon-class="arrow-up-alt" />{{
+              $t('library.uploadSongs')
+            }}
+          </button>
+        </div>
+
+        <div v-show="currentTab === 'playlists'">
+          <div v-if="filterPlaylists.length">
+            <CoverRow
+              :items="filterPlaylists"
+              type="playlist"
+              sub-text="creator"
+            />
+          </div>
+        </div>
+
+        <div v-show="currentTab === 'albums'">
+          <CoverRow :items="liked.albums" type="album" sub-text="artist" />
+        </div>
+
+        <div v-show="currentTab === 'artists'">
+          <CoverRow :items="liked.artists" type="artist" />
+        </div>
+
+        <div v-show="currentTab === 'mvs'">
+          <MvRow :mvs="liked.mvs" />
+        </div>
+
+        <div v-show="currentTab === 'cloudDisk'">
+          <TrackList
+            :items="liked.cloudDisk"
+            :track-of="record => record.simpleSong"
+            :column-number="3"
+            type="cloudDisk"
+            @activate="playCloudTrack"
+          >
+            <template #context-menu="{ item }">
+              <div
+                class="item"
+                @click="
+                  $store.state.player.enqueueNext(item.songId, {
+                    playNow: true,
+                  })
+                "
+                >{{ $t('contextMenu.play') }}</div
+              >
+              <div
+                class="item"
+                @click="$store.state.player.enqueueNext(item.songId)"
+                >{{ $t('contextMenu.addToQueue') }}</div
+              >
+              <div class="item" @click="removeCloudTrack(item)"
+                >从云盘中删除</div
+              >
+            </template>
+          </TrackList>
+        </div>
+
+        <div v-show="currentTab === 'playHistory'">
+          <button
+            :class="{
+              'playHistory-button': true,
+              'playHistory-button--selected': playHistoryMode === 'week',
+            }"
+            @click="playHistoryMode = 'week'"
+          >
+            {{ $t('library.playHistory.week') }}
+          </button>
+          <button
+            :class="{
+              'playHistory-button': true,
+              'playHistory-button--selected': playHistoryMode === 'all',
+            }"
+            @click="playHistoryMode = 'all'"
+          >
+            {{ $t('library.playHistory.all') }}
+          </button>
+          <TrackList
+            :items="playHistoryList"
+            :column-number="1"
+            type="tracklist"
+            @activate="playHistoryTrack"
+          />
+        </div>
       </div>
 
-      <div v-show="currentTab === 'playHistory'">
-        <button
-          :class="{
-            'playHistory-button': true,
-            'playHistory-button--selected': playHistoryMode === 'week',
-          }"
-          @click="playHistoryMode = 'week'"
-        >
-          {{ $t('library.playHistory.week') }}
-        </button>
-        <button
-          :class="{
-            'playHistory-button': true,
-            'playHistory-button--selected': playHistoryMode === 'all',
-          }"
-          @click="playHistoryMode = 'all'"
-        >
-          {{ $t('library.playHistory.all') }}
-        </button>
-        <TrackList
-          :items="playHistoryList"
-          :column-number="1"
-          type="tracklist"
-          @activate="playHistoryTrack"
-        />
-      </div>
+      <input
+        ref="cloudDiskUploadInput"
+        type="file"
+        style="display: none"
+        @change="uploadSongToCloudDisk"
+      />
+
+      <ContextMenu ref="playlistTabMenu">
+        <div class="item" @click="changePlaylistFilter('all')">{{
+          $t('contextMenu.allPlaylists')
+        }}</div>
+        <hr />
+        <div class="item" @click="changePlaylistFilter('mine')">{{
+          $t('contextMenu.minePlaylists')
+        }}</div>
+        <div class="item" @click="changePlaylistFilter('liked')">{{
+          $t('contextMenu.likedPlaylists')
+        }}</div>
+      </ContextMenu>
+
+      <ContextMenu ref="playModeTabMenu">
+        <div class="item" @click="playLikedSongs">{{
+          $t('library.likedSongs')
+        }}</div>
+        <hr />
+        <div class="item" @click="playIntelligenceList">{{
+          $t('contextMenu.cardiacMode')
+        }}</div>
+      </ContextMenu>
     </div>
-
-    <input
-      ref="cloudDiskUploadInput"
-      type="file"
-      style="display: none"
-      @change="uploadSongToCloudDisk"
-    />
-
-    <ContextMenu ref="playlistTabMenu">
-      <div class="item" @click="changePlaylistFilter('all')">{{
-        $t('contextMenu.allPlaylists')
-      }}</div>
-      <hr />
-      <div class="item" @click="changePlaylistFilter('mine')">{{
-        $t('contextMenu.minePlaylists')
-      }}</div>
-      <div class="item" @click="changePlaylistFilter('liked')">{{
-        $t('contextMenu.likedPlaylists')
-      }}</div>
-    </ContextMenu>
-
-    <ContextMenu ref="playModeTabMenu">
-      <div class="item" @click="playLikedSongs">{{
-        $t('library.likedSongs')
-      }}</div>
-      <hr />
-      <div class="item" @click="playIntelligenceList">{{
-        $t('contextMenu.cardiacMode')
-      }}</div>
-    </ContextMenu>
   </div>
 </template>
 
@@ -233,7 +232,6 @@ import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 import { mapActions, mapMutations, mapGetters } from 'vuex';
 import { randomNum } from '@/utils/common';
 import { getLyric } from '@/api/track';
-import NProgress from 'nprogress';
 import locale from '@/locale';
 
 import ContextMenu from '@/components/ContextMenu.vue';
@@ -257,6 +255,7 @@ export default {
   components: { SvgIcon, CoverRow, TrackList, MvRow, ContextMenu },
   data() {
     return {
+      loading: false,
       show: false,
       lyric: undefined,
       currentTab: 'playlists',
@@ -302,7 +301,9 @@ export default {
       return this.libraryPlaylistFilter || 'all';
     },
     filterPlaylists() {
-      const playlists = this.liked.playlists.slice(1);
+      const playlists = this.liked.playlists.filter(
+        playlist => playlist.id !== this.likedSongPlaylistID
+      );
       const userId = this.user.userId;
       if (this.playlistFilter === 'mine') {
         return playlists.filter(p => p.creator.userId === userId);
@@ -321,11 +322,6 @@ export default {
       return [];
     },
   },
-  created() {
-    setTimeout(() => {
-      if (!this.show) NProgress.start();
-    }, 1000);
-  },
   activated() {
     this.$parent.$refs.scrollbar.restorePosition();
     this.loadData();
@@ -336,7 +332,7 @@ export default {
     ...mapMutations(['updateModal']),
     loadData() {
       this.show = this.previewReady;
-      if (this.show) NProgress.done();
+      this.loading = !this.show;
       return this.$store
         .dispatch('library/loadPage')
         .then(() => {
@@ -344,7 +340,9 @@ export default {
           this.getRandomLyric();
         })
         .catch(() => this.showToast('音乐库加载失败'))
-        .finally(() => NProgress.done());
+        .finally(() => {
+          this.loading = false;
+        });
     },
     playCloudTrack(track) {
       return this.$store.state.player.playTracks(
@@ -373,14 +371,14 @@ export default {
       );
     },
     playLikedSongs(startTrackId) {
-      return this.$store.state.player.playPlaylist(this.liked.playlists[0].id, {
+      return this.$store.state.player.playPlaylist(this.likedSongPlaylistID, {
         fresh: true,
         startTrackId,
       });
     },
     playIntelligenceList() {
       return this.$store.state.player.playIntelligencePlaylist(
-        this.liked.playlists[0].id,
+        this.likedSongPlaylistID,
         { fresh: true }
       );
     },

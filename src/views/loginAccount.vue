@@ -113,7 +113,6 @@
 
 <script>
 import QRCode from 'qrcode';
-import NProgress from 'nprogress';
 import nativeAlert from '@/utils/nativeAlert';
 
 export default {
@@ -170,7 +169,6 @@ export default {
       this.mode = this.$route.query.mode;
     }
     if (this.mode === 'qrCode') this.$store.dispatch('session/startQrLogin');
-    NProgress.done();
   },
   beforeDestroy() {
     this.$store.dispatch('session/stopQrLogin');

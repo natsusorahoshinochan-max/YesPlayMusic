@@ -35,7 +35,6 @@
 
 <script>
 import { mapState } from 'vuex';
-import { isEqual } from 'lodash';
 import { getTrackDetail } from '@/api/track';
 import TrackList from '@/components/TrackList.vue';
 
@@ -56,7 +55,6 @@ export default {
       return this.player.state.currentTrack;
     },
     upcomingRows() {
-      this.player.state;
       return this.player.upcoming(100);
     },
     nextRows() {
@@ -69,9 +67,7 @@ export default {
   watch: {
     upcomingRows: {
       immediate: true,
-      handler(rows, previous) {
-        if (!isEqual(rows, previous)) this.loadTracks(rows);
-      },
+      handler: 'loadTracks',
     },
   },
   activated() {
@@ -87,7 +83,7 @@ export default {
       this.entries = [];
       if (!ids.length) return;
       try {
-        const data = await getTrackDetail(ids.join(','));
+        const data = await getTrackDetail(ids);
         if (request !== this.tracksRequest) return;
         this.entries = rows
           .map(row => ({

@@ -7,16 +7,16 @@ import isPlainObject from 'lodash/isPlainObject';
 export default function createPreferences(
   snapshot,
   {
-    persist = () => {},
-    applyLanguage = () => {},
-    applyProxy = () => {},
-    applyAppearance = () => {},
-    clearCache = () => {},
-    applyOutputDevice = () => {},
-    resetReversedMode = () => {},
-    applyShortcuts = () => {},
-    applyTrayIconTheme = () => {},
-  } = {}
+    persist,
+    applyLanguage,
+    applyProxy,
+    applyAppearance,
+    clearCache,
+    applyOutputDevice,
+    resetReversedMode,
+    applyShortcuts,
+    applyTrayIconTheme,
+  }
 ) {
   const shortcutControl = state => ({
     enabled: state.settings.enableGlobalShortcut !== false,
@@ -121,7 +121,7 @@ export default function createPreferences(
       async setTrayIconTheme({ commit }, value) {
         commit('updateSettings', { key: 'trayIconTheme', value });
         await persist();
-        await applyTrayIconTheme(value);
+        await applyTrayIconTheme();
       },
       async setGlobalShortcutsEnabled({ commit, state }, value) {
         commit('updateSettings', { key: 'enableGlobalShortcut', value });
@@ -179,7 +179,7 @@ export default function createPreferences(
         await applyOutputDevice();
         await applyLanguage(state.settings.lang);
         await applyAppearance(state.settings);
-        await applyTrayIconTheme(state.settings.trayIconTheme);
+        await applyTrayIconTheme();
         await applyShortcuts(shortcutControl(state), true);
       },
     },

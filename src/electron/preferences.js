@@ -7,7 +7,3 @@ export function applyDesktopShortcuts(win, store, control, updateMenu = false) {
   globalShortcut.unregisterAll();
   if (control.enabled && !control.recording) registerGlobalShortcut(win, store);
 }
-
-export function applyTrayIconTheme(trayEventEmitter) {
-  if (trayEventEmitter) trayEventEmitter.emit('updateIcon');
-}

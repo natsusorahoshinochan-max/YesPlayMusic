@@ -1,6 +1,6 @@
 # 音乐库变更与歌单详情：结构设计
 
-**Last Updated:** 2026-10-20
+**Last Updated:** 2026-10-22
 
 ## 当前实现与契约
 
@@ -110,7 +110,7 @@ type CreatePlaylistResult = {
 
 ## 当前歌单详情的 interface 与归属
 
-`playlistDetail` 维护一个当前打开的歌单。页面通过 `playlistDetail/current` getter 读取响应式视图，包含 `playlist`、`tracks`、`loading`、`loadingMore` 和 `hasMore`。没有打开详情时，当前详情为空。调用者按只读方式使用视图及其嵌套数据。
+`playlistDetail` 维护一个当前打开的歌单。页面通过 `playlistDetail/current` getter 读取响应式视图，包含 `playlist`、`tracks`、`traversed` 和 `loadingMore`；`playlistDetail/hasMore` 根据已经遍历的 ID 范围与完整 ID 数量派生。没有打开详情时，当前详情为空。调用者按只读方式使用视图及其嵌套数据。
 
 | Action | 职责 |
 | --- | --- |
@@ -130,7 +130,7 @@ library 通过内部协作 interface `playlistDetail/applyLibraryChange(change)`
 
 | 变更 | 当前详情的处理 |
 | --- | --- |
-| 删除曲目 | 移除匹配的完整 ID 与已加载歌曲，按实际移除数量更新计数，调整已遍历范围并重新计算 `hasMore` |
+| 删除曲目 | 移除匹配的完整 ID 与已加载歌曲，按实际移除数量更新计数，调整已遍历范围 |
 | 添加曲目 | 重读匹配详情，采用远端曲目顺序，恢复原有加载范围所需的数据量 |
 | 收藏歌单 | 应用已确认的收藏状态，并组织相关元数据读取 |
 | 删除歌单 | 清空匹配详情，页面根据写入结果执行返回导航 |

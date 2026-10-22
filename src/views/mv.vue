@@ -45,15 +45,12 @@
 <script>
 import { showLibraryChangeFeedback } from '@/utils/libraryOutcome';
 import { mvDetail, mvUrl, simiMv } from '@/api/mv';
-import NProgress from 'nprogress';
-import locale from '@/locale';
 import '@/assets/css/plyr.css';
 import Plyr from 'plyr';
 
 import ButtonIcon from '@/components/ButtonIcon.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
 import MvRow from '@/components/MvRow.vue';
-import { mapActions } from 'vuex';
 
 export default {
   name: 'Mv',
@@ -100,7 +97,6 @@ export default {
     console.log('网易云你这mv音频码率也太糊了吧🙄');
   },
   methods: {
-    ...mapActions(['showToast']),
     videoPlaying() {
       return this.player ? this.player.playing : false;
     },
@@ -124,7 +120,6 @@ export default {
             sources: sources,
             poster: this.mv.data.cover.replace(/^http:/, 'https:'),
           };
-          NProgress.done();
         });
       });
       simiMv(id).then(data => {
@@ -144,14 +139,10 @@ export default {
       this.$refs.mvMenu.openMenu(e);
     },
     copyUrl(id) {
-      let showToast = this.showToast;
-      this.$copyText(`https://music.163.com/#/mv?id=${id}`)
-        .then(function () {
-          showToast(locale.t('toast.copied'));
-        })
-        .catch(error => {
-          showToast(`${locale.t('toast.copyFailed')}${error}`);
-        });
+      return this.$store.dispatch(
+        'copyText',
+        `https://music.163.com/#/mv?id=${id}`
+      );
     },
     openInBrowser(id) {
       const url = `https://music.163.com/#/mv?id=${id}`;

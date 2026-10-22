@@ -1,69 +1,70 @@
 <template>
-  <div v-show="show" class="home">
-    <div
-      v-if="settings.showPlaylistsByAppleMusic !== false"
-      class="index-row first-row"
-    >
-      <div class="title"> by Apple Music </div>
-      <CoverRow
-        :type="'playlist'"
-        :items="byAppleMusic"
-        sub-text="appleMusic"
-        :image-size="1024"
-      />
-    </div>
-    <div class="index-row">
-      <div class="title">
-        {{ $t('home.recommendPlaylist') }}
-        <router-link to="/explore?category=推荐歌单">{{
-          $t('home.seeMore')
-        }}</router-link>
+  <div>
+    <PageLoading :loading="loading" />
+    <div v-show="show" class="home">
+      <div
+        v-if="settings.showPlaylistsByAppleMusic !== false"
+        class="index-row first-row"
+      >
+        <div class="title"> by Apple Music </div>
+        <CoverRow
+          :type="'playlist'"
+          :items="byAppleMusic"
+          sub-text="appleMusic"
+        />
       </div>
-      <CoverRow
-        :type="'playlist'"
-        :items="recommendPlaylist.items"
-        sub-text="copywriter"
-      />
-    </div>
-    <div class="index-row">
-      <div class="title"> For You </div>
-      <div class="for-you-row">
-        <DailyTracksCard ref="DailyTracksCard" />
-        <FMCard />
+      <div class="index-row">
+        <div class="title">
+          {{ $t('home.recommendPlaylist') }}
+          <router-link to="/explore?category=推荐歌单">{{
+            $t('home.seeMore')
+          }}</router-link>
+        </div>
+        <CoverRow
+          :type="'playlist'"
+          :items="recommendPlaylist.items"
+          sub-text="copywriter"
+        />
       </div>
-    </div>
-    <div class="index-row">
-      <div class="title">{{ $t('home.recommendArtist') }}</div>
-      <CoverRow
-        type="artist"
-        :column-number="6"
-        :items="recommendArtists.items"
-      />
-    </div>
-    <div class="index-row">
-      <div class="title">
-        {{ $t('home.newAlbum') }}
-        <router-link to="/new-album">{{ $t('home.seeMore') }}</router-link>
+      <div class="index-row">
+        <div class="title"> For You </div>
+        <div class="for-you-row">
+          <DailyTracksCard ref="DailyTracksCard" />
+          <FMCard />
+        </div>
       </div>
-      <CoverRow
-        type="album"
-        :items="newReleasesAlbum.items"
-        sub-text="artist"
-      />
-    </div>
-    <div class="index-row">
-      <div class="title">
-        {{ $t('home.charts') }}
-        <router-link to="/explore?category=排行榜">{{
-          $t('home.seeMore')
-        }}</router-link>
+      <div class="index-row">
+        <div class="title">{{ $t('home.recommendArtist') }}</div>
+        <CoverRow
+          type="artist"
+          :column-number="6"
+          :items="recommendArtists.items"
+        />
       </div>
-      <CoverRow
-        type="playlist"
-        :items="topList.items"
-        sub-text="updateFrequency"
-        :image-size="1024"
-      />
+      <div class="index-row">
+        <div class="title">
+          {{ $t('home.newAlbum') }}
+          <router-link to="/new-album">{{ $t('home.seeMore') }}</router-link>
+        </div>
+        <CoverRow
+          type="album"
+          :items="newReleasesAlbum.items"
+          sub-text="artist"
+        />
+      </div>
+      <div class="index-row">
+        <div class="title">
+          {{ $t('home.charts') }}
+          <router-link to="/explore?category=排行榜">{{
+            $t('home.seeMore')
+          }}</router-link>
+        </div>
+        <CoverRow
+          type="playlist"
+          :items="topList.items"
+          sub-text="updateFrequency"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -74,7 +75,6 @@ import { toplistOfArtists } from '@/api/artist';
 import { newAlbums } from '@/api/album';
 import { byAppleMusic } from '@/utils/staticData';
 import { getRecommendPlayList } from '@/utils/playList';
-import NProgress from 'nprogress';
 import { mapGetters } from 'vuex';
 import CoverRow from '@/components/CoverRow.vue';
 import FMCard from '@/components/FMCard.vue';
@@ -85,6 +85,7 @@ export default {
   components: { CoverRow, FMCard, DailyTracksCard },
   data() {
     return {
+      loading: false,
       show: false,
       recommendPlaylist: { items: [] },
       newReleasesAlbum: { items: [] },
@@ -94,7 +95,6 @@ export default {
       },
       recommendArtists: {
         items: [],
-        indexs: [],
       },
     };
   },
@@ -111,14 +111,15 @@ export default {
   },
   methods: {
     loadData() {
-      setTimeout(() => {
-        if (!this.show) NProgress.start();
-      }, 1000);
-      getRecommendPlayList(10, false).then(items => {
-        this.recommendPlaylist.items = items;
-        NProgress.done();
-        this.show = true;
-      });
+      this.loading = !this.show;
+      getRecommendPlayList(10, false)
+        .then(items => {
+          this.recommendPlaylist.items = items;
+          this.show = true;
+        })
+        .finally(() => {
+          this.loading = false;
+        });
       newAlbums({
         area: this.settings.musicLanguage ?? 'ALL',
         limit: 10,
@@ -141,7 +142,6 @@ export default {
           let tmp = ~~(Math.random() * 100);
           if (!indexs.includes(tmp)) indexs.push(tmp);
         }
-        this.recommendArtists.indexs = indexs;
         this.recommendArtists.items = data.list.artists.filter((l, index) =>
           indexs.includes(index)
         );

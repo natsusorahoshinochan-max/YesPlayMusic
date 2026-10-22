@@ -3,7 +3,7 @@ import { getTrackCache } from '@/utils/db';
 
 export function createPreferenceEffects({
   getLocale,
-  getPlayer = () => null,
+  getPlayer,
   ipcRenderer = process.env.IS_ELECTRON === true
     ? window.require('electron').ipcRenderer
     : null,
@@ -14,15 +14,14 @@ export function createPreferenceEffects({
     },
     applyAppearance: applySettingsAppearance,
     applyOutputDevice() {
-      return getPlayer()?.applyOutputDevice();
+      return getPlayer().applyOutputDevice();
     },
     clearCache: () => getTrackCache().clearDB(),
     resetReversedMode() {
-      const player = getPlayer();
-      player?.setReversed(false);
+      getPlayer().setReversed(false);
     },
-    applyTrayIconTheme(value) {
-      ipcRenderer?.send('updateTrayIcon', value);
+    applyTrayIconTheme() {
+      ipcRenderer?.send('updateTrayIcon');
     },
     applyShortcuts(control, updateMenu) {
       ipcRenderer?.send('applyShortcuts', control, updateMenu);

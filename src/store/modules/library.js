@@ -5,7 +5,7 @@ import {
   synchronize,
 } from '../libraryChange';
 
-export default function createLibrary(snapshot, { api = {} } = {}) {
+export default function createLibrary(snapshot, { api }) {
   function setCollection({ commit }, name, data) {
     commit('setCollection', { name, data });
   }
@@ -28,7 +28,7 @@ export default function createLibrary(snapshot, { api = {} } = {}) {
       setCollection(context, 'songs', ids);
     }
     const tracks = ids.length
-      ? (await api.getTrackDetail(ids.slice(0, 12).join(','))).songs
+      ? (await api.getTrackDetail(ids.slice(0, 12))).songs
       : [];
     setCollection(context, 'songsWithDetails', tracks);
     context.commit('setPreviewReady');

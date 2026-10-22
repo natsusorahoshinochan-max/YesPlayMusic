@@ -1,9 +1,9 @@
-export default function createPlaylistDetail({ api = {} } = {}) {
+export default function createPlaylistDetail({ api }) {
   let pending;
 
   async function loadMore(context, { count = 100 } = {}) {
     const detail = context.state.current;
-    if (!detail || !detail.playlist || !detail.hasMore || count <= 0) return;
+    if (!context.getters.hasMore || count <= 0) return;
     if (pending?.detail === detail) {
       await pending.promise;
       if (context.state.current !== detail) return;
@@ -15,7 +15,7 @@ export default function createPlaylistDetail({ api = {} } = {}) {
     context.commit('patch', { loadingMore: true });
     const promise = (async () => {
       try {
-        const result = await api.getTrackDetail(batch.join(','));
+        const result = await api.getTrackDetail(batch);
         if (context.state.current !== detail) return;
         context.commit('append', { batch, tracks: result.songs });
       } finally {
@@ -39,56 +39,54 @@ export default function createPlaylistDetail({ api = {} } = {}) {
       id,
       playlist: null,
       tracks: [],
-      hasMore: false,
       traversed: 0,
       ...(retained || {}),
       confirmedFavorite: retained?.confirmedFavorite,
-      loading: true,
       loadingMore: false,
     });
     const detail = context.state.current;
-    try {
-      const result = await api.getPlaylistDetail(id, true);
-      if (context.state.current !== detail) return;
-      const playlist = result.playlist;
-      const tracks = playlist.tracks || [];
-      const initial = tracks.reduce((end, track) => {
-        const index = playlist.trackIds.findIndex(item => item.id === track.id);
-        return Math.max(end, index + 1);
-      }, 0);
-      const available = new Map(
-        [...detail.tracks, ...tracks].map(track => [track.id, track])
-      );
-      context.commit('patch', {
-        playlist: {
-          ...playlist,
-          tracks: undefined,
-          ...(context.state.current.confirmedFavorite === undefined
-            ? {}
-            : {
-                subscribed: context.state.current.confirmedFavorite,
-              }),
-        },
-        tracks: playlist.trackIds
-          .map(track => available.get(track.id))
-          .filter(Boolean),
-        traversed: initial,
-        hasMore: initial < playlist.trackIds.length,
-      });
-      await loadMore(context, {
-        count: range === undefined ? 100 : Math.max(0, range - initial),
-      });
-    } finally {
-      if (context.state.current === detail) {
-        context.commit('patch', { loading: false });
-      }
-    }
+    const result = await api.getPlaylistDetail(id, true);
+    if (context.state.current !== detail) return;
+    const playlist = result.playlist;
+    const tracks = playlist.tracks || [];
+    const initial = tracks.reduce((end, track) => {
+      const index = playlist.trackIds.findIndex(item => item.id === track.id);
+      return Math.max(end, index + 1);
+    }, 0);
+    const available = new Map(
+      [...detail.tracks, ...tracks].map(track => [track.id, track])
+    );
+    context.commit('patch', {
+      playlist: {
+        ...playlist,
+        tracks: undefined,
+        ...(context.state.current.confirmedFavorite === undefined
+          ? {}
+          : {
+              subscribed: context.state.current.confirmedFavorite,
+            }),
+      },
+      tracks: playlist.trackIds
+        .map(track => available.get(track.id))
+        .filter(Boolean),
+      traversed: initial,
+    });
+    await loadMore(context, {
+      count: range === undefined ? 100 : Math.max(0, range - initial),
+    });
   }
 
   return {
     namespaced: true,
     state: () => ({ current: null }),
-    getters: { current: state => state.current },
+    getters: {
+      current: state => state.current,
+      hasMore: ({ current }) =>
+        Boolean(
+          current?.playlist &&
+            current.traversed < current.playlist.trackIds.length
+        ),
+    },
     mutations: {
       replace(state, detail) {
         state.current = detail;
@@ -108,7 +106,6 @@ export default function createPlaylistDetail({ api = {} } = {}) {
         detail.tracks = detail.playlist.trackIds
           .map(track => available.get(track.id))
           .filter(Boolean);
-        detail.hasMore = detail.traversed < detail.playlist.trackIds.length;
       },
       removeTracks(state, trackIds) {
         const detail = state.current;
@@ -128,7 +125,6 @@ export default function createPlaylistDetail({ api = {} } = {}) {
         };
         detail.traversed -= removedBefore;
         detail.tracks = detail.tracks.filter(track => !removed.has(track.id));
-        detail.hasMore = detail.traversed < remaining.length;
       },
     },
     actions: {

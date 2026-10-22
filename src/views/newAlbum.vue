@@ -3,12 +3,7 @@
     <h1>{{ $t('home.newAlbum') }}</h1>
     <div class="playlist-row">
       <div class="playlists">
-        <CoverRow
-          type="album"
-          :items="albums"
-          sub-text="artist"
-          :show-play-button="true"
-        />
+        <CoverRow type="album" :items="albums" sub-text="artist" />
       </div>
     </div>
   </div>
@@ -16,7 +11,6 @@
 
 <script>
 import { newAlbums } from '@/api/album';
-import NProgress from 'nprogress';
 
 import CoverRow from '@/components/CoverRow.vue';
 
@@ -35,7 +29,6 @@ export default {
       limit: 100,
     }).then(data => {
       this.albums = data.albums;
-      NProgress.done();
     });
   },
 };

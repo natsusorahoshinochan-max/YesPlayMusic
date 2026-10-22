@@ -25,10 +25,6 @@ import { restoreProxy } from './electron/proxy';
 import { createTray } from '@/electron/tray';
 import { createTouchBar } from './electron/touchBar';
 import { createDockMenu } from './electron/dockMenu';
-import {
-  applyDesktopShortcuts,
-  applyTrayIconTheme,
-} from './electron/preferences';
 import { autoUpdater } from 'electron-updater';
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer';
 import { EventEmitter } from 'events';
@@ -325,9 +321,6 @@ class Background {
 
       // create window
       this.createWindow();
-      this.window.once('ready-to-show', () => {
-        this.window.show();
-      });
       this.handleWindowEvents();
 
       // create tray
@@ -353,17 +346,6 @@ class Background {
 
       // check for updates
       this.checkForUpdates();
-
-      applyTrayIconTheme(this.trayEventEmitter);
-      applyDesktopShortcuts(
-        this.window,
-        this.store,
-        {
-          enabled: this.store.get('settings.enableGlobalShortcut') !== false,
-          recording: false,
-        },
-        true
-      );
 
       // create dock menu for macOS
       const createdDockMenu = createDockMenu(this.window);

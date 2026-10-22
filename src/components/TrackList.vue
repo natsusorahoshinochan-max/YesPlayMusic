@@ -169,15 +169,10 @@ export default {
       });
     },
     copyLink() {
-      this.$copyText(
+      return this.$store.dispatch(
+        'copyText',
         `https://music.163.com/song?id=${this.rightClickedTrack.id}`
-      )
-        .then(() => {
-          this.showToast(locale.t('toast.copied'));
-        })
-        .catch(err => {
-          this.showToast(`${locale.t('toast.copyFailed')}${err}`);
-        });
+      );
     },
   },
 };

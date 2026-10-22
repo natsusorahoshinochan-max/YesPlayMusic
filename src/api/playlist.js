@@ -100,17 +100,6 @@ export function topPlaylist(params) {
 }
 
 /**
- * 歌单分类
- * 说明 : 调用此接口,可获取歌单分类,包含 category 信息
- */
-export function playlistCatlist() {
-  return request({
-    url: '/playlist/catlist',
-    method: 'get',
-  });
-}
-
-/**
  * 所有榜单
  * 说明 : 调用此接口,可获取所有榜单 接口地址 : /toplist
  */

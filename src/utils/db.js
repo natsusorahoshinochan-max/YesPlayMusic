@@ -50,7 +50,7 @@ export function configureTrackCache({
     initializeTrackCache() {
       return isElectron ? cache.initializeTrackCache() : Promise.resolve();
     },
-    cacheTrackSource(track, url, bitRate, from = 'netease') {
+    cacheTrackSource(track, resource) {
       if (!isElectron) return Promise.resolve();
       const cover = track.al?.picUrl?.replace(/^http:/, 'https:');
       if (cover) {
@@ -62,7 +62,7 @@ export function configureTrackCache({
             });
         }
       }
-      return cache.cacheTrackSource(track, url, bitRate, from);
+      return cache.cacheTrackSource(track, resource);
     },
   };
   return trackCache;
@@ -78,23 +78,13 @@ export function cacheTrackDetail(track, privileges) {
 }
 
 export function getTrackDetailFromCache(ids) {
-  return db.trackDetail
-    .filter(track => {
-      return ids.includes(String(track.id));
-    })
-    .toArray()
-    .then(tracks => {
-      const result = { songs: [], privileges: [] };
-      ids.map(id => {
-        const one = tracks.find(t => String(t.id) === id);
-        result.songs.push(one?.detail);
-        result.privileges.push(one?.privileges);
-      });
-      if (result.songs.includes(undefined)) {
-        return undefined;
-      }
-      return result;
-    });
+  return db.trackDetail.bulkGet(ids).then(tracks => {
+    if (tracks.includes(undefined)) return undefined;
+    return {
+      songs: tracks.map(track => track.detail),
+      privileges: tracks.map(track => track.privileges),
+    };
+  });
 }
 
 export function cacheLyric(id, lyrics) {

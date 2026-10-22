@@ -23,6 +23,10 @@ export function createPlayback({
   onFeedback = () => {},
   onPlaybackEvent = () => {},
   onStateChange = () => {},
+  onArchive = () => {},
+  onTrackChange = () => {},
+  onPlayingChange = () => {},
+  onModesChange = () => {},
   onProgress = () => {},
   observe = Vue.observable,
   setInterval: schedule = setInterval,
@@ -59,7 +63,7 @@ export function createPlayback({
     personalFMNextLoading: false,
     sourceInfo: null,
   };
-  const holder = observe({ snapshot: freeze(clone(state)) });
+  const holder = observe({ snapshot: freeze(clone(state)), upcoming: [] });
   const safe = (receiver, ...values) => {
     try {
       const returned = receiver(...values);
@@ -74,6 +78,12 @@ export function createPlayback({
     holder.snapshot = freeze(clone(state));
     if (semantic) safe(onStateChange, holder.snapshot);
   }
+  const save = () => safe(onArchive, playback.archive());
+  const modesChanged = () =>
+    safe(onModesChange, {
+      repeatMode: state.repeatMode,
+      shuffle: state.shuffle,
+    });
   const valid = context => !disposed && context.id === operationId;
   function feedback(context, result) {
     if (valid(context))
@@ -126,7 +136,9 @@ export function createPlayback({
     state.playing = false;
     state.sourceInfo = null;
     state.progress = 0;
+    safe(onTrackChange, null);
     publish();
+    safe(onPlayingChange, false);
     safe(onProgress, 0);
     return true;
   }
@@ -186,6 +198,10 @@ export function createPlayback({
     }
     return result;
   }
+  function queueChanged() {
+    holder.upcoming = freeze(rows(1000));
+    save();
+  }
   async function advance(context, direction = 1, visited = new Set()) {
     if (!valid(context)) return outcome('superseded');
     if (state.isPersonalFM)
@@ -196,6 +212,7 @@ export function createPlayback({
     let remaining = list.length + nextList.length;
     do {
       if (remaining-- <= 0) {
+        queueChanged();
         publish();
         return outcome('unavailable', 'queue-ended');
       }
@@ -208,7 +225,9 @@ export function createPlayback({
         if (target == null) {
           if (current) current.handle.pause();
           state.playing = false;
+          queueChanged();
           publish();
+          safe(onPlayingChange, false);
           return outcome('unavailable', 'queue-ended');
         }
         if (state.shuffle) {
@@ -218,6 +237,7 @@ export function createPlayback({
         id = list[index];
       }
     } while (visited.has(id));
+    queueChanged();
     publish();
     return select(context, id, { direction, visited });
   }
@@ -250,6 +270,8 @@ export function createPlayback({
         0,
         state.durationSeconds - (state.durationSeconds > 1 ? 1 : 0)
       );
+      safe(onTrackChange, null);
+      save();
       publish();
       const resource = await resources.resolve(track);
       if (!valid(context)) return outcome('superseded');
@@ -274,14 +296,17 @@ export function createPlayback({
           instance.played = true;
           state.playing = true;
           publish();
+          safe(onPlayingChange, true);
           emit(instance, 'played');
         } else if (type === 'pause') {
           state.playing = false;
           publish();
+          safe(onPlayingChange, false);
         } else if (type === 'end') {
           state.playing = false;
           emit(instance, 'ended');
           publish();
+          safe(onPlayingChange, false);
           if (!state.isPersonalFM && state.repeatMode === 'one')
             void select(context, instance.track.id);
           else void advance(context);
@@ -296,9 +321,6 @@ export function createPlayback({
       preparations.add(preparation);
       prepared = await audio.prepare(resource, {
         signal: preparation.signal,
-        volume: state.volume,
-        autoplay: false,
-        position,
         onPlay: () => event('play'),
         onPause: () => event('pause'),
         onEnd: () => event('end'),
@@ -327,7 +349,9 @@ export function createPlayback({
       state.progress = position;
       prepared.setVolume(state.volume);
       if (position) prepared.seek(position);
+      safe(onTrackChange, freeze(clone(track)), state.durationSeconds);
       publish();
+      safe(onPlayingChange, false);
       pendingEvents.forEach(([type, value]) => event(type, value));
       if (autoplay) prepared.play();
       if (prefetch && resources.prefetch) {
@@ -396,6 +420,7 @@ export function createPlayback({
       const tracks = await personalFM.load();
       if (!valid(context) || request !== fmRequest) return;
       state.personalFMNextTrack = clone(tracks?.[0] || { id: 0 });
+      queueChanged();
       publish();
       if (
         state.personalFMNextTrack.id &&
@@ -427,6 +452,7 @@ export function createPlayback({
       state.personalFMNextLoading = false;
       state.isPersonalFM = true;
       state.playlistSource = { type: 'personalFM', id: 0 };
+      queueChanged();
       let target = state.personalFMNextTrack;
       if (!target?.id) {
         const tracks = await loadFM(context);
@@ -439,6 +465,7 @@ export function createPlayback({
         return outcome('unavailable', 'fm-same-track');
       state.personalFMTrack = clone(target);
       state.personalFMNextTrack = { id: 0 };
+      queueChanged();
       publish();
       const result = await select(context, target.id, { visited });
       if (valid(context)) void loadFMNext(context);
@@ -454,6 +481,7 @@ export function createPlayback({
     if (state.shuffle && list.length) index = shuffledOrder[0];
     state.playlistSource = clone(source);
     state.isPersonalFM = false;
+    queueChanged();
     publish();
     return list[index];
   }
@@ -557,6 +585,7 @@ export function createPlayback({
           index = position;
           if (state.shuffle) shuffledIndex = shuffledOrder.indexOf(index);
         }
+        queueChanged();
         publish();
         return select(context, id);
       });
@@ -607,6 +636,7 @@ export function createPlayback({
       if (!Number.isFinite(value)) return;
       state.volume = Math.max(0, Math.min(1, value));
       if (current) current.handle.setVolume(state.volume);
+      save();
       publish();
     },
     toggleMute() {
@@ -628,6 +658,7 @@ export function createPlayback({
       return runSelection(async context => {
         state.isPersonalFM = true;
         state.playlistSource = { type: 'personalFM', id: 0 };
+        queueChanged();
         if (
           !state.personalFMTrack?.id ||
           !state.personalFMNextTrack?.id ||
@@ -637,6 +668,7 @@ export function createPlayback({
           if (!valid(context)) return outcome('superseded');
           if (failure) return failure;
         }
+        queueChanged();
         publish();
         const result = await select(context, state.personalFMTrack.id);
         if (valid(context) && !state.personalFMNextTrack?.id)
@@ -677,6 +709,8 @@ export function createPlayback({
       )
         return;
       state.repeatMode = mode;
+      queueChanged();
+      modesChanged();
       publish();
     },
     cycleRepeat() {
@@ -688,6 +722,8 @@ export function createPlayback({
       if (state.isPersonalFM || state.shuffle === Boolean(enabled)) return;
       state.shuffle = Boolean(enabled);
       if (state.shuffle) shuffleQueue(list.length ? index : null);
+      queueChanged();
+      modesChanged();
       publish();
     },
     toggleShuffle() {
@@ -696,10 +732,12 @@ export function createPlayback({
     setReversed(value) {
       if (state.isPersonalFM) return;
       state.reversed = Boolean(value);
+      queueChanged();
       publish();
     },
     enqueueNext(id, { playNow = false } = {}) {
       nextList.push(id);
+      queueChanged();
       publish();
       return playNow
         ? runSelection(context => {
@@ -715,15 +753,22 @@ export function createPlayback({
         position < nextList.length
       ) {
         nextList.splice(position, 1);
+        queueChanged();
         publish();
       }
     },
     clearNext() {
       nextList = [];
+      queueChanged();
       publish();
     },
     upcoming(limit = 100) {
-      return freeze(clone(rows(limit)));
+      return Object.freeze(
+        holder.upcoming.slice(
+          0,
+          Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 0
+        )
+      );
     },
     applyOutputDevice() {
       return current ? current.handle.applyOutputDevice() : Promise.resolve();
@@ -783,6 +828,8 @@ export function createPlayback({
         nextList = saved._playNextList || [];
         state.volume = saved._volume == null ? 1 : saved._volume;
         volumeBeforeMuted = saved._volumeBeforeMuted || 1;
+        queueChanged();
+        modesChanged();
         publish();
         if (
           preparePersonalFM &&
@@ -799,6 +846,8 @@ export function createPlayback({
               if (!valid(context) || !tracks?.length) return;
               state.personalFMTrack = clone(tracks[0]);
               state.personalFMNextTrack = clone(tracks[1] || { id: 0 });
+              if (state.isPersonalFM) queueChanged();
+              else save();
               publish();
             })
             .catch(error => {

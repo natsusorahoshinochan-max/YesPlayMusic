@@ -15,19 +15,16 @@ import { createSettingsSender } from './sendSettings';
 
 Vue.use(Vuex);
 let store;
-const noCredentials = { get: () => null, set() {}, remove() {} };
 export function createStore({
   storage = localStorage,
   language = navigator.language,
-  credentials = noCredentials,
-  session = {},
-  library = {},
-  preferences = {},
+  credentials,
+  session,
+  library,
+  preferences,
   lastfm,
-  dailyRecommendations = {},
-  playlistDetail = {},
-  actions = {},
-} = {}) {
+  dailyRecommendations,
+}) {
   initializePlayerStorage(storage);
   const persistence = createPersistence(storage, language);
   const sendSettings =
@@ -36,7 +33,7 @@ export function createStore({
   const createdStore = new Vuex.Store({
     state: createState(storage),
     mutations,
-    actions: { ...rootActions, ...actions },
+    actions: rootActions,
     plugins: [persistence.install],
     modules: {
       dailyRecommendations: createDailyRecommendations({
@@ -56,7 +53,6 @@ export function createStore({
       library: createLibrary(persistence.snapshot.library, library),
       playlistDetail: createPlaylistDetail({
         api: library.api,
-        ...playlistDetail,
       }),
       preferences: createPreferences(persistence.snapshot.preferences, {
         ...preferences,

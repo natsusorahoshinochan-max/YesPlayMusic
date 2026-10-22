@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import UNM from '@unblockneteasemusic/rust-napi';
-import { applyDesktopShortcuts, applyTrayIconTheme } from './preferences';
+import { applyDesktopShortcuts } from './preferences';
 import { registerProxy } from './proxy';
 import { isCreateTray } from '@/utils/platform';
 
@@ -12,24 +12,10 @@ const log = text => {
 const client = require('discord-rich-presence')('818936529484906596');
 
 /**
- * Make data a Buffer.
- *
- * @param {?} data The data to convert.
- * @returns {import("buffer").Buffer} The converted data.
- */
-function toBuffer(data) {
-  if (data instanceof Buffer) {
-    return data;
-  } else {
-    return Buffer.from(data);
-  }
-}
-
-/**
- * Get the file base64 data from bilivideo.
+ * Download the audio bytes using the headers required by bilivideo.
  *
  * @param {string} url The URL to fetch.
- * @returns {Promise<string>} The file base64 data.
+ * @returns {Promise<ArrayBuffer>} The audio bytes.
  */
 async function getBiliVideoFile(url) {
   const axios = await import('axios').then(m => m.default);
@@ -41,10 +27,11 @@ async function getBiliVideoFile(url) {
     responseType: 'arraybuffer',
   });
 
-  const buffer = toBuffer(response.data);
-  const encodedData = buffer.toString('base64');
-
-  return encodedData;
+  const bytes = response.data;
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength
+  );
 }
 
 /**
@@ -154,7 +141,6 @@ export function initIpcMain(win, store, trayEventEmitter, windowOperations) {
           ? parseSourceStringToList(unmExecutor, sourceListString)
           : ['ytdl', 'bilibili', 'pyncm', 'kugou'];
       log(`[UNM] using source: ${sourceList.join(', ')}`);
-      log(`[UNM] using configuration: ${JSON.stringify(context)}`);
 
       try {
         // TODO: tell users to install yt-dlp.
@@ -165,14 +151,20 @@ export function initIpcMain(win, store, trayEventEmitter, windowOperations) {
         );
         const retrievedSong = await unmExecutor.retrieve(matchedAudio, context);
 
-        // bilibili's audio file needs some special treatment
-        if (retrievedSong.url.includes('bilivideo.com')) {
-          retrievedSong.url = await getBiliVideoFile(retrievedSong.url);
-        }
-
         log(`respond with retrieve song…`);
         log(JSON.stringify(matchedAudio));
-        return retrievedSong;
+        const sourceInfo = {
+          from: `unm:${retrievedSong.source}`,
+          bitRate: 128000,
+          cached: false,
+        };
+        return retrievedSong.url.includes('bilivideo.com')
+          ? {
+              kind: 'bytes',
+              bytes: await getBiliVideoFile(retrievedSong.url),
+              sourceInfo,
+            }
+          : { kind: 'url', url: retrievedSong.url, sourceInfo };
       } catch (err) {
         const errorMessage = err instanceof Error ? `${err.message}` : `${err}`;
         log(`UnblockNeteaseMusic failed: ${errorMessage}`);
@@ -237,7 +229,7 @@ export function initIpcMain(win, store, trayEventEmitter, windowOperations) {
       trayEventEmitter.emit('updateLikeState', isLiked);
     });
     ipcMain.on('updateTrayIcon', () => {
-      applyTrayIconTheme(trayEventEmitter);
+      trayEventEmitter.emit('updateIcon');
     });
   }
 }

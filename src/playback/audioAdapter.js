@@ -98,12 +98,9 @@ export function createAudioAdapter({
             listen('load', resolve);
             howl.load();
           });
-          handle.setVolume(options.volume ?? 1);
-          handle.seek(options.position ?? 0);
           await handle.applyOutputDevice();
           if (disposed) throw abortError();
           ready = true;
-          if (options.autoplay) handle.play();
           return handle;
         };
         return await Promise.race([prepare(), preparationFailure]);

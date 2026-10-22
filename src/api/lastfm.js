@@ -9,15 +9,10 @@ const baseUrl = window.location.origin;
 const url = 'https://ws.audioscrobbler.com/2.0/';
 
 const sign = params => {
-  const sortParamsKeys = Object.keys(params).sort();
-  const sortedParams = sortParamsKeys.reduce((acc, key) => {
-    acc[key] = params[key];
-    return acc;
-  }, {});
-  let signature = '';
-  for (const [key, value] of Object.entries(sortedParams)) {
-    signature += `${key}${value}`;
-  }
+  const signature = Object.keys(params)
+    .sort()
+    .map(key => `${key}${params[key]}`)
+    .join('');
   return md5(signature + apiSharedSecret).toString();
 };
 
@@ -29,58 +24,40 @@ export function auth() {
 }
 
 export function authGetSession(token) {
-  const signature = md5(
-    `api_key${apiKey}methodauth.getSessiontoken${token}${apiSharedSecret}`
-  ).toString();
+  const params = { api_key: apiKey, method: 'auth.getSession', token };
   return axios({
     url,
     method: 'GET',
     params: {
-      method: 'auth.getSession',
+      ...params,
+      api_sig: sign(params),
       format: 'json',
-      api_key: apiKey,
-      api_sig: signature,
-      token,
+    },
+  });
+}
+
+function send(method, params, authorization) {
+  params = {
+    ...params,
+    api_key: apiKey,
+    method,
+    sk: authorization.key,
+  };
+  return axios({
+    url,
+    method: 'POST',
+    params: {
+      ...params,
+      api_sig: sign(params),
+      format: 'json',
     },
   });
 }
 
 export function trackUpdateNowPlaying(params, authorization) {
-  params = {
-    ...params,
-    api_key: apiKey,
-    method: 'track.updateNowPlaying',
-    sk: authorization.key,
-  };
-  const signature = sign(params);
-
-  return axios({
-    url,
-    method: 'POST',
-    params: {
-      ...params,
-      api_sig: signature,
-      format: 'json',
-    },
-  });
+  return send('track.updateNowPlaying', params, authorization);
 }
 
 export function trackScrobble(params, authorization) {
-  params = {
-    ...params,
-    api_key: apiKey,
-    method: 'track.scrobble',
-    sk: authorization.key,
-  };
-  const signature = sign(params);
-
-  return axios({
-    url,
-    method: 'POST',
-    params: {
-      ...params,
-      api_sig: signature,
-      format: 'json',
-    },
-  });
+  return send('track.scrobble', params, authorization);
 }

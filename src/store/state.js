@@ -3,10 +3,6 @@ export default function createState() {
     showLyrics: false,
     enableScrolling: true,
     title: 'YesPlayMusic',
-    contextMenu: {
-      clickObjectID: 0,
-      showMenu: false,
-    },
     toast: {
       show: false,
       text: '',
