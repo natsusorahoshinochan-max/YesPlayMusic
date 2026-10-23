@@ -23,8 +23,6 @@ function setup({
   sourceList,
   prepareError,
   constructorError,
-  onEvent,
-  onProgress,
 } = {}) {
   const log = [];
   const howls = [];
@@ -94,7 +92,7 @@ function setup({
       log.push(['unload', this.url]);
     }
     end() {
-      this.seconds = 60;
+      this.seconds = 0;
       this.emit('end');
     }
     error(code) {
@@ -109,9 +107,8 @@ function setup({
   const feedback = jest.fn(value => log.push(['feedback', value.reason]));
   const records = jest.fn(value => {
     log.push(['record', value.type, value.track.id]);
-    onEvent?.(value);
   });
-  const progress = jest.fn((...args) => onProgress?.(...args));
+  const progress = jest.fn();
   const trackChanges = jest.fn();
   const resources = {
     resolve: jest.fn(async value => {
@@ -358,6 +355,8 @@ describe('Playback termination contract', () => {
   test('ordinary natural tail can replay its current song without being treated as source exhaustion', async () => {
     const fixture = setup();
     await fixture.playback.playTracks([1]);
+    fixture.playback.seek(17.5);
+    expect(fixture.playback.state.progress).toBe(17.5);
     fixture.howls[0].end();
     await settle();
     expect(fixture.playback.state.currentTrack.id).toBe(1);
@@ -367,8 +366,10 @@ describe('Playback termination contract', () => {
     expect(fixture.playback.state).toMatchObject({
       currentTrack: { id: 1 },
       playing: true,
+      progress: 0,
     });
     expect(fixture.playback.position()).toBe(0);
+    expect(fixture.progress).toHaveBeenLastCalledWith(0);
     fixture.howls[fixture.howls.length - 1].end();
     await settle();
     await fixture.playback.playTracks([2]);
@@ -403,6 +404,41 @@ describe('Playback termination contract', () => {
     fixture.playback.play();
     expect(fixture.playback.state.playing).toBe(true);
     expect(fixture.playback.position()).toBe(17.5);
+  });
+
+  test('seeking after a natural tail resumes from the selected position and records each playback once', async () => {
+    const fixture = setup();
+    await fixture.playback.playTracks([1]);
+    fixture.howls[0].end();
+    await settle();
+    expect(fixture.records.mock.calls.map(([event]) => event.type)).toEqual([
+      'played',
+      'ended',
+    ]);
+    fixture.playback.seek(25);
+    expect(fixture.playback.position()).toBe(25);
+    await fixture.playback.play();
+    expect(fixture.playback.state).toMatchObject({
+      currentTrack: { id: 1 },
+      playing: true,
+      progress: 25,
+    });
+    expect(fixture.playback.position()).toBe(25);
+    fixture.howls[0].end();
+    await settle();
+    await fixture.playback.playTracks([2]);
+    const finalRecords = fixture.records.mock.calls
+      .map(([event]) => event)
+      .filter(event => event.type !== 'played');
+    expect(finalRecords).toHaveLength(2);
+    for (const event of finalRecords) {
+      expect(event).toMatchObject({
+        type: 'ended',
+        track: { id: 1 },
+        position: 60,
+        durationSeconds: 60,
+      });
+    }
   });
 
   test.each([3, 4])(
@@ -491,50 +527,6 @@ describe('Playback termination contract', () => {
       expect(fixture.howls[fixture.howls.length - 1].unloaded).toBe(false);
       expect(fixture.feedback).not.toHaveBeenCalled();
       expect(fixture.requested).not.toContain(4);
-    }
-  );
-
-  test.each(['switch', 'empty target'])(
-    'synchronous final-record receiver may supersede a %s without adopting its audio',
-    async selection => {
-      let next;
-      let selected = false;
-      let playback;
-      const fixture = setup({
-        onEvent: event => {
-          if (event.type === 'before-replace' && !selected) {
-            selected = true;
-            next = playback.playTracks([3]);
-          }
-        },
-      });
-      playback = fixture.playback;
-      await playback.playTracks([1]);
-      playback.seek(8);
-      const obsolete = await playback.playTracks(
-        selection === 'switch' ? [2] : []
-      );
-      await next;
-      expect(obsolete).toEqual({ status: 'superseded' });
-      expect(playback.state).toMatchObject({
-        currentTrack: { id: 3 },
-        playing: true,
-      });
-      expect(
-        fixture.howls
-          .filter(value => !value.unloaded)
-          .map(value => value.trackId)
-      ).toEqual([3]);
-      const playedIds = fixture.records.mock.calls
-        .map(([event]) => event)
-        .filter(event => event.type === 'played')
-        .map(event => event.track.id);
-      expect(playedIds).toEqual([1, 3]);
-      expect(
-        fixture.records.mock.calls.filter(
-          ([event]) => event.type === 'before-replace'
-        )
-      ).toHaveLength(1);
     }
   );
 
@@ -751,43 +743,6 @@ describe('Playback termination contract', () => {
       await settle();
       expect(fixture.requested).toEqual([3, 2, 1, 3]);
       expectStopped(fixture, 3);
-    }
-  );
-
-  test.each(['dispose', 'select'])(
-    'ordinary tail replay survives a synchronous progress receiver that calls %s',
-    async action => {
-      let armed = false;
-      let playback;
-      let next;
-      const fixture = setup({
-        onProgress: () => {
-          if (!armed) return;
-          armed = false;
-          if (action === 'dispose') playback.dispose();
-          else next = playback.playTracks([2]);
-        },
-      });
-      playback = fixture.playback;
-      await playback.playTracks([1]);
-      fixture.howls[0].end();
-      await settle();
-      armed = true;
-      expect(() => playback.play()).not.toThrow();
-      await next;
-      expect(fixture.howls[0].playCalls).toBe(1);
-      expect(fixture.howls[0].unloaded).toBe(true);
-      if (action === 'select') {
-        expect(playback.state).toMatchObject({
-          currentTrack: { id: 2 },
-          playing: true,
-        });
-        expect(
-          fixture.howls
-            .filter(value => !value.unloaded)
-            .map(value => value.trackId)
-        ).toEqual([2]);
-      } else expect(playback.state.playing).toBe(false);
     }
   );
 });

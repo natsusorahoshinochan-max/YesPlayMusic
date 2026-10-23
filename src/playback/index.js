@@ -300,8 +300,10 @@ export function createPlayback({
           }
           instance.played = true;
           state.playing = true;
+          state.progress = instance.handle.position();
           publish();
           safe(onPlayingChange, true);
+          safe(onProgress, state.progress);
           emit(instance, 'played');
         } else if (type === 'pause') {
           state.playing = false;
@@ -340,10 +342,6 @@ export function createPlayback({
         return outcome('superseded');
       }
       emit(current, 'before-replace');
-      if (!valid(context)) {
-        prepared.dispose();
-        return outcome('superseded');
-      }
       release(current);
       instance = {
         operationId: context.id,
@@ -396,9 +394,7 @@ export function createPlayback({
     if (error.code === 3 || error.code === 4) {
       const reason = error.code === 4 ? 'unsupported-format' : 'audio-decode';
       if (error.code === 4) feedback(context, outcome('unavailable', reason));
-      const visited = options.visited || new Set();
-      visited.add(id);
-      await advance(context, options.direction, visited);
+      await advance(context, options.direction, options.visited);
       return valid(context)
         ? outcome('unavailable', reason)
         : outcome('superseded');
@@ -641,16 +637,8 @@ export function createPlayback({
     },
     play() {
       if (state.playing) return;
-      if (current && current.operationId === operationId) {
-        const instance = current;
-        if (instance.ended) playback.seek(0);
-        if (
-          !disposed &&
-          current === instance &&
-          instance.operationId === operationId
-        )
-          instance.handle.play();
-      } else if (state.currentTrack.id)
+      if (current && current.operationId === operationId) current.handle.play();
+      else if (state.currentTrack.id)
         return runSelection(context => select(context, state.currentTrack.id));
     },
     pause() {
