@@ -125,11 +125,11 @@ export function createPlayback({
     instance.released = true;
     instance.handle.dispose();
   }
-  function stopCurrent(context) {
-    if (!valid(context)) return false;
+  function finishSelection(context, result) {
+    if (!valid(context)) return outcome('superseded');
     const previous = current;
     emit(previous, 'before-replace');
-    if (!valid(context)) return false;
+    if (!valid(context)) return outcome('superseded');
     release(previous);
     current = null;
     state.playing = false;
@@ -139,11 +139,13 @@ export function createPlayback({
     publish();
     safe(onPlayingChange, false);
     safe(onProgress, 0);
-    return true;
+    return result;
   }
   function failSelection(context, reason) {
-    if (!stopCurrent(context)) return outcome('superseded');
-    return feedback(context, outcome('failed', reason));
+    return feedback(
+      context,
+      finishSelection(context, outcome('failed', reason))
+    );
   }
   function shuffleQueue(anchor) {
     const order = list.map((_, i) => i).filter(i => i !== anchor);
@@ -207,39 +209,38 @@ export function createPlayback({
       return direction === 1
         ? advanceFM(context, visited)
         : outcome('unavailable', 'fm-previous');
-    let id;
-    let remaining = list.length + nextList.length;
-    do {
-      if (remaining-- <= 0) {
-        queueChanged();
-        publish();
-        return outcome('unavailable', 'queue-ended');
-      }
+    let remaining = list.length + (direction === 1 ? nextList.length : 0);
+    while (remaining-- > 0) {
+      let id;
       if (direction === 1 && nextList.length) id = nextList.shift();
       else {
         const target = nextMain(
           state.shuffle ? shuffledIndex : index,
           direction
         );
-        if (target == null) {
-          if (current) current.handle.pause();
-          state.playing = false;
-          queueChanged();
-          publish();
-          safe(onPlayingChange, false);
-          return outcome('unavailable', 'queue-ended');
-        }
+        if (target == null) break;
         if (state.shuffle) {
           shuffledIndex = target;
           index = shuffledOrder[target];
         } else index = target;
         id = list[index];
       }
-    } while (visited.has(id));
+      if (!visited.has(id)) {
+        queueChanged();
+        publish();
+        return select(context, id, { direction, visited });
+      }
+    }
     queueChanged();
+    if (visited.size)
+      return finishSelection(context, outcome('unavailable', 'queue-ended'));
+    if (current) current.handle.pause();
+    state.playing = false;
     publish();
-    return select(context, id, { direction, visited });
+    safe(onPlayingChange, false);
+    return outcome('unavailable', 'queue-ended');
   }
+
   async function select(
     context,
     id,
@@ -291,6 +292,12 @@ export function createPlayback({
           return;
         if (type === 'play') {
           if (state.playing) return;
+          if (instance.ended) {
+            instance.ended = false;
+            instance.recorded = false;
+            visited.clear();
+            visited.add(instance.track.id);
+          }
           instance.played = true;
           state.playing = true;
           publish();
@@ -301,6 +308,7 @@ export function createPlayback({
           publish();
           safe(onPlayingChange, false);
         } else if (type === 'end') {
+          instance.ended = true;
           state.playing = false;
           emit(instance, 'ended');
           publish();
@@ -311,6 +319,8 @@ export function createPlayback({
         } else {
           void recoverAudio(context, instance.track.id, value, {
             position: instance.handle.position(),
+            direction,
+            visited,
             prefetch: false,
           });
         }
@@ -330,6 +340,10 @@ export function createPlayback({
         return outcome('superseded');
       }
       emit(current, 'before-replace');
+      if (!valid(context)) {
+        prepared.dispose();
+        return outcome('superseded');
+      }
       release(current);
       instance = {
         operationId: context.id,
@@ -338,6 +352,7 @@ export function createPlayback({
         source: clone(state.playlistSource),
         durationSeconds: Math.floor((track.dt || 0) / 1000),
         recorded: false,
+        ended: false,
         played: false,
         released: false,
       };
@@ -381,7 +396,9 @@ export function createPlayback({
     if (error.code === 3 || error.code === 4) {
       const reason = error.code === 4 ? 'unsupported-format' : 'audio-decode';
       if (error.code === 4) feedback(context, outcome('unavailable', reason));
-      await advance(context, options.direction, options.visited);
+      const visited = options.visited || new Set();
+      visited.add(id);
+      await advance(context, options.direction, visited);
       return valid(context)
         ? outcome('unavailable', reason)
         : outcome('superseded');
@@ -439,7 +456,8 @@ export function createPlayback({
   async function initializeFM(context) {
     const tracks = await loadFM(context);
     if (!valid(context)) return outcome('superseded');
-    if (!tracks.length) return outcome('unavailable', 'fm-empty');
+    if (!tracks.length)
+      return finishSelection(context, outcome('unavailable', 'fm-empty'));
     state.personalFMTrack = clone(tracks[0]);
     state.personalFMNextTrack = clone(tracks[1] || { id: 0 });
     return null;
@@ -455,12 +473,17 @@ export function createPlayback({
       if (!target?.id) {
         const tracks = await loadFM(context);
         if (!valid(context)) return outcome('superseded');
-        if (!tracks.length) return outcome('unavailable', 'fm-empty');
+        if (!tracks.length)
+          return finishSelection(context, outcome('unavailable', 'fm-empty'));
         target = tracks[0];
       }
-      if (visited.has(target.id)) return outcome('unavailable', 'queue-ended');
+      if (visited.has(target.id))
+        return finishSelection(context, outcome('unavailable', 'queue-ended'));
       if (target.id === state.personalFMTrack.id)
-        return outcome('unavailable', 'fm-same-track');
+        return finishSelection(
+          context,
+          outcome('unavailable', 'fm-same-track')
+        );
       state.personalFMTrack = clone(target);
       state.personalFMNextTrack = { id: 0 };
       queueChanged();
@@ -500,7 +523,10 @@ export function createPlayback({
       const first = installQueue(ids, { type, id }, startTrackId);
       return ids.length
         ? select(context, first)
-        : feedback(context, outcome('unavailable', 'empty-queue'));
+        : feedback(
+            context,
+            finishSelection(context, outcome('unavailable', 'empty-queue'))
+          );
     });
   }
   function runSelection(work) {
@@ -516,13 +542,6 @@ export function createPlayback({
       .then(() => (valid(context) ? work(context) : outcome('superseded')))
       .then(result => {
         if (!valid(context)) return outcome('superseded');
-        if (
-          result.status === 'unavailable' &&
-          current &&
-          current.operationId !== context.id &&
-          !stopCurrent(context)
-        )
-          return outcome('superseded');
         return result;
       })
       .catch(error =>
@@ -551,7 +570,10 @@ export function createPlayback({
         const first = installQueue(copy, sourceCopy, startTrackId);
         return list.length
           ? select(context, first)
-          : feedback(context, outcome('unavailable', 'empty-queue'));
+          : feedback(
+              context,
+              finishSelection(context, outcome('unavailable', 'empty-queue'))
+            );
       });
     },
     playQueuedTrack(
@@ -566,19 +588,25 @@ export function createPlayback({
         if (fmSelection)
           return id === state.personalFMNextTrack?.id
             ? advanceFM(context)
-            : outcome('unavailable', 'missing-track');
+            : finishSelection(context, outcome('unavailable', 'missing-track'));
         if (group === 'next') {
           const position =
             selectedIndex == null ? nextList.indexOf(id) : selectedIndex;
           if (position < 0 || nextList[position] !== id)
-            return outcome('unavailable', 'missing-track');
+            return finishSelection(
+              context,
+              outcome('unavailable', 'missing-track')
+            );
           nextList.splice(position, 1);
           state.isPersonalFM = false;
         } else {
           const position =
             selectedIndex == null ? list.indexOf(id) : selectedIndex;
           if (position < 0 || list[position] !== id)
-            return outcome('unavailable', 'missing-track');
+            return finishSelection(
+              context,
+              outcome('unavailable', 'missing-track')
+            );
           state.isPersonalFM = false;
           index = position;
           if (state.shuffle) shuffledIndex = shuffledOrder.indexOf(index);
@@ -612,7 +640,18 @@ export function createPlayback({
       return runSelection(context => advance(context, -1));
     },
     play() {
-      if (current && !state.playing) current.handle.play();
+      if (state.playing) return;
+      if (current && current.operationId === operationId) {
+        const instance = current;
+        if (instance.ended) playback.seek(0);
+        if (
+          !disposed &&
+          current === instance &&
+          instance.operationId === operationId
+        )
+          instance.handle.play();
+      } else if (state.currentTrack.id)
+        return runSelection(context => select(context, state.currentTrack.id));
     },
     pause() {
       if (current && state.playing) current.handle.pause();

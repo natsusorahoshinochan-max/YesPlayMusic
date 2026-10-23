@@ -8,6 +8,7 @@
 | --- | --- |
 | [store/playlist-detail-contract.test.js](store/playlist-detail-contract.test.js) | 写入后的详情刷新、补读失败后的继续分页与缺失歌曲的遍历进度 |
 | [playback/selection-contract.test.js](playback/selection-contract.test.js) | 最新选曲的失败与不可用结果、过时操作隔离、音频释放及下一首队列保留 |
+| [playback/termination-contract.test.js](playback/termination-contract.test.js) | 播放终局的资源释放与状态、无源耗尽后的可见歌曲重试、普通队尾及过时操作隔离 |
 | [playback/storage-reporting-contract.test.js](playback/storage-reporting-contract.test.js) | Playback 存档与独立进度恢复、保存失败重试及有效实例上报 |
 | [playback/mpris-position-contract.test.js](playback/mpris-position-contract.test.js) | 位置采样与显式 seek 的 MPRIS 输出 |
 | [playback/platform-metadata-contract.test.js](playback/platform-metadata-contract.test.js) | 歌词内容与当前行变化、写词确认与过时通知的元数据交接 |
